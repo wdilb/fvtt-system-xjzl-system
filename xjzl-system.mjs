@@ -271,8 +271,9 @@ Hooks.once("init", async function () {
   // 【V14 升级 S1.9】注销核心 AE 配置表，保持 V13 起的独占语义。注意两点：
   // ① V14 的 unregisterSheet 第三参必须传 Sheet 类（内部取 .name 拼 id），传字符串会静默无效；
   //    核心类导出位置为 foundry.applications.sheets.ActiveEffectConfig（apps 命名空间下没有）。
-  // ② 即使旧世界已保存默认表设置指向 core.ActiveEffectConfig，注销后 updateDefaultSheets
-  //    找不到该 id 会跳过应用，解析回落到下方 makeDefault 的系统表单，行为与 V13 一致。
+  // ② 注册阶段（#registerSheet）只要设置里存有任何已保存项，makeDefault 即被忽略；注销后指向
+  //    core.ActiveEffectConfig 的陈旧设置无法在注册期解析，由 ready 钩子中的清理逻辑改写并持久化
+  //    （见 ready 内 S1.9 注释），保证系统表单最终为默认。
   foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", foundry.applications.sheets.ActiveEffectConfig);
 
   // 注册我们的表单
@@ -661,6 +662,35 @@ Hooks.once("ready", async function () {
   // 等待系统完全加载后的操作，比如处理设置、欢迎弹窗等
   // 监听聊天消息渲染，绑定按钮事件
   Hooks.on("renderChatMessageHTML", ChatCardManager.onRenderChatMessage);
+
+  // 【V14 升级 S1.9】修正旧世界遗留的 AE 默认表设置。
+  // V14 的 #registerSheet 逻辑：设置里存有任何已保存项（即使指向已注销的表）时，makeDefault 即被
+  // 忽略（isDefault = existingDefault === id）。旧世界若保存过 core.ActiveEffectConfig，我们的表会
+  // 注册成 default:false，无任何表带默认标记时解析回退到"第一个可配置表"，可能被其他模块抢走。
+  // 此处把指向已注销/不存在表单的陈旧项改写为系统表单并持久化（GM 执行，一次生效），并同步
+  // 纠正当次会话的内存 default 标记；指向其他**有效**已注册表单的项尊重用户选择，不覆盖。
+  {
+    const ours = "xjzl-system.XJZLActiveEffectConfig";
+    const saved = game.settings.get("core", "sheetClasses");
+    const ae = saved?.ActiveEffect;
+    if (foundry.utils.isPlainObject(ae)) {
+      let stale = false;
+      for (const [type, id] of Object.entries(ae)) {
+        const registered = CONFIG.ActiveEffect.sheetClasses?.[type];
+        if (id === "core.ActiveEffectConfig" || (registered && !registered[id])) {
+          ae[type] = ours;
+          stale = true;
+        }
+      }
+      if (stale) {
+        if (game.user.isGM) await game.settings.set("core", "sheetClasses", saved);
+        const base = CONFIG.ActiveEffect.sheetClasses?.base;
+        if (base?.[ours]) Object.values(base).forEach(s => s.default = s.id === ours);
+        console.log("XJZL | 已修正旧世界遗留的 AE 默认表设置。");
+      }
+    }
+  }
+
   //目标选择管理器，修改为按下ALT后左键点击选择目标
   TargetManager.init();
 
