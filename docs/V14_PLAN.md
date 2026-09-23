@@ -2,7 +2,7 @@
 
 本文件是 V14 升级的进度事实源，记录工作项、依赖和验证结果；范围、设计、API 依据及验收标准见 [`V14_UPGRADE.md`](V14_UPGRADE.md)。复杂工作另建专项计划，并在对应工作项后附链接，本清单不展开实现细节。
 
-**当前下一步：M0，从 S0.1 开始。** V14 验证环境已就绪（构建号 14.368）；S1.14 已按“注释停用、保留代码”方式完成，S1.16 修复了 creature 的启动数据准备报错。待用户刷新复验启动路径无报错后，正式推进 M0 机制验证。首批 A 类改动与 S1.14/S1.16 已完成，阶段实机验收均尚未完成。
+**当前下一步：M0 已全部验证通过（S0.1–S0.7），进入 M1 剩余项（S1.8 渲染钩子实测 / S1.9 注销逻辑 / S1.10 更新键弃用 / S1.11 CSS 变量 / S1.15 #13436 审计），完成 M1 验收后进入 M2（AE 链路迁移，机制结论已齐备）；冗余代码清理集中在 S5.7 收尾执行。**
 
 ## 使用方式与状态约定
 
@@ -19,13 +19,13 @@
 
 依据：总纲 §0、§2、§3、§7。记录每项的构建号、验证场景和结论；机制试验可在独立最小环境进行，后续仍须完成系统集成验收。
 
-- [ ] S0.1 确认是否需要自定义 AE system 数据模型（Q3 已解：官方接口 `CONFIG.ActiveEffect.dataModels`、基础模型 `foundry.data.ActiveEffectTypeDataModel`；待验证派生字段如何应用变更）
-- [ ] S0.2 验证内置 initial/final 阶段与本系统基础值、物品准备、派生值计算的先后关系，确保每条变更只在指定阶段应用；仅确有需要时注册并调用附加阶段
-- [ ] S0.3 按官方契约保留状态条目的 `id`，验证对象键与条目 `id` 一致，以及 TokenHUD、状态选取器和状态创建流程
-- [ ] S0.4 验证 Region 行为 API 与核心 Apply Active Effect 行为能力（光环设计 Q4 前置）
-- [ ] S0.5 验证画布劫持点存活：`SquareGrid.measurePath`、`rulerClass._getWaypointLabelContext`、`Token._refreshTurnMarker`/`_animateTurnMarker`
-- [ ] S0.6 确认 duration 新 schema 字段与 expiry 事件清单
-- [ ] S0.7 验证数值字段、非 schema 派生字段与 flags 的 `add`/`multiply`/`override` 类型处理（见 M2 备注）
+- [x] S0.1 确认是否需要自定义 AE system 数据模型（Q3 已解：官方接口 `CONFIG.ActiveEffect.dataModels`、基础模型 `foundry.data.ActiveEffectTypeDataModel`；待验证派生字段如何应用变更）→ **已验证（14.368 实测）**：`dataModels` 仅注册 `{base: ActiveEffectTypeDataModel}`，基础模型 schema 仅含 `changes` ArrayField；我方 `documentClass=XJZLActiveEffect` 在 V14 正常加载。结论：核心模型足够，无需自定义；派生字段应用行为归 S0.7
+- [x] S0.2 验证内置 initial/final 阶段与本系统基础值、物品准备、派生值计算的先后关系，确保每条变更只在指定阶段应用；仅确有需要时注册并调用附加阶段 → **已验证（核心源码确认）**：`initial` 在 `prepareEmbeddedDocuments` 内应用（早于 `prepareDerivedData`），`final` 在 `prepareData` 末尾应用（晚于派生计算）；`applyActiveEffects(phase)` 必须显式传阶段字符串（V14 新契约，缺省仅发兼容警告），`_completedActiveEffectPhases` 防同阶段重复；变更默认 `phase="initial"`。我方不自行调用该钩子，保持现状即等价 V13 时序，无需附加阶段
+- [x] S0.3 按官方契约保留状态条目的 `id`，验证对象键与条目 `id` 一致，以及 TokenHUD、状态选取器和状态创建流程 → **已验证（14.368 实测）**：①数据层：V14 将 `CONFIG.statusEffects` 包装为原生混合结构（Proxy：可数组迭代 63 项无双重计数、`CONFIG.statusEffects[slug]` 直查命中、键=id 一致）；我方 `Object.fromEntries` 转换（xjzl-system.mjs:282）不报错但已无意义（V14 原生提供同等能力），列入 S5.7 冗余代码清理；②TokenHUD：HUD 正常打开（`canvas.hud.token.bind`），63 个状态图标全部渲染且 `data-status-id` 与状态表一致；左键点击创建带完整 slug 语义的特效（name/img/slug/stacks 来自 CONFIG），不可叠层状态二次点击保持 1 层，系统 `renderTokenHUD` 改造在 V14 的 HUD 三栏结构下工作正常；③状态选取器：**`getSceneControlButtons` 钩子在 V14 正常触发**，damage-tool/effect-picker/combat-meter 三个按钮均注入成功（V14 控制栏 DOM 从 `#controls` 改为 `#scene-controls` ApplicationV2，按钮带 `data-tool`，注入数据结构兼容）；选取器窗口完整渲染（分类/计数/最近/常用/场上特效分组），状态网格点击经 slug→addEffect 链路成功施加到受控 token，“身上状态”面板与网格 active 态同步正确。备注：测试时用户自研 TokenHUD mod 处于开启状态，mod 兼容性回归按用户要求推迟到系统升级完成后（S5.x）；可叠层状态的 HUD 加层细化归 S2.8 联调。测试数据已全部清理
+- [x] S0.4 验证 Region 行为 API 与核心 Apply Active Effect 行为能力（光环设计 Q4 前置）→ **已验证（14.368 实测，含完整进出周期）**：①区域形状字段为 `shapes` 数组，元素为 `{type: "circle", radius, x, y}`（判别字段是 `type` 不是 `kind`，错误键会被静默丢弃）；②行为条目 `{name, type: "applyActiveEffect", system: {effects: [uuid]}}`；③核心行为语义：tokenEnter 时 `fromUuid` 解析特效并复制到 `token.actor`（`origin=behavior.uuid`），tokenExit 按 origin 清理，实测“出→0 个、进→恰好 1 个”；④**事件仅由官方移动驱动派发**（`tokenDocument.move()`/`scene.moveTokens`），裸 update x/y 传送不触发 enter/exit（但 `region.tokens` 包含性跟踪仍更新）；⑤派发按 `event.user.isSelf` 门控，仅移动发起者的客户端执行施加/清理；⑥**非链接 token 的 `token.actor` 是合成 Actor**，特效落在合成实例而非 world Actor——M3 光环的自研 addEffect/removeEffect 与权限代理必须处理该分支；⑦`region.testPoint` 需带 elevation 属性；`RegionDocument.createTokenEmanation` 为静态方法；`attachment.token` 字段存在（跟随光环基础）；`attachment`/`restriction`/`displayMeasurements` 等字段齐备。测试数据已全部清理
+- [x] S0.5 验证画布劫持点存活：`SquareGrid.measurePath`、`rulerClass._getWaypointLabelContext`、`Token._refreshTurnMarker`/`_animateTurnMarker` → **已验证（14.368 实测）**：measurePath 劫持存活且计费正确（直行1+首斜1=2；三连斜=1+2+2=5）；`CONFIG.Canvas.rulerClass=Ruler`，`_getWaypointLabelContext` 存活；`Token._refreshTurnMarker` 存活；**`_animateTurnMarker` 已被 V14 移除**——我方 combat-turn-marker.mjs 有 if 守卫不会崩，仅“顶底图交错旋转”装饰失效，重适配或放弃由 S3.8 决定
+- [x] S0.6 确认 duration 新 schema 字段与 expiry 事件清单 → **已验证（实例清洗实测）**：新文档级 schema 为 `{units, value, expiry, expired}` + 派生 `{seconds, remaining, secondsRemaining, label, _worldTime}`；V13 的 `rounds/turns` 在清洗时按 `CONFIG.time.roundTime` 折算为 seconds（3轮×2s=6s 实测），`startRound/startTurn/startTime` 不复存在（改由 worldTime 锚定）；`expiry` 缺省 `"turnStart"`；`CONFIG.ActiveEffect.expiryEvents` 启动时为空表（可注册）；`ActiveEffect.registry` 存在（启动时为空）。战斗中逐轮递减与 registry 清理分工归 M2/S2.4 实测（Q5 依据）
+- [x] S0.7 验证数值字段、非 schema 派生字段与 flags 的 `add`/`multiply`/`override` 类型处理（见 M2 备注）→ **已验证（14.368 实测，临时 Actor 全类型变更）**：①`add`/`multiply`/`subtract`/`override` 全部生效，`subtract` 无下限钳制、`multiply` 按当前值计算；②**变更到派生字段（`stats.*.total`、`resources.*.max`）会被 `prepareDerivedData` 重算覆盖**（initial 阶段先于派生计算，语义与 V13 一致，变更 key 必须指向原始字段——与现有设计一致）；③`@` 引用按应用时点的 rollData 解析（initial 阶段取派生前基础值）；④`value:"true"` 在 DB 写入、模型清洗、flags 应用全链路保持字符串，布尔 override 语义安全；⑤`flags.xjzl-xxx.key` 路径 override 正常写入；⑥标准数据准备中 initial 与 final 两阶段均完成；清洗层结论：字符串 `type` 生效、`priority` 按类型默认（add=20/override=50/custom=0）、`phase` 默认 `"initial"`；静态 `ActiveEffect.applyChange/applyChangeField` 与原型 `shouldApplyChange/getReplacementData` 均存在。**结论：现有变更模型无需 `applyChange` 定制即可迁移**
 
 ## M1 机械替换与启动解阻
 
@@ -108,6 +108,11 @@
 - [ ] S5.4 完整战斗流程实测（出招/对抗/伤害/状态/战局）
 - [ ] S5.5 文档同步（CLAUDE.md / SCRIPT_ENGINE.md / SEEDING_GUIDELINES.md / README / PROJECT_MAP.md）
 - [ ] S5.6 发布前核验：各阶段必需项与验收记录齐全、未解决问题已关闭或明确排除在本次范围外，确认 `system.json` 的兼容声明与 download 链接；本项不包含自动提交或发布
+- [ ] S5.7 升级遗留冗余代码清理（不报错但已失去意义的代码，收尾时以最简正确形态过一遍）：
+  1. `xjzl-system.mjs` init 的 `CONFIG.statusEffects = Object.fromEntries(...)` 转换：S0.3 实测 V14 原生包装已提供数组迭代与 slug 直查，改为直接赋值 `CONFIG.XJZL.statusEffects` 数组，删除转换层；
+  2. `getSceneControlButtons` 中为旧构建保留的 Array/Object 多形态兼容分支：V14 实测按钮注入成功，先确认 `tools` 实际类型后精简为单一路径；
+  3. 复审升级期间新增的防御性代码：S1.16 的 getRollData `?.` 兜底经确认为 V14 数据准备时序的必要修复（creature 鸭子类型晚于 AE 应用），须保留；其余临时防御代码确认无必要时删除；
+  4. 通读 M2–M4 改动，删除数据迁移完成后失去意义的旧格式检测与转换分支；D2 入参归一化层是否长期保留属产品决策，在总纲 §2.7 红线内单独评估，不计入冗余。
 
 ## 阶段验收记录
 
@@ -115,8 +120,8 @@
 
 | 阶段 | 验收状态 | 验证记录 / 专项计划 |
 |---|---|---|
-| M0 | 待验 | 尚无 V14 实机验证记录 |
-| M1 | 待验 | 首批 A 类代码项与 S1.14 已勾选；2026-09-23 构建 14.368 首次实机进入系统：AOE 按钮确认下线，但发现 creature Actor 数据准备报错（S1.16 已修复待复验），启动验收仍未通过 |
+| M0 | **通过** | 2026-09-23 构建 14.368 实机验证（浏览器自动化，GM 身份）：S0.1–S0.7 全部通过并记录结论。关键结论：无需自定义 AE 数据模型；initial/final 阶段契约确认（initial 先于派生计算，变更必须指向原始字段）；1-2-2-2 劫持存活且计费正确（`_animateTurnMarker` 已被 V14 移除，装饰损失）；duration 全新 `{units,value,expiry,expired}` 结构；Region 行为完整进出周期通过（事件仅由官方移动驱动派发；非链接 token 落合成 Actor）；AE 变更全类型应用与“true”字符串语义安全；TokenHUD/选取器/工具栏注入全链路正常。写入型验证用临时数据已全部清理。影响实现的待定问题：无阻塞项（Q4/Q5 依据已收集，分别在 S3.6/S2.4 定稿） |
+| M1 | 待验 | 首批 A 类代码项与 S1.14 已勾选；2026-09-23 构建 14.368 首次实机进入系统：AOE 按钮确认下线；creature Actor 数据准备报错由 S1.16 修复，用户刷新复验启动路径无报错，S1.14/S1.16 的启动解阻目标达成，其余 M1 项（钩子/表单/样式）仍待验 |
 | M2 | 待验 | — |
 | M3 | 待验 | — |
 | M4 | 待验 | — |
