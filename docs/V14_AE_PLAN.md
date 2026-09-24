@@ -78,7 +78,7 @@ V14 还增加 `showIcon`（状态图标显隐）、以 `token.` 为前缀的 Tok
 
 ### D. 源数据、合集包与世界迁移（与 M4 共用工作项，不因 M2 完成而提前勾选）
 
-- [ ] AE-10（S4.1/S4.2/S4.6，及 S4.8 的 AE 相关脚本审计）按 AE 对象结构遍历 `data/**/*.json`：`changes→system.changes`、数字 `mode→type`、`icon→img`、duration、`origin`、`showIcon` 的实际需要；按脚本字段和变量来源迁移动态构造、`effect.changes`、状态查询和时长读取。既有约 500 处 `CONFIG.statusEffects.find`、98 处 AE `.changes` 只是检索基线，需按谓词/变量来源分类并补查其他别名。检查 `module/config.mjs` 的通用状态模板；不对整个 JSON 文件盲目替换。同步更新 `SCRIPT_ENGINE.md` 中旧时长和状态 API 示例，并按录入格式变化更新 `SEEDING_GUIDELINES.md`。
+- [ ] AE-10（S4.1/S4.2/S4.6，及 S4.8 的 AE 相关脚本审计）按 AE 对象结构遍历 `data/**/*.json`：`changes→system.changes`、数字 `mode→type`、`icon→img`、duration、`origin`、`showIcon` 的实际需要；按脚本字段和变量来源迁移动态构造、`effect.changes`、状态查询和时长读取。既有约 500 处 `CONFIG.statusEffects.find`、98 处 AE `.changes` 只是检索基线，需按谓词/变量来源分类并补查其他别名。检查 `module/config.mjs` 的通用状态模板；不对整个 JSON 文件盲目替换。同步更新 `SCRIPT_ENGINE.md` 中旧时长和状态 API 示例，并按录入格式变化更新 `SEEDING_GUIDELINES.md`。→ **M2 期间实测盘点基线（2026-09-24，供实施时对照）**：data/ 共 1815 处 `addEffect` 调用（660 处带内联 `duration:{rounds}`），全部经门面、由归一化承接，**无需迁移**；需迁移的是约 101 处旧文档路径读取（`effect.changes`、`thisEffect.duration.rounds` 等，含 `eff.changes` 别名）与约 478 处 `CONFIG.statusEffects` 直查（改 `getStatus`）；未发现绕过门面直建 AE 的调用（无 `createEmbeddedDocuments("ActiveEffect")`/`new ActiveEffect`/`ActiveEffect.create`）
 - [ ] AE-11（S4.4）源 JSON、seeding 和脚本审计完成后重建现有 Item 等合集包并检查导入结果；不为每个内容专属 AE 建独立合集包。若未来要建立固定 AE 模板包，先明确唯一素材事实源和 seed 规则。
 - [ ] AE-14（S4.7）在备份的 V13 世界副本实施并验收 AE-12 的迁移：Actor/Item/非关联 Token AE、世界物品、导入宏和用户脚本；核对 `baseChanges`、duration、变更与图片字段、既有数值和可恢复的剩余时长。验证首次执行、重启、重复运行及中断重试；用户改过的脚本只做可确认的定点转换，无法识别的记录 UUID/字段位置和处理方案，不整项覆盖。
 
