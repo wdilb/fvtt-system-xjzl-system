@@ -382,7 +382,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: this.document.name,
-            icon: this.document.img,
+            img: this.document.img, // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             transfer: false // 内功的被动通常在圆满特效就搞定了，这里如果配置的话一般是特有buff/debuff
         }, { parent: this.document });

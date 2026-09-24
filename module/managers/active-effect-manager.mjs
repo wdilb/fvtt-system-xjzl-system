@@ -4,6 +4,104 @@ import { xjzlSocket } from "../socket.mjs";
 export class ActiveEffectManager {
 
     /**
+     * V13 数字 mode → V14 字符串 type 的映射表。
+     * 注意：CONST.ACTIVE_EFFECT_CHANGE_TYPES 的成员值是默认优先级数字（如 add: 20），
+     * 不能作为 type 字面量或反向映射使用，必须维护这张独立对照表。
+     */
+    static #MODES_TO_TYPES = { 0: "custom", 1: "multiply", 2: "add", 3: "downgrade", 4: "upgrade", 5: "override" };
+
+    /**
+     * 按状态 id 查询系统通用状态定义（S2.9/D3 公开门面）。
+     * @param {string} id 状态 id（同 CONFIG.statusEffects 的键，如 "pain"、"stun"）
+     * @returns {object|undefined} 可安全修改的 V14 格式深拷贝；未命中返回 undefined。不负责创建或更新文档。
+     */
+    static getStatus(id) {
+        const status = CONFIG.statusEffects[id];
+        return status ? foundry.utils.deepClone(status) : undefined;
+    }
+
+    /**
+     * 把已到达门面的 V13 风格入参就地归一化为 V14 格式（D2 兼容层，仅归一化不回写）。
+     * 覆盖：icon→img、顶层 changes 数组→system.changes、数字 mode→字符串 type、
+     * 旧 duration 结构 {rounds/turns/seconds/startTime...}→{value,units,expiry}。
+     * 调用前就访问 effect.changes 等旧文档路径的脚本无法由本层修复，须单独迁移。
+     * @param {object} effectData 门面已解析出的普通对象数据（克隆体，可安全就地修改）
+     */
+    static #normalizeEffectData(effectData) {
+        // img：V13 的 icon 字段在 V14 schema 中不存在，会被核心清洗丢弃导致图标回退默认值
+        if (!effectData.img && effectData.icon) {
+            effectData.img = effectData.icon;
+        }
+        delete effectData.icon;
+
+        // changes：补丁对象里的顶层 changes 表达的是最新意图，整体替换底板已迁移的 system.changes
+        if (Array.isArray(effectData.changes)) {
+            effectData.system ??= {};
+            effectData.system.changes = effectData.changes.map(change => this.#normalizeChange(change));
+            delete effectData.changes;
+        } else if (Array.isArray(effectData.system?.changes)) {
+            effectData.system.changes = effectData.system.changes.map(change => this.#normalizeChange(change));
+        }
+
+        // duration：旧结构归一化；已是 {value, units} 的 V14 结构原样保留
+        if (foundry.utils.isPlainObject(effectData.duration)) {
+            this.#normalizeDuration(effectData.duration);
+        }
+    }
+
+    /**
+     * 归一化单条变更数据：数字 mode → 字符串 type，并移除旧 mode 键。
+     * @param {object} change 单条变更对象（就地修改）
+     * @returns {object} 原对象引用
+     */
+    static #normalizeChange(change) {
+        if (!foundry.utils.isPlainObject(change)) return change;
+        if (change.type === undefined && typeof change.mode === "number") {
+            change.type = this.#MODES_TO_TYPES[change.mode] ?? `custom.${change.mode}`;
+        }
+        delete change.mode;
+        return change;
+    }
+
+    /**
+     * 归一化旧 duration 结构为 V14 的 {value, units, expiry}。
+     * V14 单字段只支持一个单位：旧 rounds+turns 组合无法原义保留，按主单位 rounds 迁移；
+     * rounds/turns 依到期事件结算（默认 turnStart），seconds 为纯时间制（expiry 置 null）。
+     * 旧开始锚点（startTime/startRound/startTurn）删除：V14 锚点在顶层 start，新建由核心自动初始化。
+     * @param {object} duration duration 对象（就地修改）
+     */
+    static #normalizeDuration(duration) {
+        let value = null;
+        let units = null;
+        if (typeof duration.rounds === "number") {
+            value = duration.rounds;
+            units = "rounds";
+        } else if (typeof duration.turns === "number") {
+            value = duration.turns;
+            units = "turns";
+        } else if (typeof duration.seconds === "number") {
+            value = duration.seconds;
+            units = "seconds";
+        }
+
+        // 无旧单位键：已是 V14 结构或空对象/无限时长，原样保留
+        if (value === null) return;
+
+        // 有旧单位键时按其覆盖 value/units：可能是补丁与 V14 底板（如 CONFIG 状态条目）
+        // 深度合并后的结果，旧键代表补丁意图，不能让底板已有的 value/units 抢先返回
+        duration.value = value;
+        duration.units = units;
+        if (units === "seconds") duration.expiry = null;
+        else if (!duration.expiry) duration.expiry = "turnStart";
+        delete duration.rounds;
+        delete duration.turns;
+        delete duration.seconds;
+        delete duration.startTime;
+        delete duration.startRound;
+        delete duration.startTurn;
+    }
+
+    /**
      * 核心方法：向 Actor 添加或叠加特效
      * @param {Actor} actor - 目标角色
      * @param {Object} effectDataOrId - 特效源数据 (普通 Object或者系统状态 ID)
@@ -78,6 +176,9 @@ export class ActiveEffectManager {
             effectData.description = game.i18n.localize(effectData.description);
         }
 
+        // D2 入参归一化：把 V13 风格的 changes/mode/icon/duration 转为 V14 格式，后续逻辑只读 V14 结构
+        this.#normalizeEffectData(effectData);
+
         // 补全 statuses (用于系统逻辑判定)
         if (effectData.id && !effectData.statuses) {
             effectData.statuses = [effectData.id];
@@ -93,16 +194,16 @@ export class ActiveEffectManager {
         // 特殊规则：忍耐减免剧痛
         // =====================================================
         // 规则：每1级忍耐，减少1回合持续时间 (仅限有持续时间且单位是round)
-        if (lookupSlug === "pain" && effectData.duration?.rounds > 0) {
+        if (lookupSlug === "pain" && effectData.duration?.units === "rounds" && effectData.duration.value > 0) {
             const rennai = actor.system.skills?.rennai?.total || 0;
 
             if (rennai > 0) {
-                const original = effectData.duration.rounds;
+                const original = effectData.duration.value;
                 const reduced = Math.max(0, original - rennai);
                 const reducedAmount = original - reduced;
 
                 // 修改持续时间
-                effectData.duration.rounds = reduced;
+                effectData.duration.value = reduced;
 
                 // 发送提示卡片
                 const msgContent = `
@@ -160,7 +261,10 @@ export class ActiveEffectManager {
             if (isStackable && count > 1) {
                 // 1. 显式记录 BaseChanges (这是1层的原始值)
                 // 必须在修改 changes 之前保存，否则 _preCreate 会把乘算后的值当成基准值！
-                foundry.utils.setProperty(effectData, "flags.xjzl-system.baseChanges", foundry.utils.deepClone(effectData.changes));
+                // V14：变更数组在 system.changes 下
+                effectData.system ??= {};
+                foundry.utils.setProperty(effectData, "flags.xjzl-system.baseChanges",
+                    foundry.utils.deepClone(effectData.system.changes ?? []));
 
                 // 2. 设置初始层数
                 foundry.utils.setProperty(effectData, "flags.xjzl-system.stacks", count);
@@ -172,10 +276,10 @@ export class ActiveEffectManager {
                 // 在内存中创建一个临时特效实例 (不保存)
                 const tempEffect = new XJZLActiveEffect(effectData, { parent: actor });
                 // 调用写好的正确逻辑
-                effectData.changes = tempEffect.calculateChangesForStacks(count);
+                effectData.system.changes = tempEffect.calculateChangesForStacks(count);
             }
             // 显式禁止系统默认飘字 (scrollingStatusText: false)
-            // 创建时，系统会自动处理 duration.startTime 等初始化工作
+            // 创建时，核心会自动初始化顶层 start 锚点（当前世界时间与战斗位置）
             const createdDocs = await actor.createEmbeddedDocuments("ActiveEffect", [effectData], { scrollingStatusText: false });
 
             // 手动调用我们的 Socket 飘字 (绿色 +)
@@ -230,8 +334,8 @@ export class ActiveEffectManager {
                 );
 
                 if (jiaoxieData) {
-                    // 强制缴械持续 1 回合
-                    jiaoxieData.duration = { rounds: 1 };
+                    // 强制缴械持续 1 回合（V14：rounds 单位 + turnStart 到期事件）
+                    jiaoxieData.duration = { value: 1, units: "rounds", expiry: "turnStart", expired: false };
                     await this.addEffect(actor, jiaoxieData);
                 }
 
@@ -278,7 +382,7 @@ export class ActiveEffectManager {
                 );
 
                 if (rageData) {
-                    rageData.duration = { rounds: 1 };
+                    rageData.duration = { value: 1, units: "rounds", expiry: "turnStart", expired: false };
                     await this.addEffect(actor, rageData);
                 }
 
@@ -307,7 +411,8 @@ export class ActiveEffectManager {
                 }
                 if (newStacks !== currentStacks) {
                     // 调用 Document 类的方法，基于 BaseChanges 快照重新计算数值
-                    updateData.changes = existingEffect.calculateChangesForStacks(newStacks);
+                    // V14：变更数组的更新键是 system.changes
+                    updateData["system.changes"] = existingEffect.calculateChangesForStacks(newStacks);
                     // 记录新层数
                     updateData["flags.xjzl-system.stacks"] = newStacks;
                     // 因为这是 Update 操作，核心默认不飘字，我们补上
@@ -318,38 +423,30 @@ export class ActiveEffectManager {
             // --- 覆盖模式 (不可叠层) ---
             // 如果新传入的数据带有 changes，我们通常认为新来源可能更强，予以覆盖
             // 如果希望保留旧的数值，可以在这里加判断逻辑
-            if (effectData.changes) {
-                updateData.changes = effectData.changes;
+            if (effectData.system?.changes) {
+                updateData["system.changes"] = effectData.system.changes;
                 // 覆盖时：手动字幕
                 this._showScrollingText(actor, `! ${existingEffect.name}`, "neutral");
             }
 
             // 持续时间叠加 (Extension)
-            const oldDur = existingEffect.duration;
+            // V14：读持久化源数据（toObject），避免取到派生层补了 Infinity 的展示值
+            const oldDur = existingEffect.toObject().duration;
             const newDur = effectData.duration;
 
-            // 只有当两者都存在且为非无限时才尝试叠加
-            if (oldDur && newDur) {
-                // 情况A: Rounds (回合) - 最常用
-                if (typeof oldDur.rounds === "number" && typeof newDur.rounds === "number") {
-                    // 核心：深拷贝旧的时间数据，保留 startTime, startRound, startTurn
+            // 只有当两者都存在且均为有限数值时长时才尝试同单位叠加。
+            // 新数据为无限（value 为 null）时必须落空此分支，交给下方 4.2 的比较刷新，
+            // 否则 `旧value + null` 仍是旧值，限时效果将无法被覆盖为无限
+            if (oldDur && newDur && Number.isFinite(oldDur.value) && Number.isFinite(newDur.value)) {
+                // 同单位：累加时长并保持旧锚点（start 不动），剩余时间正确顺延
+                if (oldDur.units === newDur.units) {
                     updateData.duration = foundry.utils.deepClone(oldDur);
-                    // 累加时长
-                    updateData.duration.rounds = oldDur.rounds + newDur.rounds;
+                    updateData.duration.value = oldDur.value + newDur.value;
+                    // 延长使已到期的特效恢复生效
+                    updateData.duration.expired = false;
                     isDurationExtended = true;
                 }
-                // 情况B: Seconds (秒)
-                else if (typeof oldDur.seconds === "number" && typeof newDur.seconds === "number") {
-                    updateData.duration = foundry.utils.deepClone(oldDur);
-                    updateData.duration.seconds = oldDur.seconds + newDur.seconds;
-                    isDurationExtended = true;
-                }
-                // 情况C: Turns (轮)
-                else if (typeof oldDur.turns === "number" && typeof newDur.turns === "number") {
-                    updateData.duration = foundry.utils.deepClone(oldDur);
-                    updateData.duration.turns = oldDur.turns + newDur.turns;
-                    isDurationExtended = true;
-                }
+                // 不同单位：不做跨单位换算，交给下方 4.2 按“新时长不短于旧时长”比较后整体刷新
             }
         }
 
@@ -369,24 +466,12 @@ export class ActiveEffectManager {
                 const newDuration = foundry.utils.deepClone(effectData.duration);
 
                 // 时间锚点重置
-                // 无论是在战斗内还是战斗外，必须更新“开始时刻”，否则系统会按旧的开始时间计算，导致瞬间过期
-
-                // 1. 重置世界时间 (秒) - 适用于大地图探索
-                newDuration.startTime = game.time.worldTime;
-
-                // 2. 重置战斗轮次 - 适用于战斗追踪器 (Combat Tracker)
-                if (game.combat) {
-                    // 如果当前处于战斗中，锁定为当前的 Round 和 Turn
-                    newDuration.startRound = game.combat.round;
-                    newDuration.startTurn = game.combat.turn;
-                } else {
-                    // 如果不在战斗中，清除战斗锚点
-                    // 防止遗留了旧的 round 数据，导致下次进战时计算错误
-                    newDuration.startRound = null;
-                    newDuration.startTurn = null;
-                }
-
+                // 无论是在战斗内还是战斗外，必须重置“开始时刻”，否则会按旧锚点计算导致瞬间过期
+                // V14：锚点在顶层 start（含世界时间与战斗位置），由核心 getEffectStart() 取当前值；
+                // 新建特效时核心 _preCreate 会自动完成同样的初始化
                 updateData.duration = newDuration;
+                updateData.duration.expired = false;
+                updateData.start = XJZLActiveEffect.getEffectStart();
             }
         }
 
@@ -448,7 +533,7 @@ export class ActiveEffectManager {
         this._showScrollingText(actor, `- ${effect.name} (${newStacks})`, "delete");
 
         await effect.update({
-            changes: newChanges,
+            "system.changes": newChanges,
             "flags.xjzl-system.stacks": newStacks
         });
     }
@@ -597,7 +682,41 @@ export class ActiveEffectManager {
     }
 
     /**
+     * 计算特效剩余时长的中文简写标签（角色/生物卡与状态选取器共用）。
+     * V14 依核心派生数据（remaining/secondsRemaining）计算，替代旧 rounds/startRound/startTime 手工推算。
+     * @param {ActiveEffect} effect 已完成数据准备的特效文档
+     * @returns {string|null} 如 "3 回合"、"45s"；无限/无时长返回 null
+     */
+    static getDurationLabel(effect) {
+        const d = effect?.duration;
+        if (!d || !Number.isFinite(d.value)) return null;
+
+        const roundTime = CONFIG.time?.roundTime || 2; // 侠界默认2秒一轮
+        if (d.units === "seconds") {
+            const s = Math.max(0, Math.ceil(d.secondsRemaining ?? d.remaining ?? 0));
+            if (s >= 3600) return `${Math.floor(s / 3600)}h`;
+            if (s >= 60) return `${Math.floor(s / 60)}m`;
+            return `${s}s`;
+        }
+
+        // rounds/turns：战斗内核心派生的 remaining 就是剩余回合/轮数；
+        // 战斗外核心按 turnTime/roundTime 把回合/轮时长折算为秒计时，据此回推
+        let remaining;
+        if (game.combat?.round) {
+            remaining = d.remaining;
+        } else {
+            remaining = Math.ceil((d.secondsRemaining ?? 0) / roundTime);
+        }
+        // 防御：折算源异常导致剩余量为 Infinity 时回退总时长，避免出现"Infinity 轮"标签
+        if (!Number.isFinite(remaining)) remaining = d.value;
+        remaining = Math.max(0, Math.floor(remaining) || 0);
+        const unit = d.units === "turns" ? "轮" : "回合";
+        return remaining === 0 ? "即将结束" : `${remaining} ${unit}`;
+    }
+
+    /**
      * 辅助工具：比较两个持续时间的长短
+     * 入参为 V14 duration 结构 {value, units, expiry}（源数据或派生数据均可）
      * @param {Object} d1 - 新持续时间
      * @param {Object} d2 - 旧持续时间
      * @returns {number} 1(d1长), -1(d2长), 0(相等)
@@ -608,38 +727,46 @@ export class ActiveEffectManager {
 
         if (val1 > val2) return 1;
         if (val1 < val2) return -1;
+
+        // 数值折算等长时考虑到期事件（AE-04 要求）。同一时长内到期越晚效果存续越久：
+        // 纯时间制（expiry 为 null，到点即失效，秒制归一化的产物）< turnStart < turnEnd，
+        // 避免等值但更早到期的效果覆盖现有效果。
+        // 其余事件（combatEnd、roundStart 等）本系统未使用，与 turnStart 同级保守处理。
+        const expiryRank = e => e?.expiry === null ? 0 : e?.expiry === "turnEnd" ? 2 : 1;
+        const r1 = expiryRank(d1);
+        const r2 = expiryRank(d2);
+        if (r1 > r2) return 1;
+        if (r1 < r2) return -1;
         return 0;
     }
 
     /**
-     * 辅助工具：计算持续时间评分 (用于比较)
-     * 假设：
-     * 1. 没写 duration = 无限 (Infinity)
-     * 2. Rounds 优先级 > Turns
-     * 3. 忽略 Seconds (除非只有 Seconds)
+     * 辅助工具：按秒折算持续时间用于比较
+     * 假设：没写 duration 或 value 非有限数值 = 无限 (Infinity)。
+     * V14 不再沿用旧 rounds*100+turns 评分：rounds/turns 按系统回合口径
+     * (CONFIG.time.roundTime，战斗外核心同样按它折算计时) 换算成秒后直接比较；
+     * 其余日历时间单位交由核心日历换算，无法折算时保守视为无限。
+     * 本评分不含到期事件差异；等长时的到期先后由 compareDurations 排序。
+     * @param {Object} d - V14 duration 结构
+     * @returns {number} 折算秒数；无限返回 Infinity
      */
     static getDurationScore(d) {
         if (!d) return Infinity;
-        // 全空视为无限
-        if (d.rounds === undefined && d.turns === undefined && d.seconds === undefined) return Infinity;
+        if (typeof d.value !== "number" || !Number.isFinite(d.value)) return Infinity;
 
-        // 评分算法：
-        // Round * 100 + Turn
-        // 这样 1 Round (100分) > 10 Turns (10分)
-        // 10 Turns (10分) > 8 Turns (8分)
-        let score = 0;
+        if (d.units === "seconds") return d.value;
+        // rounds 按 roundTime（2 秒/轮）、turns 按 turnTime（1 秒/轮次，与 init 配置一致）折算
+        if (d.units === "rounds") return d.value * (CONFIG.time?.roundTime || 2);
+        if (d.units === "turns") return d.value * (CONFIG.time?.turnTime || 1);
 
-        if (typeof d.rounds === "number") score += d.rounds * 100;
-        if (typeof d.turns === "number") score += d.turns;
-
-        // 如果没有 Rounds/Turns 只有 Seconds (极少见)，折算一下
-        if (score === 0 && typeof d.seconds === "number") {
-            // 简单粗暴：读取定义的一轮的时间，然后一轮 = 100分 (1轮)
-            const roundSeconds = CONFIG.time?.roundTime || 2;  //侠界默认2秒一轮
-            score += (d.seconds / roundSeconds) * 100;
+        // 分钟/小时等日历单位：用核心日历换算成秒
+        try {
+            const seconds = game.time.calendar?.componentsToTime?.({ [d.units.replace(/s$/, "")]: d.value });
+            if (typeof seconds === "number") return seconds;
+        } catch (err) {
+            console.warn(`XJZL ActiveEffectManager | 无法折算时长单位 "${d.units}"，按无限处理:`, err);
         }
-
-        return score;
+        return Infinity;
     }
 
     /**

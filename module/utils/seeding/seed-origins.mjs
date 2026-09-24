@@ -72,13 +72,13 @@ export async function seedOrigins() {
             const effects = [];
             if (d.modifiers) {
                 const changes = Object.entries(d.modifiers).map(([k, v]) => ({
-                    key: k, value: String(v), mode: 2
+                    key: k, value: String(v), type: "add" // V14 字符串类型（旧数字 mode 2 = add）
                 }));
                 effects.push({
                     name: "背景加成",
-                    icon: ICONS.ae,
+                    img: ICONS.ae, // V14 字段为 img
                     transfer: true,
-                    changes: changes,
+                    system: { changes: changes }, // V14 变更数组在 system 下
                     flags: { "xjzl-system": { slug: "background-modifier", stackable: false } }
                 });
             }

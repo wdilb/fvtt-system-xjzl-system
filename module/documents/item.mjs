@@ -26,7 +26,8 @@ export class XJZLItem extends Item {
       const effectData = this.system.buildModifierEffectData();
 
       // 初始 chosen 不会触发 _onUpdate，因此必须在创建事务中直接嵌入 AE。
-      if (effectData?.changes.length > 0) {
+      // V14：变更数组由 buildModifierEffectData 输出在 system.changes 下
+      if (effectData?.system?.changes.length > 0) {
         const effectSlug = effectData.flags["xjzl-system"].slug;
         const hasModifier = this.effects.some(
           effect => effect.getFlag("xjzl-system", "slug") === effectSlug

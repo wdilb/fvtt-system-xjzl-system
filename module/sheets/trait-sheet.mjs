@@ -102,7 +102,7 @@ export class XJZLTraitSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: "特质加成",
-            icon: "icons/svg/aura.svg",
+            img: "icons/svg/aura.svg", // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             transfer: true // 特质属性默认被动生效
         }, { parent: this.document });

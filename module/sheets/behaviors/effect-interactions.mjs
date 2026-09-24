@@ -6,6 +6,7 @@
  * 普通函数，两张 Sheet 以委托方式调用，避免重复实现。
  */
 import { ActiveEffectManager } from "../../managers/active-effect-manager.mjs";
+import { XJZLActiveEffect } from "../../documents/active-effect.mjs";
 
 /**
  * 准备特效数据，把 AE 分为 temporary（非被动）与 passive（被动）两类。
@@ -34,36 +35,8 @@ export function prepareEffects(sheet, context) {
         // 在页面处理了叠层的显示，所以这里直接用 e.name
         const displayName = e.name;
 
-        // 计算持续时间简写 (支持 轮/回合/秒)
-        let durationLabel = null;
-        const d = e.duration;
-
-        if (d) {
-            if (d.seconds) {
-                const startTime = d.startTime || game.time.worldTime;
-                const endTime = startTime + d.seconds;
-                const remainingSeconds = Math.max(0, endTime - game.time.worldTime);
-
-                if (remainingSeconds >= 3600) durationLabel = `${Math.floor(remainingSeconds / 3600)}h`;
-                else if (remainingSeconds >= 60) durationLabel = `${Math.floor(remainingSeconds / 60)}m`;
-                else durationLabel = `${remainingSeconds}s`;
-            }
-            else if (d.rounds) {
-                if (game.combat && game.combat.round) {
-                    const currentRound = game.combat.round;
-                    const startRound = d.startRound || currentRound;
-                    const elapsed = currentRound - startRound;
-                    const remaining = Math.max(0, d.rounds - elapsed);
-                    if (remaining === 0) durationLabel = "即将结束";
-                    else durationLabel = `${remaining} 回合`;
-                } else {
-                    durationLabel = `${d.rounds} 回合`;
-                }
-            }
-            else if (d.turns) {
-                durationLabel = `${d.turns} 轮`;
-            }
-        }
+        // 计算持续时间简写：V14 统一走管理器的派生数据标签（支持 轮/回合/秒）
+        const durationLabel = ActiveEffectManager.getDurationLabel(e);
 
         const effectData = {
             id: e.id,
@@ -154,15 +127,33 @@ export async function onEffectAction(sheet, event, change) {
  * @param {ActiveEffect} effect
  */
 export async function promptEffectDuration(sheet, effect) {
-    // 1. 默认显示值：优先剩余回合数，回退到原始总回合数
-    let defaultVal = effect.duration.rounds || 0;
-    if (effect.duration && typeof effect.duration.remaining === "number") {
-        defaultVal = effect.duration.remaining;
+    // 1. 默认显示值统一换算成“回合”口径（输入框写入的也是 rounds）：
+    //    战斗内的回合/轮时长，核心派生 remaining 就是剩余回合/轮数，可直接用；
+    //    战斗外的回合时长与秒制时长都被核心折算成秒计时（remaining 为秒数），
+    //    必须按 roundTime 回推回合数，否则会把秒数当回合数填入而放大时长；
+    //    无限特效（value 非有限）回退 0，对应界面“0=无限”语义
+    const d = effect.duration;
+    let defaultVal = 0;
+    if (d && Number.isFinite(d.value)) {
+        const roundTime = CONFIG.time?.roundTime || 2; // 侠界默认2秒一轮
+        const inCombat = (d.units === "rounds" || d.units === "turns") && game.combat?.round;
+        defaultVal = inCombat
+            ? Math.max(0, Math.floor(d.remaining ?? 0))
+            : Math.max(0, Math.ceil((d.secondsRemaining ?? 0) / roundTime));
+        // 防御：折算源异常导致剩余量为 Infinity 时回退总时长，
+        // 避免 Infinity 进入输入框后被 parseInt 归零而把效果误存为无限
+        if (!Number.isFinite(defaultVal)) defaultVal = d.value;
     }
+
+    // 保持原时长单位：turns 单位的效果保存后仍是 turns（轮），弹窗标签同步切换，
+    // 否则会把“剩余 N 轮”保存成 N 回合而改变到期语义；其余单位统一按回合写入。
+    // 战斗外核心把 turns 的派生数据改写为秒制展示，须回读 _source 才能识别原单位
+    const useTurns = d?.units === "turns" || effect._source?.duration?.units === "turns";
+    const unitLabel = useTurns ? "轮" : "回合";
 
     const content = `
         <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
-            <label style="flex: 0 0 auto; white-space: nowrap; font-weight:bold;">持续时间 (回合):</label>
+            <label style="flex: 0 0 auto; white-space: nowrap; font-weight:bold;">持续时间 (${unitLabel}):</label>
             <div style="flex: 1;">
                 <input type="number" name="rounds" value="${defaultVal}" min="0" step="1" autofocus style="text-align:center; width: 100%;">
             </div>
@@ -204,26 +195,21 @@ export async function promptEffectDuration(sheet, effect) {
 
     if (result === null) return;
 
+    // V14 duration 结构：0 是界面上的"无限"语义，必须写 value:null + expiry:null，
+    // 不能把 0 直接当作 0 回合时长写入；回合/轮时长依 turnStart 到期事件结算
     const updateData = {
-        duration: {
-            rounds: result,
-            // 修改时间时必须重置开始锚点，否则按旧开始时间计算会刚改完就过期
-            startTime: game.time.worldTime
-        }
+        duration: result > 0
+            ? { value: result, units: useTurns ? "turns" : "rounds", expiry: "turnStart", expired: false }
+            : { value: null, units: useTurns ? "turns" : "rounds", expiry: null, expired: false },
+        // 修改时间时必须重置开始锚点，否则按旧开始时间计算会刚改完就过期。
+        // V14 锚点在顶层 start（世界时间 + 当前战斗位置），由核心静态方法取当前值
+        start: XJZLActiveEffect.getEffectStart()
     };
-
-    if (game.combat) {
-        updateData.duration.startRound = game.combat.round;
-        updateData.duration.startTurn = game.combat.turn;
-    } else {
-        updateData.duration.startRound = null;
-        updateData.duration.startTurn = null;
-    }
 
     await effect.update(updateData);
 
     if (result > 0) {
-        ui.notifications.info(`${effect.name} 剩余时间已重置为 ${result} 回合。`);
+        ui.notifications.info(`${effect.name} 剩余时间已重置为 ${result} ${unitLabel}。`);
     } else {
         ui.notifications.info(`${effect.name} 已设为无限持续。`);
     }

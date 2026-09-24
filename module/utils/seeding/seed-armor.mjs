@@ -1,4 +1,5 @@
 /* module/utils/seeding/seed-armor.mjs */
+import { normalizeLegacyChanges } from "./effect-data.mjs";
 
 const PACK_NAME = "xjzl-system.armor";
 
@@ -105,11 +106,11 @@ export async function seedArmor() {
             // 你的 XJZLActiveEffect 类会自动处理 "未装备时抑制" 的逻辑，所以这里放心设为 true。
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                icon: e.icon || d.img, // 如果没配图标，默认用物品图标
+                img: e.img || e.icon || d.img, // V14 字段为 img；兼容读取旧 JSON 的 icon，缺省回退物品图标
                 // 防具通常是被动传输，除非是主动使用的技能
                 transfer: e.transfer ?? true,
                 disabled: e.disabled ?? false,
-                changes: e.changes || [],
+                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) }, // V14 变更数组在 system 下；旧 JSON 的数字 mode 在此转换（核心只迁移顶层 changes）
                 // 重要：保留 flags，因为里面存了 slug, stackable, 以及 AE 内部的 scripts
                 flags: e.flags || {},
                 description: e.description || "",

@@ -842,8 +842,8 @@ export class XJZLActor extends Actor {
       if (e.disabled) return false;
 
       // 2. 扫描 Changes：看有没有针对目标 Flag 的修改
-      // 注意：e.changes 是一个数组对象
-      return e.changes.some(change => change.key === targetFlagKey);
+      // 注意：V14 起变更数组在 system.changes 下
+      return e.system.changes.some(change => change.key === targetFlagKey);
     });
   }
 

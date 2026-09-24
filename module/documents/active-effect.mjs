@@ -113,8 +113,8 @@ export class XJZLActiveEffect extends ActiveEffect {
     const parent = this.parent;
 
     // 3. 核心逻辑：如果父级是物品 (Item)，且物品没装备，则抑制
-    // 注意：只有在 CONFIG.ActiveEffect.legacyTransferral = false 时，
-    // 被动特效才会留在 Item 上，此时 parent 才是 Item。
+    // V14 已彻底移除 legacyTransferral 兼容层：内嵌物品的特效始终留在 Item 上（parent 恒为 Item），
+    // transfer 仅决定变更的应用目标（true 时经核心 target getter 作用于所属 Actor），不再是转移开关
     if (parent instanceof Item) {
       // 检查 Item 是否有 equipped 属性
       const itemData = parent.system;
@@ -149,6 +149,8 @@ export class XJZLActiveEffect extends ActiveEffect {
     }
 
     // 4. 其他情况 (如特效在 Actor 身上)，保持默认行为
+    // V14 核心默认判定等价于 duration.expired（基础模型无 system.isSuppressed 字段），
+    // 已到期的特效由此自然失效
     return super.isSuppressed;
   }
 
@@ -218,8 +220,10 @@ export class XJZLActiveEffect extends ActiveEffect {
 
     // 3. 拍摄数值快照 (Base Snapshot)
     // 如果是第一次创建，且没有现成的 baseChanges，我们将当前的 changes 存为 baseChanges
-    if (!flags.baseChanges && data.changes) {
-      updates["flags.xjzl-system.baseChanges"] = foundry.utils.deepClone(data.changes);
+    // V14 起变更数组由 system 数据模型承载；创建数据在到达本钩子前已经过核心 migrateData
+    // （旧顶层 changes 已迁入 system.changes、数字 mode 已转字符串 type），因此只读 V14 路径
+    if (!flags.baseChanges && data.system?.changes) {
+      updates["flags.xjzl-system.baseChanges"] = foundry.utils.deepClone(data.system.changes);
     }
 
     // 4. 初始化层数

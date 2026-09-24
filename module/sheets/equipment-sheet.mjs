@@ -168,7 +168,7 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: "装备属性",
-            icon: "icons/svg/aura.svg",
+            img: "icons/svg/aura.svg", // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             transfer: true // 【关键】装备的属性默认是被动生效的
         }, { parent: this.document });

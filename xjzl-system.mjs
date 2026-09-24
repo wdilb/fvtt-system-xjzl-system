@@ -289,6 +289,9 @@ Hooks.once("init", async function () {
 
   // 修改世界时间配置
   CONFIG.time.roundTime = 2; // 1 轮 = 2 秒（侠界时长规则）
+  // 1 轮次 = 1 秒：核心在战斗外靠该值把 turns 时长折算为秒；缺省 0 会导致
+  // turns 效果的 secondsRemaining 为 Infinity（弹窗误存为无限、标签显示异常）
+  CONFIG.time.turnTime = 1;
 
   // 1. 配置 Combat 先攻设置
   CONFIG.Combat.initiative = {

@@ -305,17 +305,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                 let source = e.sourceName;
                 if (source === "Unknown" || !source) source = e.parent instanceof Item ? e.parent.name : "未知来源";
 
-                let durationLabel = "";
-                const d = e.duration;
-                if (d?.rounds) {
-                    if (game.combat?.round) {
-                        const elapsed = game.combat.round - (d.startRound || game.combat.round);
-                        const remaining = Math.max(0, d.rounds - elapsed);
-                        durationLabel = remaining === 0 ? "即将结束" : `${remaining} 回合`;
-                    } else {
-                        durationLabel = `${d.rounds} 回合`;
-                    }
-                }
+                // V14：剩余时长统一走管理器的派生数据标签
+                const durationLabel = ActiveEffectManager.getDurationLabel(e) || "";
 
                 return {
                     id: e.id,

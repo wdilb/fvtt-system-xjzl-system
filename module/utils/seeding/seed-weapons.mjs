@@ -1,4 +1,5 @@
 /* module/utils/seeding/seed-weapons.mjs */
+import { normalizeLegacyChanges } from "./effect-data.mjs";
 
 const PACK_NAME = "xjzl-system.weapons";
 
@@ -103,12 +104,12 @@ export async function seedWeapons() {
             // 兵器的 AE 通常用于：被动属性加成(装备生效)、特殊状态(中毒/发光等)
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                icon: e.icon || d.img,
+                img: e.img || e.icon || d.img, // V14 字段为 img；兼容读取旧 JSON 的 icon，缺省回退物品图标
                 // 兵器特效通常随装备生效 (transfer: true)
                 // 除非是主动使用的消耗型技能 (transfer: false)
                 transfer: e.transfer ?? true,
                 disabled: e.disabled ?? false,
-                changes: e.changes || [],
+                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) }, // V14 变更数组在 system 下；旧 JSON 的数字 mode 在此转换（核心只迁移顶层 changes）
                 // 关键：保留 flags (slug, stacking, scripts inside AE)
                 flags: e.flags || {},
                 description: e.description || "",

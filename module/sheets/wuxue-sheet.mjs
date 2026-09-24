@@ -493,7 +493,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 创建一个新的 AE 文档嵌入到此 Item
         return ActiveEffect.create({
             name: "新特效",
-            icon: "icons/svg/aura.svg",
+            img: "icons/svg/aura.svg", // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             // 默认为不自动应用 (transfer=false)，因为这是给招式触发用的
             transfer: false

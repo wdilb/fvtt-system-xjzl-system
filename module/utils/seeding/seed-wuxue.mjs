@@ -1,4 +1,5 @@
 /* module/utils/seeding/seed-wuxue.mjs */
+import { normalizeLegacyChanges } from "./effect-data.mjs";
 
 const PACK_NAME = "xjzl-system.wuxue";
 
@@ -334,10 +335,10 @@ export async function seedWuxue() {
                 // 基础结构
                 const effectData = {
                     name: e.name,
-                    icon: d.img, // 如果特效没配图标，默认用物品图标，暂时使用物品图标吧，AI会给特效配上不存在的图标 e.icon
+                    img: d.img, // 如果特效没配图标，默认用物品图标，暂时使用物品图标吧，AI会给特效配上不存在的图标 e.icon（V14 字段为 img）
                     transfer: e.transfer ?? false,
                     disabled: e.disabled ?? false,
-                    changes: e.changes || [],
+                    system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) }, // V14 变更数组在 system 下；旧 JSON 的数字 mode 在此转换（核心只迁移顶层 changes）
                     flags: e.flags || {},
                     description: e.description || "",
                     // 补上 duration

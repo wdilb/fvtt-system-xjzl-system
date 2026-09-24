@@ -209,7 +209,7 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: "新状态",
-            icon: "icons/svg/aura.svg",
+            img: "icons/svg/aura.svg", // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             // 消耗品的特效通常不是 Transfer (被动)，而是使用时触发
             // 但也可以做成 Transfer (只要放在包里就生效？通常不是)

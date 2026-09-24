@@ -56,11 +56,13 @@ export class XJZLPersonalityData extends foundry.abstract.TypeDataModel {
     return {
       name: `${game.i18n.localize("XJZL.Personality.Label")}: ${item.name}`,
       img: item.img || "icons/magic/life/heart-shadow-red.webp",
-      changes: this.chosen.map(skillKey => ({
-        key: `system.skills.${skillKey}.mod`,
-        value: String(this.bonus),
-        type: "add" // V14 变更类型为小写字符串字面量（常量表成员值是优先级数字，不可用作类型）
-      })),
+      system: {
+        changes: this.chosen.map(skillKey => ({
+          key: `system.skills.${skillKey}.mod`,
+          value: String(this.bonus),
+          type: "add" // V14 变更类型为小写字符串字面量（常量表成员值是优先级数字，不可用作类型）
+        }))
+      },
       transfer: true,
       flags: {
         "xjzl-system": {
@@ -86,11 +88,12 @@ export class XJZLPersonalityData extends foundry.abstract.TypeDataModel {
 
     if (effect) {
       // 如果已存在：更新数值。如果勾选为空，changes 也会为空，实现数值回退。
+      // V14：变更数组的更新键是 system.changes
       await effect.update({
         name: effectData.name,
-        changes: effectData.changes
+        "system.changes": effectData.system.changes
       });
-    } else if (effectData.changes.length > 0) {
+    } else if (effectData.system.changes.length > 0) {
       // 如果不存在且有选择：创建一个被动传输(transfer)的 AE
       await item.createEmbeddedDocuments("ActiveEffect", [effectData]);
     }

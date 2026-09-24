@@ -643,6 +643,18 @@ effectData.origin = thisItem.uuid;
 await game.xjzl.api.effects.addEffect(args.target, effectData);
 ```
 
+### 查询状态定义
+
+脚本内不要直接访问 `CONFIG.statusEffects`。按 ID 查询状态定义（图标、描述、变更、flags 等）使用：
+
+```javascript
+const status = game.xjzl.api.effects.getStatus("pojia");
+if (!status) return; // 未命中返回 undefined
+const change = status.system.changes[0]; // 命中返回可安全修改的 V14 格式深拷贝
+```
+
+`getStatus(id)` 为同步查询，返回的副本可随意修改，不会影响 `CONFIG.statusEffects`；它只读定义，不负责创建或更新文档。需要施加时把副本（可按需改写）传给 `addEffect`。
+
 需要随架招解除的效果设置：
 
 ```json
