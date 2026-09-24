@@ -1,9 +1,9 @@
 # 侠界之旅系统
 
-![Foundry VTT 13](https://img.shields.io/badge/Foundry_VTT-13-orange)
+![Foundry VTT 14](https://img.shields.io/badge/Foundry_VTT-14-orange)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-面向 Foundry VTT V13 的《侠界之旅》游戏系统，提供角色成长、战斗流程、特效自动化、规则书资源和战局管理等功能。
+面向 Foundry VTT V14 的《侠界之旅》游戏系统，提供角色成长、战斗流程、特效自动化、规则书资源和战局管理等功能。
 
 **系统开发与维护：[Tiwelee](https://github.com/wdilb)**
 
@@ -30,7 +30,7 @@
 | 必需模组 | [socketlib](https://github.com/manuelVo/foundryvtt-socketlib) |
 | 当前版本 | 见 [`system.json`](system.json) 或 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) |
 
-系统仅针对 Foundry VTT V13 进行开发和验证。玩家使用权限代理、物资交易及部分自动结算功能时，需要至少一名 GM 在线。
+系统仅面向 Foundry VTT V14（V13 升级迁移进行中，发布前须通过完整回归）。玩家使用权限代理、物资交易及部分自动结算功能时，需要至少一名 GM 在线。
 
 ## 主要功能
 
