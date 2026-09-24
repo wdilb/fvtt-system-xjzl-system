@@ -1,8 +1,8 @@
 # V14 升级执行计划
 
-本文件是 V14 升级的进度事实源，记录工作项、依赖和验证结果；范围、设计、API 依据及验收标准见 [`V14_UPGRADE.md`](V14_UPGRADE.md)。复杂工作另建专项计划，并在对应工作项后附链接，本清单不展开实现细节。
+本文件是 V14 升级的总进度事实源，记录里程碑、跨阶段依赖和验证结果；范围与既定接口约束见 [`V14_UPGRADE.md`](V14_UPGRADE.md)。**AE 相关实施步骤、工作项状态和验收以 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 为唯一执行依据**；本文件仅同步其里程碑与跨阶段依赖，不再作为 AE 施工清单。
 
-**当前下一步：M1 已验收通过（S1.1–S1.16 全部完成，启动无报错、无弃用警告），进入 M2（AE 链路迁移，从 S2.2 开始，机制结论见 M0 记录）。**
+**当前下一步：M1 已验收通过（S1.1–S1.16 全部完成，启动无报错、无弃用警告），进入 M2（AE 链路迁移）。直接按照 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 开发和验收；到期顺序不再是前置决策，机制结论见 M0 记录。**
 
 ## 使用方式与状态约定
 
@@ -58,19 +58,12 @@
 
 ## M2 ActiveEffect 链路（依赖 S0.1/S0.2/S0.6/S0.7）
 
-依据：总纲 §2；运行联调依赖 M1 启动可用。S2.7 落实 Q1，S2.4 落实 Q5；S2.9 的查询 API 必须先于 S4.2/S4.7 的脚本迁移。
+**直接执行 [`V14_AE_PLAN.md`](V14_AE_PLAN.md)；该文件的工作项、依赖、决策门槛和验收矩阵是 M2 的唯一施工与验收依据。**本节只记录总里程碑，不把旧 S2 条目当作第二套指令。运行联调依赖 M1；M2 的 `getStatus(id)` 可用后才能执行 M4 的状态查询脚本迁移。
 
-- [ ] S2.1 落实 S0.1 的模型选择：核心模型足够则沿用；需要扩展时在 init 注册 `CONFIG.ActiveEffect.dataModels`，继承 `foundry.data.ActiveEffectTypeDataModel` 并保留 type/phase/priority；附加阶段按需注册并显式调用
-- [ ] S2.2 `XJZLActiveEffect` 剩余读写迁移：`system.changes`、字符串 `type`、`img`、`origin` UUID 校验；沿用 S1.3 已修正的类型判断，同步清理 `isSuppressed` 中 `legacyTransferral` 过时注释
-- [ ] S2.3 `addEffect`/`removeEffect` 入参归一化兼容层（D2，含 `icon→img` 映射；只处理已到达入口的数据，不能修复调用前的旧文档访问，见 S4.6）
-- [ ] S2.4 时长引擎适配新 duration schema（叠加/刷新/锚点/转化规则保留）；落实 Q5 的自研过期清理与核心 registry 分工并验证不重复处理
-- [ ] S2.5 `XJZLActiveEffectConfig` 重写（V2 规范 tab/partial，去除 jQuery 注入）
-- [ ] S2.6 effects 构造与读取点迁移（personality / item / actor / sheets / config / seeding 代码侧）；`XJZL.statusEffects` 源容器保持数组，仅迁移条目字段；seeding 与 Q2 的转换方式保持一致
-- [ ] S2.7 世界数据迁移机制（Q1：baseChanges flags 等，覆盖 S4.7；独立世界设置记录迁移版本，支持重复执行与失败重试，仅全部成功后推进版本）
-- [ ] S2.8 状态选取器与新 CONFIG 形态联调回归（依据 S0.3 结论，S1.5 的对象访问替换已完成）
-- [ ] S2.9 在 `ActiveEffectManager` 实现并暴露 `game.xjzl.api.effects.getStatus(id)`（D3、总纲 §2.3）：同步按 id 查询、未命中返回 `undefined`、返回副本可修改而不污染 CONFIG；验证契约并同步 `SCRIPT_ENGINE.md`，供 S4.2/S4.7 使用
+- [x] S2.1 模型选择已由 M0 验证：沿用核心 `ActiveEffectTypeDataModel` 和内置 initial/final 阶段，无需自定义注册。
+- [ ] S2.2–S2.11 **按 AE 专项计划中对应 S 编号的工作项完成并验收**；其中世界迁移和源数据重建的正式出口在 M4，状态从专项计划同步到本里程碑。
 
-> 备注（S0.7）：社区的字符串拼接案例仅作为测试线索，不能直接认定稳定版存在同样问题。验证数字/数字字符串、布尔 override、`@` 引用及派生字段；确需定制时使用静态 `ActiveEffect.applyChange()`/`applyChangeField()`，`shouldApplyChange()` 只负责是否应用的判定，详见总纲 §2.7。
+S2.11 在专项计划中只要求独立 AE 文档与合集包的原生互操作验收；内容专属 AE 继续放在各自物品中，不建立第二份 AE 目录，也不把合集包接入状态选取器作为本次升级必做项。
 
 ## M3 Region / 光环（依赖 S0.4）
 
@@ -89,13 +82,13 @@
 
 依据：总纲 §6。先完成 S4.1/S4.2/S4.3/S4.5/S4.6 与 S4.8 审计，再做 S4.4 合集重建和 S4.7 世界迁移验收；世界迁移实现可与源脚本迁移同步推进，但须复用同一套转换规则。
 
-- [ ] S4.1 落实 Q2 后，将 data/ 源 JSON 中的 AE 数据转 V14 格式（`system.changes`、`type`、`img`、duration；按 AE 结构遍历，避免误改其他 mode 字段）
-- [ ] S4.2 S2.9 完成后，将脚本内按 id 查询的 `CONFIG.statusEffects.find` 替换为 `getStatus`（检索基线为 script/command 字段中 500 个调用，D3；其他谓词保留语义，不能仅按文本全局替换）
+- [ ] S4.1 落实 Q2 后，按 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 的 AE-10 执行并验收 data/ 源 JSON 的 AE 迁移
+- [ ] S4.2 S2.9 完成后，按 AE-10 执行并验收 data/ 脚本中的状态查询迁移
 - [ ] S4.3 `data/macros/utility.json` 光环宏改写（或并入 S3.6）
-- [ ] S4.4 所有 data/ 与 seeding 修改及 S4.8 审计完成后，重建合集包（`game.xjzl.seed.all()`），验证包内数据及导入行为
+- [ ] S4.4 所有 data/ 与 seeding 修改及 S4.8 审计完成后，重建合集包（`game.xjzl.seed.all()`）；AE 相关验收按 AE-11，其他数据按本计划验收
 - [ ] S4.5 `measureDistance` → `measurePath` 脚本迁移（2 处，验证取点坐标与距离单位）
-- [ ] S4.6 文档访问类脚本迁移：以约 98 处 `eff/effect/thisEffect/ae.changes` 为检索起点并检查其他别名；普通数据经门面传入的可由 S2.3 承接，文档/导出对象访问及绕过门面的核心 API 调用必须迁移
-- [ ] S4.7 基于 S2.7 框架及 S2.9 查询 API 迁移世界副本：世界物品、角色内嵌物品、非关联 Token 的 Actor、AE 脚本、已导入宏中的旧格式数据与脚本（含状态查询、文档 changes 访问、聊天 author、距离 API、光环宏）；在备份的 V13 世界副本验证首次迁移、重复启动和中断重试，无法自动处理的自定义脚本须报告定位并解决后再验收
+- [ ] S4.6 文档访问类脚本迁移：AE 字段与入口按 AE-10 执行并验收；其他已移除 API 按本计划审计
+- [ ] S4.7 基于 S2.7 框架及 S2.9 查询 API 迁移 V13 世界副本：AE 数据、脚本及迁移安全性按 AE-14 执行并验收；聊天 author、距离 API、光环宏等非 AE 内容按本计划验收
 - [ ] S4.8 对照[官方 #13436](https://github.com/foundryvtt/foundryvtt/issues/13436)审计 data/ 脚本字符串中的已移除 API
 
 ## M5 回归与文档
