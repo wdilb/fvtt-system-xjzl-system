@@ -851,6 +851,60 @@ Hooks.once("ready", async function () {
 });
 
 //  在 getSceneControlButtons 阶段注入按钮
+// 首次渲染登记前暂存伤害工具实例，供连续打开时复用。
+let damageToolPending = null;
+
+/**
+ * 统一打开伤害工具，复用已登记或首次渲染中的实例。
+ * 关闭中的实例仍占用 ID，须等其注销后再打开。
+ * @returns {Promise<GenericDamageTool|undefined>} 实例或 undefined；渲染失败时会关闭实例。
+ */
+async function openDamageTool() {
+  const states = foundry.applications.api.ApplicationV2.RENDER_STATES;
+  // 等待关闭期间可能有其他调用打开窗口，复用前须重新读取注册表。
+  const readRegistered = () => {
+    const registry = foundry.applications?.instances;
+    return registry
+      ? [...(registry instanceof Map ? registry.values() : Object.values(registry))]
+          .filter((app) => app?.options?.id === "xjzl-damage-tool")
+      : [];
+  };
+  for (const app of readRegistered()) {
+    if (app.state <= states.CLOSING) {
+      try {
+        await app.close();
+      } catch (error) {
+        // 旧实例可能仍占用 ID；关闭失败时中止打开。
+        console.error("XJZL | 伤害工具旧窗口关闭失败，本次打开中止:", error);
+        ui.notifications.error(game.i18n.localize("XJZL.UI.DamageTool.OpenFailedOldClose"));
+        return undefined;
+      }
+    }
+  }
+  const existingApp = readRegistered().find((app) => app.state >= states.RENDERING) ?? damageToolPending;
+  if (existingApp) {
+    // 核心按实例串行处理渲染，首次渲染期间的再次调用会排队。
+    existingApp.render(true, { focus: true });
+    return existingApp;
+  }
+  const app = new GenericDamageTool();
+  damageToolPending = app;
+  // 渲染完成后由核心登记；失败时关闭实例以清理构造时注册的监听器。
+  return app.render(true).then(
+    () => {
+      if (damageToolPending === app) damageToolPending = null;
+      return app;
+    },
+    (error) => {
+      if (damageToolPending === app) damageToolPending = null;
+      console.error("XJZL | 伤害工具打开失败:", error);
+      return app.close().catch((closeError) => {
+        console.error("XJZL | 伤害工具关闭失败:", closeError);
+      });
+    }
+  );
+}
+
 Hooks.on('getSceneControlButtons', (controls) => {
 
   // 检查权限
@@ -868,18 +922,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
     visible: true,
     button: true,
     // V13 必须使用 onChange，废弃 onClick
-    onChange: () => {
-      // 单例模式：查找或新建
-      const existingApp = Object.values(ui.windows).find(
-        (app) => app.options.id === "xjzl-damage-tool"
-      );
-      if (existingApp) {
-        existingApp.render(true, { focus: true });
-      } else {
-        // 确保 GenericDamageTool 已被导入
-        new GenericDamageTool().render(true);
-      }
-    }
+    onChange: () => openDamageTool()
   };
 
   // --- 步骤 1: 查找 Token 控制层级 ---
@@ -939,18 +982,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       visible: true,
       button: true,
       onChange: () => {
-        // 单例模式：查找或新建
-        const existingApp = Object.values(ui.windows).find(
-          (app) => app.options.id === "xjzl-effect-picker"
-        );
-
-        if (existingApp) {
-          existingApp.actor = null;
-          existingApp.render(true, { focus: true });
-        } else {
-          // 这里不再需要传 actor 参数，因为它是全局的
-          new EffectSelectionDialog().render(true);
-        }
+        EffectSelectionDialog.open();
       }
     };
 

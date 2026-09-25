@@ -64,6 +64,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
     };
 
+    // 首次渲染登记前暂存实例，供连续打开时复用。
+    static #pendingInstance = null;
+
     constructor(options = {}) {
         super(options);
         // 目标 Actor：从角色卡打开状态盘时直接传入；为 null 时由 _getTargetActors 取当前选中的 Token
@@ -118,9 +121,86 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * @returns {Promise<EffectSelectionDialog>} Foundry 的关闭结果。
      */
     async close(options = {}) {
+        if (EffectSelectionDialog.#pendingInstance === this) EffectSelectionDialog.#pendingInstance = null;
+        // 核心完成关闭动画后才移除实例；此期间保留监听器，避免关闭与渲染交错时失效。
+        const result = await super.close(options);
         for (const [hook, id] of this._hookIds) Hooks.off(hook, id);
         this._hookIds = [];
-        return super.close(options);
+        return result;
+    }
+
+    /**
+     * 枚举注册表中全部状态盘实例（含正在关闭的）。
+     * @returns {EffectSelectionDialog[]}
+     */
+    static #registered() {
+        const registry = foundry.applications?.instances;
+        if (!registry) return [];
+        const apps = registry instanceof Map ? registry.values() : Object.values(registry);
+        return [...apps].filter(app => app?.options?.id === "xjzl-effect-picker");
+    }
+
+    /**
+     * 查找 V14 注册表中可复用的状态盘实例；关闭中的实例不可复用。
+     * 首次渲染登记前的实例由 #pendingInstance 保存。
+     * @returns {EffectSelectionDialog|undefined} 渲染中或已渲染的实例。
+     */
+    static findInstance() {
+        const states = ApplicationV2.RENDER_STATES;
+        for (const app of EffectSelectionDialog.#registered()) {
+            if (app.state >= states.RENDERING) return app;
+        }
+        return undefined;
+    }
+
+    /**
+     * 统一打开状态盘，复用已登记或首次渲染中的实例。
+     * 首次渲染前暂存实例，避免连续调用创建同 ID 窗口和多余的 Hooks。
+     * @param {Actor|null} [actor] 绑定目标 Actor；null 表示按画布选中动态取目标。
+     * @returns {Promise<EffectSelectionDialog|undefined>} 实例（首次渲染异步进行）；旧窗口关闭失败时返回 undefined。
+     */
+    static async #open({ actor = null } = {}) {
+        // 关闭中的实例仍占用 ID；等待其注销，失败时中止打开。
+        const states = ApplicationV2.RENDER_STATES;
+        for (const app of EffectSelectionDialog.#registered()) {
+            if (app.state <= states.CLOSING) {
+                try {
+                    await app.close();
+                } catch (error) {
+                    console.error("XJZL | 状态盘旧窗口关闭失败，本次打开中止:", error);
+                    ui.notifications.error(game.i18n.localize("XJZL.UI.EffectPicker.OpenFailedOldClose"));
+                    return undefined;
+                }
+            }
+        }
+        const existing = EffectSelectionDialog.findInstance() ?? EffectSelectionDialog.#pendingInstance;
+        if (existing) {
+            existing.actor = actor;
+            // 核心按实例串行处理渲染，首次渲染期间的再次调用会排队。
+            existing.render(true, { focus: true });
+            return existing;
+        }
+        const app = new EffectSelectionDialog({ actor });
+        EffectSelectionDialog.#pendingInstance = app;
+        app.render(true).then(
+            () => {
+                if (EffectSelectionDialog.#pendingInstance === app) EffectSelectionDialog.#pendingInstance = null;
+            },
+            error => {
+                if (EffectSelectionDialog.#pendingInstance === app) EffectSelectionDialog.#pendingInstance = null;
+                console.error("XJZL | 状态盘打开失败:", error);
+                // 渲染失败不会触发 close，需清理构造时注册的 Hooks。
+                app.close().catch(closeError => console.error("XJZL | 状态盘关闭失败:", closeError));
+            }
+        );
+        return app;
+    }
+
+    /**
+     * 静态入口：打开不绑定角色卡的状态盘（工具栏按钮等画布目标场景）
+     */
+    static open() {
+        return EffectSelectionDialog.#open({ actor: null });
     }
 
     /**
@@ -128,13 +208,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * 窗口已存在则复用并切换目标（避免重复弹窗），否则新建实例
      */
     static openForActor(actor) {
-        const existingApp = Object.values(ui.windows).find(app => app.options.id === "xjzl-effect-picker");
-        if (existingApp) {
-            existingApp.actor = actor;
-            existingApp.render(true, { focus: true });
-            return existingApp;
-        }
-        return new EffectSelectionDialog({ actor }).render(true);
+        return EffectSelectionDialog.#open({ actor: actor ?? null });
     }
 
     /**

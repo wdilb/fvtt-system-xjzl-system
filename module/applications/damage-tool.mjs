@@ -162,8 +162,10 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
    * @returns {Promise<GenericDamageTool>} Foundry 的关闭结果。
    */
   async close(options = {}) {
+    // 核心完成关闭动画后才移除实例；此期间保留监听器，避免关闭与渲染交错时失效。
+    const result = await super.close(options);
     this._teardown();
-    return super.close(options);
+    return result;
   }
 
   /** 注销实例级监听器；无界面宏执行也用它释放构造时注册的画布 Hook。 */

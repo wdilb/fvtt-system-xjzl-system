@@ -723,7 +723,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     const pending = EncounterManager.getState(this.combat)?.pendingItems.find(item => item.id === target.dataset.pendingId);
     const combatant = pending?.targetCombatantIds?.length === 1 ? this.combat.combatants.get(pending.targetCombatantIds[0]) : null;
     if (combatant?.actor) return EffectSelectionDialog.openForActor(combatant.actor);
-    return new EffectSelectionDialog().render(true);
+    return EffectSelectionDialog.open();
   }
 }
 
