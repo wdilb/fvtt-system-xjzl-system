@@ -363,7 +363,7 @@
                         {
                             "label": "施加禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 用补丁形式传入持续时间，创建时即带回合锚点；先创建再 update 会导致 duration 缺少 startRound 起点而无法正常倒计时\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 2 } });\n}",
+                            "script": "if (args.isHit) {\n    // 用补丁形式传入持续时间，创建时即带回合锚点；先创建再 update 会导致 duration 缺少 startRound 起点而无法正常倒计时\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { value: 2, units: \"rounds\", expiry: \"turnStart\"} });\n}",
                             "active": true
                         }
                     ]
@@ -421,17 +421,20 @@
             "effects": [
                 {
                     "name": "顽石",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "当目标与其他具有“顽石”的目标贴近时（距离为 1），双方立即流失气血并倒地，然后双方移除“顽石”。流失量随[他山之石]等级成长（10+5×升级数），以添加时写入的实际数值为准。",
                     "duration": {
-                        "rounds": 99
+                        "value": 99,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "wanshi"
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -573,7 +576,7 @@
                         {
                             "label": "反击获得蛮力",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算持续时间\nconst stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst manli = thisItem.effects.getName(\"蛮力\");\nif (manli) {\n    // 动态调整持续时间\n    const effectData = manli.toObject();\n    effectData.duration.rounds = durationRounds;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【蛮力】\");\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算持续时间\nconst stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst manli = thisItem.effects.getName(\"蛮力\");\nif (manli) {\n    // 动态调整持续时间\n    const effectData = manli.toObject();\n    effectData.duration.value = durationRounds;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【蛮力】\");\n}",
                             "active": true
                         }
                     ]
@@ -671,10 +674,11 @@
             "effects": [
                 {
                     "name": "蛮力",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "以力量为伤害系数的招式伤害+10。",
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "transfer": false,
                     "flags": {
@@ -682,13 +686,17 @@
                             "slug": "manli"
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.skill.mod",
+                                "value": "10",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -936,17 +944,20 @@
             "effects": [
                 {
                     "name": "铁壁",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "无法被范围攻击选中。",
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "tiebi"
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -995,7 +1006,7 @@
                         {
                             "label": "无架招施加错骨",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\n// 检查目标是否开启架招\nif (!args.target.system.martial?.stanceActive) {\n    // 利用高级传参，直接赋予状态并指定持续时间\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被施加【错骨】。`);\n}",
+                            "script": "if (!args.isHit) return;\n// 检查目标是否开启架招\nif (!args.target.system.martial?.stanceActive) {\n    // 利用高级传参，直接赋予状态并指定持续时间\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} });\n    ui.notifications.info(`${args.target.name} 被施加【错骨】。`);\n}",
                             "active": true
                         }
                     ]
@@ -1122,7 +1133,6 @@
         "effects": [
             {
                 "name": "眼力",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                 "description": "每层使命中+5。",
                 "transfer": false,
                 "flags": {
@@ -1132,18 +1142,22 @@
                         "maxStacks": 3
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.hit_waigong",
-                        "mode": 2,
-                        "value": "5"
-                    },
-                    {
-                        "key": "system.combat.hit_neigong",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "value": "5",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1198,7 +1212,7 @@
                             "label": "开启获得燧火",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 仅在开启架招瞬间触发\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst critReduct = -lvl; // Lv1: -1, Lv2: -2, Lv3: -3\n\nconst suihuo = thisItem.effects.getName(\"燧火\");\nif (suihuo) {\n    const effectData = suihuo.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    \n    // 动态注入当级暴击骰减免\n    effectData.changes.forEach(c => {\n        if (c.key.includes(\"crit_\")) c.value = String(critReduct);\n    });\n    effectData.description += ` (当前暴击骰: ${critReduct})`;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"燧火萦绕\", { fill: \"#ff4500\" });\n}"
+                            "script": "// 仅在开启架招瞬间触发\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst critReduct = -lvl; // Lv1: -1, Lv2: -2, Lv3: -3\n\nconst suihuo = thisItem.effects.getName(\"燧火\");\nif (suihuo) {\n    const effectData = suihuo.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    \n    // 动态注入当级暴击骰减免\n    effectData.system.changes.forEach(c => {\n        if (c.key.includes(\"crit_\")) c.value = String(critReduct);\n    });\n    effectData.description += ` (当前暴击骰: ${critReduct})`;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"燧火萦绕\", { fill: \"#ff4500\" });\n}"
                         }
                     ]
                 },
@@ -1246,7 +1260,7 @@
                             "label": "无架招施加烙伤",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit || !args.target) return;\n\n// 判定目标当前是否开启了架招\nif (!args.target.system.martial?.stanceActive) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = lvl; // Lv1=1回合, Lv2=2回合, Lv3=3回合\n\n    const laoshang = thisItem.effects.getName(\"烙伤\");\n    if (laoshang) {\n        const effectData = laoshang.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { rounds: rounds };\n        \n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        actor.showFloatyText(\"趁虚点燃!\", { fill: \"#ff4500\" });\n    }\n}"
+                            "script": "if (!args.isHit || !args.target) return;\n\n// 判定目标当前是否开启了架招\nif (!args.target.system.martial?.stanceActive) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = lvl; // Lv1=1回合, Lv2=2回合, Lv3=3回合\n\n    const laoshang = thisItem.effects.getName(\"烙伤\");\n    if (laoshang) {\n        const effectData = laoshang.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        \n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        actor.showFloatyText(\"趁虚点燃!\", { fill: \"#ff4500\" });\n    }\n}"
                         }
                     ]
                 },
@@ -1357,7 +1371,6 @@
             "effects": [
                 {
                     "name": "燧火",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "暴击骰减免。暴击时给目标添加“烙伤”持续一回合。",
                     "transfer": false,
                     "flags": {
@@ -1369,30 +1382,35 @@
                                     "label": "燧火暴击施加烙伤",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "if (!args.isCrit || !args.target) return;\n\nconst sourceItem = await fromUuid(thisEffect.origin);\n\nconst laoshang = sourceItem.effects.getName(\"烙伤\");\nif (laoshang) {\n    const effectData = laoshang.toObject();\n    delete effectData._id;\n    effectData.origin = sourceItem.uuid;\n    effectData.duration = { rounds: 1 };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    \n    // 暴击点燃！带安全边距 padding 的专属卡片\n    const content = `\n        <div class=\"xjzl-chat-card item-card\">\n            <header class=\"card-header\" style=\"border-left: 4px solid #e74c3c; padding: 6px 8px;\">\n                <img src=\"${sourceItem.img}\" style=\"border:none;\" />\n                <h3 style=\"color: #e74c3c; margin-left: 4px;\">燧火灼心 · 烙伤触发</h3>\n            </header>\n            <div class=\"card-content-wrapper\" style=\"padding: 6px 8px;\">\n                <div style=\"font-weight:bold; color:#c0392b; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 暴击烈焰附着！</div>\n                <div style=\"font-size:0.9em;\">目标：<b>${args.target.name}</b> 被点燃，获得 <b>【烙伤】</b> 状态！</div>\n                <div style=\"font-size:0.8em; color:#7f8c8d; margin-top:4px;\">└ 每次出招后将受到 10 点火焰灼烧伤害。</div>\n            </div>\n        </div>\n    `;\n    ChatMessage.create({\n        author: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n}"
+                                    "script": "if (!args.isCrit || !args.target) return;\n\nconst sourceItem = await fromUuid(thisEffect.origin);\n\nconst laoshang = sourceItem.effects.getName(\"烙伤\");\nif (laoshang) {\n    const effectData = laoshang.toObject();\n    delete effectData._id;\n    effectData.origin = sourceItem.uuid;\n    effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    \n    // 暴击点燃！带安全边距 padding 的专属卡片\n    const content = `\n        <div class=\"xjzl-chat-card item-card\">\n            <header class=\"card-header\" style=\"border-left: 4px solid #e74c3c; padding: 6px 8px;\">\n                <img src=\"${sourceItem.img}\" style=\"border:none;\" />\n                <h3 style=\"color: #e74c3c; margin-left: 4px;\">燧火灼心 · 烙伤触发</h3>\n            </header>\n            <div class=\"card-content-wrapper\" style=\"padding: 6px 8px;\">\n                <div style=\"font-weight:bold; color:#c0392b; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 暴击烈焰附着！</div>\n                <div style=\"font-size:0.9em;\">目标：<b>${args.target.name}</b> 被点燃，获得 <b>【烙伤】</b> 状态！</div>\n                <div style=\"font-size:0.8em; color:#7f8c8d; margin-top:4px;\">└ 每次出招后将受到 10 点火焰灼烧伤害。</div>\n            </div>\n        </div>\n    `;\n    ChatMessage.create({\n        author: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n}"
                                 }
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "-1"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.crit_waigong",
+                                "value": "-1",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.crit_neigong",
+                                "value": "-1",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "烙伤",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "每次出招后，受到 10 点火焰伤害。",
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "transfer": false,
                     "flags": {
@@ -1408,11 +1426,14 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "薪火",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "下一次出招招式伤害+10 且必定暴击。",
                     "transfer": false,
                     "flags": {
@@ -1434,13 +1455,17 @@
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.skill.mod",
+                                "value": "10",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1520,7 +1545,7 @@
                             "label": "格挡获泰山磐石",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 背景防御时 args.move 是敌人的招式，必须自己找本架招\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst panshi = thisItem.effects.getName(\"泰山磐石\");\nif (panshi) {\n    const effectData = panshi.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration.rounds = durationRounds;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"触发：泰山磐石\", { fill: \"#f39c12\" });\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 背景防御时 args.move 是敌人的招式，必须自己找本架招\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst panshi = thisItem.effects.getName(\"泰山磐石\");\nif (panshi) {\n    const effectData = panshi.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration.value = durationRounds;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"触发：泰山磐石\", { fill: \"#f39c12\" });\n}"
                         }
                     ]
                 },
@@ -1602,7 +1627,7 @@
                             "label": "进入神剑姿态",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 1. 解除架招\nawait actor.stopStance();\n\n// 2. 计算动态时间与等级快照\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\n// 3. 赋予神剑AE\nconst shenjian = thisItem.effects.getName(\"神剑\");\nif (shenjian) {\n    const effectData = shenjian.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration.rounds = durationRounds;\n    \n    // 核心：把当前绝招的等级注入 AE，让普攻知道自己该加多少伤害\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.shenjianLevel\", lvl);\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(`进入【神剑】姿态，持续 ${durationRounds} 回合！`);\n}"
+                            "script": "// 1. 解除架招\nawait actor.stopStance();\n\n// 2. 计算动态时间与等级快照\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\n// 3. 赋予神剑AE\nconst shenjian = thisItem.effects.getName(\"神剑\");\nif (shenjian) {\n    const effectData = shenjian.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration.value = durationRounds;\n    \n    // 核心：把当前绝招的等级注入 AE，让普攻知道自己该加多少伤害\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.shenjianLevel\", lvl);\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(`进入【神剑】姿态，持续 ${durationRounds} 回合！`);\n}"
                         }
                     ]
                 }
@@ -1611,29 +1636,34 @@
         "effects": [
             {
                 "name": "泰山磐石",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                 "description": "免疫所有敌人添加的状态。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 1
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
-                "changes": [],
                 "flags": {
                     "xjzl-system": {
                         "slug": "taishanpanshi",
                         "stackable": false
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "神剑",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                 "description": "只能持一把重剑，解除架招。重剑普攻伤害附加 0.4 力量系数及技能等级加成，且视为招式。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 1
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
-                "changes": [],
                 "flags": {
                     "xjzl-system": {
                         "slug": "shenjian",
@@ -1647,7 +1677,12 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1706,16 +1741,19 @@
         "effects": [
             {
                 "name": "踵息",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                 "description": "若本回合没有造成任何伤害，则下回合招式命中增加。",
                 "transfer": false,
-                "changes": [],
                 "flags": {
                     "xjzl-system": {
                         "slug": "zhongxi",
                         "stackable": false
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1809,23 +1847,26 @@
         "effects": [
             {
                 "name": "力道",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                 "description": "每层力量+10，持续到死亡。",
                 "transfer": false,
-                "changes": [
-                    {
-                        "key": "system.stats.liliang.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "slug": "lidao",
                         "stackable": true,
                         "maxStacks": 2
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.stats.liliang.mod",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1882,10 +1923,8 @@
         "effects": [
             {
                 "name": "剑嶽",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                 "description": "周围形成剑嶽领域，造成困难地形与拉扯效果。",
                 "transfer": false,
-                "changes": [],
                 "flags": {
                     "xjzl-system": {
                         "slug": "jianyue_aura",
@@ -1911,7 +1950,12 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     }

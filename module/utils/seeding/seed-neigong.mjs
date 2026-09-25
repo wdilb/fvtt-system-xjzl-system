@@ -152,8 +152,9 @@ export async function seedNeigong() {
                 name: e.name,
                 img: e.img || e.icon || d.img, // V14 字段为 img；兼容读取旧 JSON 的 icon
                 transfer: e.transfer ?? false, // 内功特效通常不直接 transfer，而是通过脚本调用
+                showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) }, // V14 变更数组在 system 下；旧 JSON 的数字 mode 在此转换（核心只迁移顶层 changes）
+                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) },
                 flags: e.flags || {},
                 description: e.description || "",
                 // 补上 duration

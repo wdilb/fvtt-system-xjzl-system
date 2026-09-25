@@ -111,7 +111,7 @@
                             "label": "格挡反馈",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 1. 给对方添加下盘不稳 (1回合)\nconst unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\nif (unstable && args.attacker) {\n    unstable.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, unstable);\n}\n\n// 2. 自身获得2层痛哭\nconst tongku = thisItem.effects.getName('痛哭').toObject();\ndelete tongku._id;\ntongku.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, tongku, 2);\n\nactor.showFloatyText(\"受阻，反馈痛哭！\", { fill: \"#FFA500\" });"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 1. 给对方添加下盘不稳 (1回合)\nconst unstable = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('unstable'));\nif (unstable && args.attacker) {\n    unstable.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.attacker, unstable);\n}\n\n// 2. 自身获得2层痛哭\nconst tongku = thisItem.effects.getName('痛哭').toObject();\ndelete tongku._id;\ntongku.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, tongku, 2);\n\nactor.showFloatyText(\"受阻，反馈痛哭！\", { fill: \"#FFA500\" });"
                         }
                     ]
                 },
@@ -163,7 +163,6 @@
         "effects": [
             {
                 "name": "痛哭",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "transfer": false,
                 "description": "哭丧棒累计的悲伤情绪，最高叠加5层。",
                 "flags": {
@@ -173,15 +172,20 @@
                         "maxStacks": 5
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "哭丧",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "transfer": false,
                 "description": "施展消耗动作的轻功时，流失内力。",
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -189,7 +193,11 @@
                         "stackable": false
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -364,7 +372,6 @@
         "effects": [
             {
                 "name": "莲花真气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "description": "每层使你内功命中+5。",
                 "transfer": false,
                 "flags": {
@@ -374,13 +381,17 @@
                         "maxStacks": 3
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.hit_neigong",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -430,7 +441,7 @@
                             "label": "击破禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const root = CONFIG.statusEffects.find(e => e.id === 'root');\n    const effectData = foundry.utils.deepClone(root);\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    effectData.duration = { rounds: lvl };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isBroken) {\n    const root = game.xjzl.api.effects.getStatus('root');\n    const effectData = foundry.utils.deepClone(root);\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    effectData.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -469,7 +480,7 @@
                             "label": "施加腿软",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName('腿软').toObject();\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    effectData.duration = { rounds: lvl };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName('腿软').toObject();\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    effectData.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -552,7 +563,7 @@
                             "label": "韧性检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    let dc = 15;\n    if (args.target.statuses.has('prone')) dc += 5;\n    \n    const tuiruan = thisItem.effects.getName('腿软').toObject();\n    tuiruan.duration = { rounds: 3 };\n    tuiruan.origin = thisItem.uuid;\n    \n    const jinshi = CONFIG.statusEffects.find(e => e.id === 'jinshi');\n    const jinshiData = foundry.utils.deepClone(jinshi);\n    jinshiData.duration = { rounds: 3 };\n    jinshiData.origin = thisItem.uuid;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: 'renxing',\n        dc: dc,\n        label: '抵抗膝顶',\n        onFail: [tuiruan, jinshiData]\n    });\n}"
+                            "script": "if (args.isHit) {\n    let dc = 15;\n    if (args.target.statuses.has('prone')) dc += 5;\n    \n    const tuiruan = thisItem.effects.getName('腿软').toObject();\n    tuiruan.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    tuiruan.origin = thisItem.uuid;\n    \n    const jinshi = game.xjzl.api.effects.getStatus('jinshi');\n    const jinshiData = foundry.utils.deepClone(jinshi);\n    jinshiData.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    jinshiData.origin = thisItem.uuid;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: 'renxing',\n        dc: dc,\n        label: '抵抗膝顶',\n        onFail: [tuiruan, jinshiData]\n    });\n}"
                         }
                     ]
                 }
@@ -561,14 +572,16 @@
         "effects": [
             {
                 "name": "腿软",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "description": "回合结束时，若剩余移动力低于最大速度的一半，则倒地。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "tuiruan",
                         "stackable": false
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },
@@ -651,7 +664,7 @@
                             "label": "施加状态",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    \n    if (args.isBroken) {\n        const fushen = CONFIG.statusEffects.find(e => e.id === 'fushen');\n        const fsData = foundry.utils.deepClone(fushen);\n        fsData.duration = { rounds: 2 };\n        fsData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fsData);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const chanshou = game.xjzl.api.effects.getStatus('chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    \n    if (args.isBroken) {\n        const fushen = game.xjzl.api.effects.getStatus('fushen');\n        const fsData = foundry.utils.deepClone(fushen);\n        fsData.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        fsData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fsData);\n    }\n}"
                         }
                     ]
                 },
@@ -690,7 +703,7 @@
                             "label": "消耗颤手",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const cs = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'chanshou');\n    if (cs) {\n        const stacks = cs.getFlag('xjzl-system', 'stacks') || 1;\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"丧门之犬 - 颤手爆发\" },\n            content: `<p>目标身上拥有 ${stacks} 层 <b>[颤手]</b>。</p><p>是否消耗 1 层，使其陷入“缚身”一回合？</p>`,\n            yes: { label: \"消耗\" },\n            no: { label: \"保留\" }\n        });\n        if (!confirm) return;\n        await game.xjzl.api.effects.removeEffect(args.target, 'chanshou', 1);\n        const fushen = CONFIG.statusEffects.find(e => e.id === 'fushen');\n        const fsData = foundry.utils.deepClone(fushen);\n        fsData.duration = { rounds: 1 };\n        fsData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fsData);\n        ui.notifications.info(\"消耗颤手，施加缚身！\");\n    }\n}"
+                            "script": "if (args.isHit) {\n    const cs = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'chanshou');\n    if (cs) {\n        const stacks = cs.getFlag('xjzl-system', 'stacks') || 1;\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"丧门之犬 - 颤手爆发\" },\n            content: `<p>目标身上拥有 ${stacks} 层 <b>[颤手]</b>。</p><p>是否消耗 1 层，使其陷入“缚身”一回合？</p>`,\n            yes: { label: \"消耗\" },\n            no: { label: \"保留\" }\n        });\n        if (!confirm) return;\n        await game.xjzl.api.effects.removeEffect(args.target, 'chanshou', 1);\n        const fushen = game.xjzl.api.effects.getStatus('fushen');\n        const fsData = foundry.utils.deepClone(fushen);\n        fsData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        fsData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fsData);\n        ui.notifications.info(\"消耗颤手，施加缚身！\");\n    }\n}"
                         }
                     ]
                 },
@@ -729,7 +742,7 @@
                             "label": "添加颤手",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const chanshou = game.xjzl.api.effects.getStatus('chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n}"
                         }
                     ]
                 },
@@ -773,7 +786,7 @@
                             "label": "双层颤手",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n}"
+                            "script": "if (args.isHit) {\n    const chanshou = game.xjzl.api.effects.getStatus('chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n}"
                         }
                     ]
                 }
@@ -969,7 +982,7 @@
                         {
                             "label": "破防眩晕",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const xuanyun = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'xuanyun'));\n    if (xuanyun) {\n        xuanyun.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, xuanyun);\n        ui.notifications.info(`${args.target.name} 被跃龙在渊震晕！`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const xuanyun = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('xuanyun'));\n    if (xuanyun) {\n        xuanyun.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, xuanyun);\n        ui.notifications.info(`${args.target.name} 被跃龙在渊震晕！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1094,7 +1107,7 @@
                         {
                             "label": "劲气眩晕",
                             "trigger": "hit",
-                            "script": "const jinqi = attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gaibang_jinqi\");\nif (args.isHit && jinqi && (jinqi.getFlag('xjzl-system', 'stacks') || 1) >= 3) {\n    const xuanyun = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'xuanyun'));\n    if (xuanyun) {\n        xuanyun.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, xuanyun);\n        ui.notifications.info(`${args.target.name} 被亢龙有悔震晕！`);\n    }\n}",
+                            "script": "const jinqi = attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gaibang_jinqi\");\nif (args.isHit && jinqi && (jinqi.getFlag('xjzl-system', 'stacks') || 1) >= 3) {\n    const xuanyun = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('xuanyun'));\n    if (xuanyun) {\n        xuanyun.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, xuanyun);\n        ui.notifications.info(`${args.target.name} 被亢龙有悔震晕！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1103,7 +1116,6 @@
             "effects": [
                 {
                     "name": "降龙总纲",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                     "description": "已激活：使用《降龙神掌》招式时，额外消耗内力，降低暴击阈值，并获得劲气。",
                     "transfer": false,
                     "flags": {
@@ -1119,11 +1131,12 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "劲气",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                     "description": "每层提高招式伤害 10 点。",
                     "transfer": false,
                     "flags": {
@@ -1133,17 +1146,20 @@
                             "maxStacks": 3
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.skill.mod",
+                                "value": "10",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "神龙",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                     "description": "围绕周身的神龙劲气，可用于复制出招。",
                     "transfer": false,
                     "flags": {
@@ -1153,7 +1169,9 @@
                             "maxStacks": 1,
                             "tiedToStance": true
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -1246,15 +1264,17 @@
         "effects": [
             {
                 "name": "百事通",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "transfer": true,
-                "changes": [
-                    {
-                        "key": "system.skills.bagua.mod",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.skills.bagua.mod",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                }
             }
         ]
     },
@@ -1355,10 +1375,11 @@
         "effects": [
             {
                 "name": "醉雨",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "description": "闪避和内外功防御下降 10 点，受到阳属性伤害时伤害提高 30 点。",
                 "duration": {
-                    "rounds": 2
+                    "value": 2,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -1374,34 +1395,41 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.dodge",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "-10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.dodge",
+                            "value": "-10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "-10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "-10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "transfer": false,
+                "showIcon": 2
             },
             {
                 "name": "酒醉",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "description": "每层增加 10 点醉意；出招前，每移除一层酒醉，招式暴击骰-1。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "jiuzui",
                         "stackable": true
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     }

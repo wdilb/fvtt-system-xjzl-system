@@ -175,11 +175,12 @@
             "effects": [
                 {
                     "name": "剑鬼破绽",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "受到的招式伤害增加一倍。",
                     "transfer": false,
                     "duration": {
-                        "turns": 1
+                        "value": 1,
+                        "units": "turns",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -194,7 +195,9 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -356,11 +359,12 @@
             "effects": [
                 {
                     "name": "重明天音",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "抵抗暴击伤害，濒死回怒。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -381,11 +385,12 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "仙音",
-                    "icon": "icons/svg/sound.svg",
                     "description": "回合结束时引爆造成精神伤害。",
                     "transfer": false,
                     "flags": {
@@ -401,7 +406,9 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/sound.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -592,7 +599,7 @@
                         {
                             "label": "我欲即法",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"我欲即法\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\nif (lvl >= 4) eff.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"我欲即法\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\nif (lvl >= 4) eff.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -615,7 +622,7 @@
                         "scalings": [
                             {
                                 "prop": "liliang",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -637,7 +644,7 @@
                         {
                             "label": "错骨与武器损坏提示",
                             "trigger": "hit_once",
-                            "script": "const wep = actor.itemTypes.weapon.find(w => w.system.equipped);\nif (wep) {\n    ui.notifications.warn(`${wep.name} 已损坏！`);\n    }\n\nif (actor.system.resources.rage.value >= 1) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"黄泉无觅\" },\n        content: `<p>消耗 1 怒气给所有目标施加 [错骨]？</p>`,\n        yes: { label: \"施加\", icon: \"fas fa-check\" },\n        no: { label: \"否\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await actor.changeResources({ \"system.resources.rage.value\": { delta: -1 } }, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        const eff = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n        if (eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { rounds: 1 };\n            for (const t of args.targets) {\n                await game.xjzl.api.effects.addEffect(t.target, data);\n            }\n            ui.notifications.info(\"已施加错骨\");\n        }\n    }\n}",
+                            "script": "const wep = actor.itemTypes.weapon.find(w => w.system.equipped);\nif (wep) {\n    ui.notifications.warn(`${wep.name} 已损坏！`);\n    }\n\nif (actor.system.resources.rage.value >= 1) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"黄泉无觅\" },\n        content: `<p>消耗 1 怒气给所有目标施加 [错骨]？</p>`,\n        yes: { label: \"施加\", icon: \"fas fa-check\" },\n        no: { label: \"否\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await actor.changeResources({ \"system.resources.rage.value\": { delta: -1 } }, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        const eff = game.xjzl.api.effects.getStatus('cuogu');\n        if (eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            for (const t of args.targets) {\n                await game.xjzl.api.effects.addEffect(t.target, data);\n            }\n            ui.notifications.info(\"已施加错骨\");\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -646,26 +653,30 @@
             "effects": [
                 {
                     "name": "沙罗染血",
-                    "icon": "icons/svg/blood.svg",
                     "description": "周围有人出招回内，有人濒死回怒回血。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
                             "slug": "shaluo_ranxue",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "icons/svg/blood.svg",
+                    "showIcon": 2
                 },
                 {
                     "name": "血花",
-                    "icon": "icons/svg/rose.svg",
                     "description": "受御魔式攻击时，攻击者回怒。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 3
+                        "value": 3,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -680,15 +691,18 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/rose.svg",
+                    "showIcon": 2
                 },
                 {
                     "name": "我欲即法",
-                    "icon": "icons/svg/eye.svg",
                     "description": "绝招无视格挡架招。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -703,7 +717,9 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/eye.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -775,7 +791,7 @@
                         {
                             "label": "施加目盲",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = game.xjzl.api.effects.getStatus('blind');\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -812,7 +828,7 @@
                         {
                             "label": "施加错骨",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n    if (eff) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const eff = game.xjzl.api.effects.getStatus('cuogu');\n    if (eff) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1 + (lvl - 1), units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -892,7 +908,7 @@
                         {
                             "label": "姿态效果",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const choice = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"风波诡谲 - 选择扇姿态\" },\n        content: \"<p>当前扇子状态？</p>\",\n        buttons: [{\n            label: \"开扇 (目盲)\", action: \"open\"\n        }, {\n            label: \"合扇 (错骨)\", action: \"close\"\n        }]\n    });\n    \n    const statusId = (choice === \"open\") ? \"blind\" : \"cuogu\";\n    const eff = CONFIG.statusEffects.find(e => e.id === statusId);\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`已施加 ${data.name}`);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const choice = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"风波诡谲 - 选择扇姿态\" },\n        content: \"<p>当前扇子状态？</p>\",\n        buttons: [{\n            label: \"开扇 (目盲)\", action: \"open\"\n        }, {\n            label: \"合扇 (错骨)\", action: \"close\"\n        }]\n    });\n    \n    const statusId = (choice === \"open\") ? \"blind\" : \"cuogu\";\n    const eff = game.xjzl.api.effects.getStatus(statusId);\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`已施加 ${data.name}`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -901,7 +917,6 @@
             "effects": [
                 {
                     "name": "谋定",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                     "description": "架招结束获得护体。",
                     "transfer": false,
                     "flags": {
@@ -909,7 +924,9 @@
                             "slug": "mouding",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -1026,7 +1043,7 @@
                         {
                             "label": "击破特效",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    // 护体\n    const def = args.target.system.combat.defWaigongTotal || 0;\n    await actor.applyHealing({ healer: actor, amount: def, type: \"huti\", showScrolling: true});\n    \n    // 破甲\n    const eff = CONFIG.statusEffects.find(e => e.id === \"pojia\");\n    if(eff) {\n       const lvl = Math.max(1, move.computedLevel || 1);\n       const data = foundry.utils.deepClone(eff);\n       data.duration = { rounds: 1 + (lvl - 1) };\n       await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    // 护体\n    const def = args.target.system.combat.defWaigongTotal || 0;\n    await actor.applyHealing({ healer: actor, amount: def, type: \"huti\", showScrolling: true});\n    \n    // 破甲\n    const eff = game.xjzl.api.effects.getStatus('pojia');\n    if(eff) {\n       const lvl = Math.max(1, move.computedLevel || 1);\n       const data = foundry.utils.deepClone(eff);\n       data.duration = { value: 1 + (lvl - 1), units: \"rounds\", expiry: \"turnStart\" };\n       await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1084,7 +1101,6 @@
             "effects": [
                 {
                     "name": "白色",
-                    "icon": "icons/magic/light/orb-lightbulb-gray.webp",
                     "description": "棋子计数。",
                     "transfer": false,
                     "flags": {
@@ -1092,11 +1108,12 @@
                             "slug": "baise",
                             "stackable": true
                         }
-                    }
+                    },
+                    "img": "icons/magic/light/orb-lightbulb-gray.webp",
+                    "showIcon": 2
                 },
                 {
                     "name": "黑色",
-                    "icon": "icons/magic/unholy/orb-glowing-purple.webp",
                     "description": "棋子计数。",
                     "transfer": false,
                     "flags": {
@@ -1104,7 +1121,9 @@
                             "slug": "heise",
                             "stackable": true
                         }
-                    }
+                    },
+                    "img": "icons/magic/unholy/orb-glowing-purple.webp",
+                    "showIcon": 2
                 }
             ]
         }
@@ -1280,11 +1299,12 @@
             "effects": [
                 {
                     "name": "坤卦",
-                    "icon": "icons/magic/symbols/runes-star-magenta.webp",
                     "description": "格挡值+5。若由奇爻异术生成，请手动为周围3米内友方添加此状态。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -1292,21 +1312,26 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.block",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
+                    "img": "icons/magic/symbols/runes-star-magenta.webp",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.block",
+                                "value": "5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "艮卦",
-                    "icon": "icons/magic/symbols/runes-star-blue.webp",
                     "description": "周围3米变为困难地形。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -1314,15 +1339,20 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "icons/magic/symbols/runes-star-blue.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "坎卦",
-                    "icon": "icons/magic/symbols/runes-star-magenta.webp",
                     "description": "本套路属性视为阴柔，请出招时手动覆盖属性。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -1330,15 +1360,20 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "icons/magic/symbols/runes-star-magenta.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "震卦",
-                    "icon": "icons/magic/symbols/runes-star-blue.webp",
                     "description": "造成伤害时，击退目标1米。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -1354,15 +1389,20 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/magic/symbols/runes-star-blue.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "巽卦",
-                    "icon": "icons/magic/symbols/runes-star-magenta.webp",
                     "description": "移动速度+3。若由奇爻异术生成，请手动为周围3米内友方添加此状态。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -1370,21 +1410,26 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "3"
-                        }
-                    ]
+                    "img": "icons/magic/symbols/runes-star-magenta.webp",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.speed",
+                                "value": "3",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "离卦",
-                    "icon": "icons/magic/symbols/runes-star-blue.webp",
                     "description": "奇爻异术的招式造成伤害时额外造成10点火焰伤害。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -1400,11 +1445,14 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/magic/symbols/runes-star-blue.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "兑卦",
-                    "icon": "icons/magic/symbols/runes-star-magenta.webp",
                     "description": "下次奇爻异术的招式命中无架招目标时，施加缚身1回合。",
                     "transfer": false,
                     "flags": {
@@ -1415,13 +1463,17 @@
                                 {
                                     "label": "施加缚身并移除",
                                     "trigger": "hit",
-                                    "script": "if (args.isHit && !args.target.system.martial.stanceActive && args.item?.name === \"奇爻异术\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 1 } });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #2ecc71; background:rgba(46,204,113,0.1); padding:4px;\"><b><i class=\"fas fa-link\"></i> 兑卦触发：</b>对 ${args.target.name} 施加了 [缚身]！</div>` });\n    await game.xjzl.api.effects.removeEffect(actor, \"bagua_dui\", 1);\n}",
+                                    "script": "if (args.isHit && !args.target.system.martial.stanceActive && args.item?.name === \"奇爻异术\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #2ecc71; background:rgba(46,204,113,0.1); padding:4px;\"><b><i class=\"fas fa-link\"></i> 兑卦触发：</b>对 ${args.target.name} 施加了 [缚身]！</div>` });\n    await game.xjzl.api.effects.removeEffect(actor, \"bagua_dui\", 1);\n}",
                                     "active": true
                                 }
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/magic/symbols/runes-star-magenta.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1464,7 +1516,6 @@
         "effects": [
             {
                 "name": "混沌为一（被动特效）",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "被击破架招时自动获取护体。",
                 "transfer": true,
                 "flags": {
@@ -1479,7 +1530,8 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png"
             }
         ]
     },
@@ -1523,7 +1575,7 @@
                             "label": "幻象对抗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst attBonus = (lvl - 1) * 2;\nconst rounds = lvl; // 1 + (lvl - 1)\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"qiaoshou\",\n    defType: \"rennai\",\n    attBonus: attBonus,\n    label: \"千象万化手 - 幻象迷惑\",\n    outcome: {\n        win: {\n            text: \"目标脑海紊乱，恶心干呕，陷入迟滞！\",\n            targetEffect: { id: \"chizhi\", duration: { rounds: rounds } }\n        },\n        lose: {\n            text: \"目标看破了你的幻象，并未受到影响。\"\n        }\n    }\n});"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst attBonus = (lvl - 1) * 2;\nconst rounds = lvl; // 1 + (lvl - 1)\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"qiaoshou\",\n    defType: \"rennai\",\n    attBonus: attBonus,\n    label: \"千象万化手 - 幻象迷惑\",\n    outcome: {\n        win: {\n            text: \"目标脑海紊乱，恶心干呕，陷入迟滞！\",\n            targetEffect: { id: \"chizhi\", duration: { value: rounds, units: \"rounds\", expiry: \"turnStart\" } }\n        },\n        lose: {\n            text: \"目标看破了你的幻象，并未受到影响。\"\n        }\n    }\n});"
                         }
                     ]
                 }

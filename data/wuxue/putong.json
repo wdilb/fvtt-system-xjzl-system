@@ -65,7 +65,7 @@
                         {
                             "label": "击破击倒",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被扫堂腿击倒！`);\n}",
+                            "script": "if (args.isBroken) {\n    const eff = game.xjzl.api.effects.getStatus('prone');\n    if (eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被扫堂腿击倒！`);\n}",
                             "active": true
                         }
                     ]
@@ -139,7 +139,7 @@
                         {
                             "label": "应用高声打",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst speedBonus = 1 + (lvl - 1);\n\nconst effData = foundry.utils.deepClone(thisItem.effects.getName(\"高声打\"));\nif (effData) {\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 1 };\n    effData.changes[0].value = String(speedBonus);\n    foundry.utils.setProperty(effData, \"flags.xjzl-system.dmgBonus\", dmgBonus);\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    actor.showFloatyText(\"高声打！\", {fill: \"#FFA500\"});\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst speedBonus = 1 + (lvl - 1);\n\nconst effData = foundry.utils.deepClone(thisItem.effects.getName(\"高声打\"));\nif (effData) {\n    effData.origin = thisItem.uuid;\n    effData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    effData.system.changes[0].value = String(speedBonus);\n    foundry.utils.setProperty(effData, \"flags.xjzl-system.dmgBonus\", dmgBonus);\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    actor.showFloatyText(\"高声打！\", {fill: \"#FFA500\"});\n}",
                             "active": true
                         }
                     ]
@@ -182,7 +182,7 @@
                         {
                             "label": "施加下盘不稳",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if(eff) {\n        eff.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const eff = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('unstable'));\n    if(eff) {\n        eff.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -192,7 +192,6 @@
         "effects": [
             {
                 "name": "高声打",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "移动速度提升，且《粗浅功夫》招式伤害提升。",
                 "transfer": false,
                 "flags": {
@@ -209,13 +208,17 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -908,7 +911,7 @@
                         {
                             "label": "下盘不稳",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const eff = game.xjzl.api.effects.getStatus('unstable');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1054,7 +1057,7 @@
                         {
                             "label": "击破禁足",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const eff = game.xjzl.api.effects.getStatus('root');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！`);\n    }\n}",
                             "active": true
                         }
                     ]

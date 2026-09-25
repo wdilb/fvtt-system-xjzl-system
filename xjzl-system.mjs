@@ -71,6 +71,7 @@ import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 import { xjzlSocket } from "./module/socket.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
+import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -92,6 +93,8 @@ Hooks.once("init", async function () {
 
   // 替换系统的当前战斗指示物
   XJZLTurnMarkerManager.registerSettings();
+
+  registerAEMigrationSetting();
 
   // 是否启用侠界自定义距离
   game.settings.register("xjzl-system", "customDistanceRule", {
@@ -847,6 +850,9 @@ Hooks.once("ready", async function () {
 
   console.log("XJZL | 门派赠品自动化已就绪");
   console.log("XJZL | 背景赠品自动化已就绪");
+
+  await runAEMigrationsIfNeeded();
+
   console.log("侠界之旅系统 - 准备就绪");
 });
 

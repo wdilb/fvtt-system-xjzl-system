@@ -108,8 +108,9 @@ export async function seedWeapons() {
                 // 兵器特效通常随装备生效 (transfer: true)
                 // 除非是主动使用的消耗型技能 (transfer: false)
                 transfer: e.transfer ?? true,
+                showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) }, // V14 变更数组在 system 下；旧 JSON 的数字 mode 在此转换（核心只迁移顶层 changes）
+                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) },
                 // 关键：保留 flags (slug, stacking, scripts inside AE)
                 flags: e.flags || {},
                 description: e.description || "",

@@ -78,7 +78,7 @@
                             "label": "击破禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const rounds = Math.max(1, args.move.computedLevel || 1);\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}"
+                            "script": "if (args.isBroken) {\n    const rounds = Math.max(1, args.move.computedLevel || 1);\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}"
                         }
                     ]
                 },
@@ -153,7 +153,7 @@
                             "label": "施加禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    effectData.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 }
@@ -206,7 +206,7 @@
                             "label": "施加下盘不稳",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    effectData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('unstable'));\n    effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -422,7 +422,7 @@
                             "label": "击破目盲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"blind\"));\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被致盲！`);\n}"
+                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('blind'));\n    effectData.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被致盲！`);\n}"
                         }
                     ]
                 },
@@ -516,14 +516,15 @@
             "effects": [
                 {
                     "name": "残虹",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                     "description": "投掷 D20 出现 20 时，立即回复 50 点气血，50 点内力，然后移除残虹 (需手动)",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "canhong"
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -696,13 +697,13 @@
                             "label": "出招前禁足",
                             "trigger": "check",
                             "active": true,
-                            "script": "if (actor.effects.some(e => e.name === \"阴阳调和\")) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    // 查找禁足 (root/jinzu)\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (root) {\n        root.duration = { rounds: 1 + (lvl - 1) };\n        root.origin = item.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, root);\n        ui.notifications.info(`${args.target.name} 被动静方圆先行禁足！`);\n    }\n}"
+                            "script": "if (actor.effects.some(e => e.name === \"阴阳调和\")) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    // 查找禁足 (root/jinzu)\n    const root = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (root) {\n        root.duration = { value: 1 + (lvl - 1), units: \"rounds\", expiry: \"turnStart\" };\n        root.origin = item.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, root);\n        ui.notifications.info(`${args.target.name} 被动静方圆先行禁足！`);\n    }\n}"
                         },
                         {
                             "label": "命中封招",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const fengzhao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fengzhao\"));\n    if (fengzhao) {\n        fengzhao.duration = { rounds: 1 };\n        fengzhao.origin = item.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fengzhao);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const fengzhao = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fengzhao'));\n    if (fengzhao) {\n        fengzhao.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        fengzhao.origin = item.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fengzhao);\n    }\n}"
                         }
                     ]
                 }
@@ -711,7 +712,6 @@
         "effects": [
             {
                 "name": "太阳",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "description": "四象之一：太阳",
                 "transfer": false,
                 "flags": {
@@ -719,11 +719,14 @@
                         "slug": "taiyang"
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "少阳",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "description": "四象之一：少阳",
                 "transfer": false,
                 "flags": {
@@ -731,11 +734,14 @@
                         "slug": "shaoyang"
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "太阴",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "description": "四象之一：太阴",
                 "transfer": false,
                 "flags": {
@@ -743,11 +749,14 @@
                         "slug": "taiyin"
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "少阴",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "description": "四象之一：少阴",
                 "transfer": false,
                 "flags": {
@@ -755,11 +764,14 @@
                         "slug": "shaoyin"
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "阴阳调和",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "description": "四象流转，阴阳调和",
                 "transfer": false,
                 "flags": {
@@ -767,7 +779,11 @@
                         "slug": "yinyang_harmony"
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -811,7 +827,7 @@
                             "label": "格挡施加迟滞",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招的 ID\nconst stanceId = actor.system.martial.stance;\n// 在本武学中找到该招式数据以读取等级\nconst stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\n\n// 动态计算持续时间：基础1 + (等级-1) = 等级\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst rounds = lvl;\n\nconst effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\neffectData.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"迟滞反击\", {fill: \"#00FFFF\"});"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招的 ID\nconst stanceId = actor.system.martial.stance;\n// 在本武学中找到该招式数据以读取等级\nconst stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\n\n// 动态计算持续时间：基础1 + (等级-1) = 等级\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst rounds = lvl;\n\nconst effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('chizhi'));\neffectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"迟滞反击\", {fill: \"#00FFFF\"});"
                         }
                     ]
                 },
@@ -933,7 +949,7 @@
                             "label": "施加点穴",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    let openCount = 0;\n    const standard = args.target.system.jingmai.standard;\n    for(const key in standard) { if(standard[key]) openCount++; }\n    \n    const dc = 11 + openCount;\n    \n    // 获取系统点穴状态模板\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"dianxue\"));\n    effectData.duration = { rounds: 1 };\n    // 将DC写入描述，方便查看\n    effectData.description = `冲穴难度: ${dc}`;\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被点穴 (DC ${dc})`);\n}"
+                            "script": "if (args.isHit) {\n    let openCount = 0;\n    const standard = args.target.system.jingmai.standard;\n    for(const key in standard) { if(standard[key]) openCount++; }\n    \n    const dc = 11 + openCount;\n    \n    // 获取系统点穴状态模板\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('dianxue'));\n    effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    // 将DC写入描述，方便查看\n    effectData.description = `冲穴难度: ${dc}`;\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被点穴 (DC ${dc})`);\n}"
                         }
                     ]
                 }
@@ -985,7 +1001,7 @@
                             "label": "计算治疗与Buff",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 1. 计算治疗量\nconst skillVal = actor.system.skills.liaoshang.total;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 10;\nconst totalHeal = skillVal + bonus;\n\n// 执行治疗\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"hp\", showScrolling: true });\n\n// 2. 应用云霞Buff\nconst source = thisItem.effects.getName(\"云霞\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "// 1. 计算治疗量\nconst skillVal = actor.system.skills.liaoshang.total;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 10;\nconst totalHeal = skillVal + bonus;\n\n// 执行治疗\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"hp\", showScrolling: true });\n\n// 2. 应用云霞Buff\nconst source = thisItem.effects.getName(\"云霞\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -1107,7 +1123,6 @@
             "effects": [
                 {
                     "name": "云霞",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                     "description": "下次施展招式时，招式伤害+10",
                     "transfer": false,
                     "flags": {
@@ -1116,17 +1131,20 @@
                             "maxStacks": 1
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.skill.mod",
+                                "value": "10",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "离苦",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                     "description": "每有一层招式伤害+5，每次出招后消耗一层",
                     "transfer": false,
                     "flags": {
@@ -1144,13 +1162,17 @@
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.skill.mod",
+                                "value": "5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1276,7 +1298,7 @@
                             "label": "格挡触发皓腕",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"皓腕\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"皓腕\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
                         }
                     ]
                 },
@@ -1362,7 +1384,7 @@
                             "label": "无架招控制",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target.system.martial.stanceActive) {\n    const rootStatus = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (rootStatus) {\n        const rootData = foundry.utils.deepClone(rootStatus);\n        rootData.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n    }\n    const fushenStatus = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n    if (fushenStatus) {\n        const fushenData = foundry.utils.deepClone(fushenStatus);\n        fushenData.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, fushenData);\n    }\n}"
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    const rootStatus = game.xjzl.api.effects.getStatus('root');\n    if (rootStatus) {\n        const rootData = foundry.utils.deepClone(rootStatus);\n        rootData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n    }\n    const fushenStatus = game.xjzl.api.effects.getStatus('fushen');\n    if (fushenStatus) {\n        const fushenData = foundry.utils.deepClone(fushenStatus);\n        fushenData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, fushenData);\n    }\n}"
                         }
                     ]
                 }
@@ -1371,14 +1393,15 @@
         "effects": [
             {
                 "name": "皓腕",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "description": "无法被击落、击飞、击倒",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "haowan"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "showIcon": 2
             }
         ]
     },
@@ -1424,7 +1447,7 @@
                             "label": "移除移速限制",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const targetDoc = args.target;\n// 1. 移除限制状态\nconst toRemove = targetDoc.effects.filter(e => \n    e.statuses.has(\"unstable\") || e.statuses.has(\"root\") || \n    e.changes.some(c => c.key === \"system.combat.speed\" && Number(c.value) < 0)\n).map(e => e.id);\n\nfor (const eid of toRemove) {\n    // 传足够大的移除数量，确保叠层减速也被整体移除（旧逻辑是删除整个 AE）\n    await game.xjzl.api.effects.removeEffect(targetDoc, eid, 99);\n}\n\n// 2. 自身增加速度 (仅对自己生效)\nif (targetDoc.uuid === actor.uuid) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1;\n    const source = thisItem.effects.getName(\"白雪皑皑\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        // 基础2 + (等级-1)\n        const spd = 2 + (lvl - 1);\n        effectData.changes[0].value = String(spd);\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                            "script": "const targetDoc = args.target;\n// 1. 移除限制状态\nconst toRemove = targetDoc.effects.filter(e => \n    e.statuses.has(\"unstable\") || e.statuses.has(\"root\") || \n    e.system.changes.some(c => c.key === \"system.combat.speed\" && Number(c.value) < 0)\n).map(e => e.id);\n\nfor (const eid of toRemove) {\n    // 传足够大的移除数量，确保叠层减速也被整体移除（旧逻辑是删除整个 AE）\n    await game.xjzl.api.effects.removeEffect(targetDoc, eid, 99);\n}\n\n// 2. 自身增加速度 (仅对自己生效)\nif (targetDoc.uuid === actor.uuid) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1;\n    const source = thisItem.effects.getName(\"白雪皑皑\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        // 基础2 + (等级-1)\n        const spd = 2 + (lvl - 1);\n        effectData.system.changes[0].value = String(spd);\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
                         }
                     ]
                 },
@@ -1464,7 +1487,7 @@
                             "label": "施加冻伤",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
                         }
                     ]
                 },
@@ -1498,7 +1521,7 @@
                             "label": "获得状态",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const source = thisItem.effects.getName(\"飞鸿踏雪\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    // 持续1回合\n    effectData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "const source = thisItem.effects.getName(\"飞鸿踏雪\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    // 持续1回合\n    effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 },
@@ -1651,7 +1674,7 @@
                             "label": "敌友判定与施法",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\n// 获取敌我态度 (1: 友善, 0: 中立, -1: 敌对)\n// 兼容 Actor 和 TokenDocument 数据结构\nconst getDisp = (a) => {\n    if (a.token) return a.token.disposition; // TokenDocument (v11+)\n    if (a.prototypeToken) return a.prototypeToken.disposition; // Actor\n    return 0;\n};\n\nconst actorDisp = getDisp(actor);\nconst targetDisp = getDisp(args.target);\n\n// 判定逻辑: 相同 disposition 视为友方 \nconst isFriend = (actorDisp === targetDisp);\n\nif (isFriend) {\n    // 友方：凝霜\n    const bonus = 5 + (lvl - 1) * 5;\n    const source = thisItem.effects.getName(\"凝霜\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { rounds: rounds };\n        effectData.description = `招式伤害+${bonus}，手动视为阴属性`;\n        effectData.changes[0].value = String(bonus);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [凝霜]`);\n    }\n} else {\n    // 敌方：下盘不稳\n    const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (unstable) {\n        const effectData = foundry.utils.deepClone(unstable);\n        effectData.duration = { rounds: rounds };\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳`);\n    }\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\n// 获取敌我态度 (1: 友善, 0: 中立, -1: 敌对)\n// 兼容 Actor 和 TokenDocument 数据结构\nconst getDisp = (a) => {\n    if (a.token) return a.token.disposition; // TokenDocument (v11+)\n    if (a.prototypeToken) return a.prototypeToken.disposition; // Actor\n    return 0;\n};\n\nconst actorDisp = getDisp(actor);\nconst targetDisp = getDisp(args.target);\n\n// 判定逻辑: 相同 disposition 视为友方 \nconst isFriend = (actorDisp === targetDisp);\n\nif (isFriend) {\n    // 友方：凝霜\n    const bonus = 5 + (lvl - 1) * 5;\n    const source = thisItem.effects.getName(\"凝霜\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        effectData.description = `招式伤害+${bonus}，手动视为阴属性`;\n        effectData.system.changes[0].value = String(bonus);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [凝霜]`);\n    }\n} else {\n    // 敌方：下盘不稳\n    const unstable = game.xjzl.api.effects.getStatus('unstable');\n    if (unstable) {\n        const effectData = foundry.utils.deepClone(unstable);\n        effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳`);\n    }\n}"
                         }
                     ]
                 },
@@ -1697,7 +1720,7 @@
                             "label": "冻伤眩晕连招",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    // 1. 检查是否已有冻伤 (触发眩晕)\n    if (args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"frostbite\")) {\n        // 使用 xuanyun ID\n        const xuanyun = CONFIG.statusEffects.find(e => e.id === \"xuanyun\");\n        if (xuanyun) {\n            const effectData = foundry.utils.deepClone(xuanyun);\n            effectData.duration = { rounds: 1 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info(`${args.target.name} 伤上加霜，陷入眩晕！`);\n        }\n    }\n    \n    // 2. 无论如何都施加冻伤 (刷新或叠加)\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                            "script": "if (args.isHit) {\n    // 1. 检查是否已有冻伤 (触发眩晕)\n    if (args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"frostbite\")) {\n        // 使用 xuanyun ID\n        const xuanyun = game.xjzl.api.effects.getStatus('xuanyun');\n        if (xuanyun) {\n            const effectData = foundry.utils.deepClone(xuanyun);\n            effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info(`${args.target.name} 伤上加霜，陷入眩晕！`);\n        }\n    }\n    \n    // 2. 无论如何都施加冻伤 (刷新或叠加)\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
                         }
                     ]
                 }
@@ -1705,7 +1728,6 @@
             "effects": [
                 {
                     "name": "白雪皑皑",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                     "description": "移动速度提升",
                     "transfer": false,
                     "flags": {
@@ -1714,17 +1736,20 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.speed",
+                                "value": "2",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "冻伤",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                     "description": "被阴、柔属性招式攻击时，额外受到 30 点伤害",
                     "transfer": false,
                     "flags": {
@@ -1740,11 +1765,12 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "飞鸿踏雪",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                     "description": "免疫所有你不想要的状态 (需手动移除)",
                     "transfer": false,
                     "flags": {
@@ -1752,11 +1778,12 @@
                             "slug": "feihongtaxue",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "凝霜",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                     "description": "招式伤害提高，且可视为阴属性伤害",
                     "transfer": false,
                     "flags": {
@@ -1765,13 +1792,17 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.global.mod",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.global.mod",
+                                "value": "5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1823,7 +1854,7 @@
                             "label": "试剑对抗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\n\n// 1. 防刷屏\nif (actor.effects.some(e => e.name === \"神虹\")) return;\n\n// 2. 读取并动态修改神虹数值\nconst sourceAe = thisItem.effects.getName(\"神虹\");\nlet effectData = null;\n\nif (sourceAe) {\n    effectData = sourceAe.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n\n    // 计算动态加成: 基础1 + (等级-1) = 等级\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = lvl;\n    \n    effectData.changes.forEach(c => {\n        if (c.key === \"system.combat.xuzhao\" || c.key === \"system.combat.kanpo\") {\n            c.value = String(bonus);\n        }\n    });\n    effectData.description += ` (当前虚招加成: +${bonus})`;\n}\n\n// 3. 发起自动化对抗\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"sword\",\n    label: \"袁公试剑 - 剑术对抗\",\n    outcome: {\n        win: {\n            text: \"剑气冲霄！获胜获得 [神虹]。\",\n            selfEffect: effectData\n        },\n        lose: {\n            text: \"剑意被阻。\"\n        }\n    }\n});"
+                            "script": "if (!args.isHit) return;\n\n// 1. 防刷屏\nif (actor.effects.some(e => e.name === \"神虹\")) return;\n\n// 2. 读取并动态修改神虹数值\nconst sourceAe = thisItem.effects.getName(\"神虹\");\nlet effectData = null;\n\nif (sourceAe) {\n    effectData = sourceAe.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n\n    // 计算动态加成: 基础1 + (等级-1) = 等级\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = lvl;\n    \n    effectData.system.changes.forEach(c => {\n        if (c.key === \"system.combat.xuzhao\" || c.key === \"system.combat.kanpo\") {\n            c.value = String(bonus);\n        }\n    });\n    effectData.description += ` (当前虚招加成: +${bonus})`;\n}\n\n// 3. 发起自动化对抗\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"sword\",\n    label: \"袁公试剑 - 剑术对抗\",\n    outcome: {\n        win: {\n            text: \"剑气冲霄！获胜获得 [神虹]。\",\n            selfEffect: effectData\n        },\n        lose: {\n            text: \"剑意被阻。\"\n        }\n    }\n});"
                         }
                     ]
                 },
@@ -1937,7 +1968,7 @@
                             "label": "对抗与神虹联动",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst hasShenhong = actor.effects.some(e => e.name === \"神虹\");\nconst lvl = Math.max(1, move.computedLevel || 1);\n\nif (hasShenhong) {\n    const extraReactions = lvl; // 升级: 再获得一个 (Lvl1=1, Lvl2=2...)\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#2c3e50;\"><b><i class=\"fas fa-bolt\"></i> 纵横逆顺触发：</b></p><p>已处于[神虹]状态，下回合额外获得 <b>${extraReactions}</b> 个反应动作。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const sourceAe = thisItem.effects.getName(\"神虹\");\n    let effectData = null;\n    if (sourceAe) {\n        effectData = sourceAe.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        const bonus = lvl;\n        effectData.changes.forEach(c => {\n            if (c.key === \"system.combat.xuzhao\" || c.key === \"system.combat.kanpo\") c.value = String(bonus);\n        });\n        effectData.description += ` (当前虚招加成: +${bonus})`;\n    }\n    \n    // 完美利用新加的 attBonus 参数！\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"sword\",\n        label: \"纵横逆顺 - 剑气压制\",\n        attBonus: 3,\n        outcome: {\n            win: { text: \"剑气压制成功！获得 [神虹]。\", selfEffect: effectData },\n            lose: { text: \"压制失败。\" }\n        }\n    });\n}"
+                            "script": "if (!args.isHit) return;\nconst hasShenhong = actor.effects.some(e => e.name === \"神虹\");\nconst lvl = Math.max(1, move.computedLevel || 1);\n\nif (hasShenhong) {\n    const extraReactions = lvl; // 升级: 再获得一个 (Lvl1=1, Lvl2=2...)\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#2c3e50;\"><b><i class=\"fas fa-bolt\"></i> 纵横逆顺触发：</b></p><p>已处于[神虹]状态，下回合额外获得 <b>${extraReactions}</b> 个反应动作。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const sourceAe = thisItem.effects.getName(\"神虹\");\n    let effectData = null;\n    if (sourceAe) {\n        effectData = sourceAe.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        const bonus = lvl;\n        effectData.system.changes.forEach(c => {\n            if (c.key === \"system.combat.xuzhao\" || c.key === \"system.combat.kanpo\") c.value = String(bonus);\n        });\n        effectData.description += ` (当前虚招加成: +${bonus})`;\n    }\n    \n    // 完美利用新加的 attBonus 参数！\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"sword\",\n        label: \"纵横逆顺 - 剑气压制\",\n        attBonus: 3,\n        outcome: {\n            win: { text: \"剑气压制成功！获得 [神虹]。\", selfEffect: effectData },\n            lose: { text: \"压制失败。\" }\n        }\n    });\n}"
                         }
                     ]
                 },
@@ -1972,7 +2003,7 @@
                             "label": "施加颤手与目盲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"chanshou\", 1);\n\nif (actor.effects.some(e => e.name === \"神虹\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = lvl; // 1 + (lvl - 1)\n    const blindData = { id: \"blind\", duration: { rounds: rounds } };\n    await game.xjzl.api.effects.addEffect(args.target, blindData);\n}"
+                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"chanshou\", 1);\n\nif (actor.effects.some(e => e.name === \"神虹\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = lvl; // 1 + (lvl - 1)\n    const blindData = { id: \"blind\", duration: { value: rounds, units: \"rounds\", expiry: \"turnStart\" } };\n    await game.xjzl.api.effects.addEffect(args.target, blindData);\n}"
                         }
                     ]
                 },
@@ -2027,7 +2058,6 @@
         "effects": [
             {
                 "name": "神虹",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "description": "投掷 D20 出现 20 时，立即回复 50 点气血，50 点内力。虚招/看破对抗结果增加。",
                 "transfer": false,
                 "flags": {
@@ -2035,18 +2065,22 @@
                         "slug": "shenhong"
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.xuzhao",
-                        "mode": 2,
-                        "value": "1"
-                    },
-                    {
-                        "key": "system.combat.kanpo",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.xuzhao",
+                            "value": "1",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.kanpo",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2088,26 +2122,28 @@
         "effects": [
             {
                 "name": "峨眉十二桩",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
                 "transfer": true,
                 "description": "你的[道法]、[医术]、[佛法]检定结果+1。",
-                "changes": [
-                    {
-                        "key": "system.arts.daofa.checkMod",
-                        "mode": 2,
-                        "value": "1"
-                    },
-                    {
-                        "key": "system.arts.yishu.checkMod",
-                        "mode": 2,
-                        "value": "1"
-                    },
-                    {
-                        "key": "system.arts.fofa.checkMod",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.arts.daofa.checkMod",
+                            "value": "1",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.arts.yishu.checkMod",
+                            "value": "1",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.arts.fofa.checkMod",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                }
             }
         ]
     },
@@ -2181,10 +2217,13 @@
         "effects": [
             {
                 "name": "骨折",
-                "icon": "icons/svg/bone-broken.svg",
                 "transfer": false,
                 "description": "投掷 D4: 1-左手, 2-右手, 3-左脚, 4-右脚。请手动应用对应效果（如缴械或禁足）。",
-                "changes": []
+                "img": "icons/svg/bone-broken.svg",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2242,7 +2281,7 @@
                         {
                             "label": "施加禁虚",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 从系统配置中获取禁虚数据\n    const statusData = CONFIG.statusEffects.find(e => e.id === \"jinxu\");\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
+                            "script": "if (args.isHit) {\n    // 从系统配置中获取禁虚数据\n    const statusData = game.xjzl.api.effects.getStatus('jinxu');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
                             "active": true
                         }
                     ]

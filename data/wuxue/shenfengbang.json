@@ -74,7 +74,7 @@
                             "label": "消耗刀气并禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nif (!daoqi) return;\nconst stacks = daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n\nconst use = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"风起云涌\" },\n    content: `<p>命中目标！是否消耗全部 <b>${stacks}</b> 层神风刀气以禁足目标 ${stacks} 回合？</p>`,\n    rejectClose: false\n});\n\nif (use) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shenfeng_daoqi\", stacks);\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootData) {\n        rootData.duration = { rounds: stacks };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n        ui.notifications.info(`${actor.name} 消耗 ${stacks} 层刀气，禁足 ${args.target.name} ${stacks} 回合！`);\n    }\n}"
+                            "script": "if (!args.isHit) return;\nconst daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nif (!daoqi) return;\nconst stacks = daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n\nconst use = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"风起云涌\" },\n    content: `<p>命中目标！是否消耗全部 <b>${stacks}</b> 层神风刀气以禁足目标 ${stacks} 回合？</p>`,\n    rejectClose: false\n});\n\nif (use) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shenfeng_daoqi\", stacks);\n    const rootData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (rootData) {\n        rootData.duration = { value: stacks, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n        ui.notifications.info(`${actor.name} 消耗 ${stacks} 层刀气，禁足 ${args.target.name} ${stacks} 回合！`);\n    }\n}"
                         }
                     ]
                 },
@@ -158,7 +158,6 @@
         "effects": [
             {
                 "name": "神风刀气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
                 "description": "每层使刀法的释放距离+1。",
                 "transfer": false,
                 "flags": {
@@ -167,7 +166,9 @@
                         "stackable": true,
                         "maxStacks": 3
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                "showIcon": 2
             }
         ]
     },
@@ -227,7 +228,7 @@
                             "label": "暴击获取/倒地应用",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.isCrit) {\n    const eff = thisItem.effects.getName(\"易水寒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
+                            "script": "if (args.isHit && args.isCrit) {\n    const eff = thisItem.effects.getName(\"易水寒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
                         }
                     ]
                 },
@@ -307,7 +308,7 @@
                             "label": "击破/易水寒效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    const lianji = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    await game.xjzl.api.effects.addEffect(actor, lianji);\n    ui.notifications.info(\"图穷匕见！击倒目标并获得连击。\");\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    const lianji = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('lianji'));\n    await game.xjzl.api.effects.addEffect(actor, lianji);\n    ui.notifications.info(\"图穷匕见！击倒目标并获得连击。\");\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
                         }
                     ]
                 },
@@ -364,7 +365,6 @@
             "effects": [
                 {
                     "name": "易水寒",
-                    "icon": "icons/svg/ice-aura.svg",
                     "description": "下一次施展《易水诀》招式时，可以消耗此状态生效特殊效果。",
                     "transfer": false,
                     "flags": {
@@ -372,7 +372,9 @@
                             "slug": "yishui_han",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "icons/svg/ice-aura.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -507,7 +509,7 @@
                             "label": "击破效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const chizhi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\n    if (chizhi) {\n        chizhi.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, chizhi);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const chizhi = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('chizhi'));\n    if (chizhi) {\n        chizhi.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, chizhi);\n    }\n}"
                         }
                     ]
                 },
@@ -564,7 +566,6 @@
             "effects": [
                 {
                     "name": "回风",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
                     "description": "每层使施展带有“风”字的招式暴击骰-1。",
                     "transfer": false,
                     "flags": {
@@ -573,7 +574,9 @@
                             "stackable": true,
                             "maxStacks": 3
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -622,7 +625,7 @@
                             "label": "命中倒地",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
                         },
                         {
                             "label": "获得刀意",
@@ -745,7 +748,7 @@
                             "label": "流失与状态应用",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const stacks = args.scriptFlags?.shenfeng_stacks || 0;\n    if (stacks > 0) {\n        await args.target.applyDamage({\n            amount: stacks * 20,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            item: args.item,\n            move: args.move,\n            source: \"extra\"\n        });\n        if (stacks >= 3) {\n            const jinjue = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinjue\"));\n            if (jinjue) {\n                jinjue.duration = { rounds: 3 };\n                await game.xjzl.api.effects.addEffect(args.target, jinjue);\n            }\n        }\n    }\n}"
+                            "script": "if (args.isHit) {\n    const stacks = args.scriptFlags?.shenfeng_stacks || 0;\n    if (stacks > 0) {\n        await args.target.applyDamage({\n            amount: stacks * 20,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            item: args.item,\n            move: args.move,\n            source: \"extra\"\n        });\n        if (stacks >= 3) {\n            const jinjue = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jinjue'));\n            if (jinjue) {\n                jinjue.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n                await game.xjzl.api.effects.addEffect(args.target, jinjue);\n            }\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -754,7 +757,6 @@
         "effects": [
             {
                 "name": "刀意",
-                "icon": "icons/svg/sword.svg",
                 "description": "每层使刀法伤害+10。",
                 "transfer": false,
                 "flags": {
@@ -764,17 +766,20 @@
                         "maxStacks": 3
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.weaponTypes.blade.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "icons/svg/sword.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.weaponTypes.blade.mod",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "神风刀气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
                 "description": "每层使刀法的释放距离+1。",
                 "transfer": false,
                 "flags": {
@@ -783,7 +788,9 @@
                         "stackable": true,
                         "maxStacks": 3
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                "showIcon": 2
             }
         ]
     },
@@ -910,7 +917,6 @@
             "effects": [
                 {
                     "name": "杀念",
-                    "icon": "icons/svg/skull.svg",
                     "description": "出招时可消耗20杀戮值增伤。",
                     "transfer": false,
                     "flags": {
@@ -933,7 +939,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/svg/skull.svg",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -979,14 +989,15 @@
             "effects": [
                 {
                     "name": "不定风",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
                     "description": "定无风：可自由切换名称中带有'风'字的武学套路，不必遵循武学切换规则。由GM在移动计数达标时手动添加，持续一回合。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "budingfeng"
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                    "showIcon": 2
                 }
             ]
         }

@@ -353,9 +353,10 @@
         "effects": [
             {
                 "name": "震伤 (小成)",
-                "icon": "systems/xjzl-system/assets/icons/neigong/真武.png",
                 "duration": {
-                    "rounds": 2
+                    "value": 2,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "description": "每次被攻击流失10气血。",
                 "flags": {
@@ -371,13 +372,17 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/neigong/真武.png",
+                "transfer": false,
+                "showIcon": 2
             },
             {
                 "name": "震伤 (圆满)",
-                "icon": "systems/xjzl-system/assets/icons/neigong/真武.png",
                 "duration": {
-                    "rounds": 2
+                    "value": 2,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "description": "每次被攻击流失10气血。出招3次后转为内伤。",
                 "flags": {
@@ -400,43 +405,52 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/neigong/真武.png",
+                "transfer": false,
+                "showIcon": 2
             },
             {
                 "name": "内伤",
-                "icon": "icons/svg/skull.svg",
                 "duration": {
-                    "rounds": 2
+                    "value": 2,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "description": "陷入“禁实”“禁虚”“禁足”。",
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.blockShiZhao",
-                        "mode": 5,
-                        "value": "true"
-                    },
-                    {
-                        "key": "flags.xjzl-system.blockXuZhao",
-                        "mode": 5,
-                        "value": "true"
-                    },
-                    {
-                        "key": "flags.xjzl-system.forceSpeedZero",
-                        "mode": 5,
-                        "value": "true"
-                    },
-                    {
-                        "key": "flags.xjzl-system.forceDodgeZero",
-                        "mode": 5,
-                        "value": "true"
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "slug": "neishang_chunyang",
                         "stackable": false
                     }
-                }
+                },
+                "img": "icons/svg/skull.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.blockShiZhao",
+                            "value": "true",
+                            "type": "override"
+                        },
+                        {
+                            "key": "flags.xjzl-system.blockXuZhao",
+                            "value": "true",
+                            "type": "override"
+                        },
+                        {
+                            "key": "flags.xjzl-system.forceSpeedZero",
+                            "value": "true",
+                            "type": "override"
+                        },
+                        {
+                            "key": "flags.xjzl-system.forceDodgeZero",
+                            "value": "true",
+                            "type": "override"
+                        }
+                    ]
+                },
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },
@@ -550,7 +564,6 @@
         "effects": [
             {
                 "name": "化劲",
-                "icon": "icons/svg/aura.svg",
                 "description": "每层化劲可手动消耗以增加10点招式伤害。",
                 "flags": {
                     "xjzl-system": {
@@ -558,7 +571,10 @@
                         "maxStacks": 10,
                         "slug": "huajin"
                     }
-                }
+                },
+                "img": "icons/svg/aura.svg",
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },
@@ -871,22 +887,9 @@
         "effects": [
             {
                 "name": "正一",
-                "icon": "systems/xjzl-system/assets/icons/neigong/真武.png",
                 "transfer": true,
                 "disabled": true,
                 "description": "格挡值和招式伤害提高10点；出招命中目标后，还会为其添加一回合“迟滞”。",
-                "changes": [
-                    {
-                        "key": "system.combat.block",
-                        "mode": 2,
-                        "value": "10"
-                    },
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "slug": "neigong_zhengyi",
@@ -896,10 +899,25 @@
                                 "label": "正一·迟滞",
                                 "trigger": "hit",
                                 "active": true,
-                                "script": "if (args.actionType !== 'attack' || !args.isHit || !args.target) return;\nconst source = CONFIG.statusEffects.find(e => e.id === 'chizhi');\nif (!source) return;\nconst effect = foundry.utils.deepClone(source);\neffect.duration = { rounds: 1 };\neffect.origin = thisEffect.origin || actor.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, effect);\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #4f6d9a;\"><b>正一：</b>${args.target.name} 获得一回合【迟滞】。</div></div>`\n});"
+                                "script": "if (args.actionType !== 'attack' || !args.isHit || !args.target) return;\nconst source = game.xjzl.api.effects.getStatus('chizhi');\nif (!source) return;\nconst effect = foundry.utils.deepClone(source);\neffect.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\neffect.origin = thisEffect.origin || actor.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, effect);\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #4f6d9a;\"><b>正一：</b>${args.target.name} 获得一回合【迟滞】。</div></div>`\n});"
                             }
                         ]
                     }
+                },
+                "img": "systems/xjzl-system/assets/icons/neigong/真武.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "value": "10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
                 }
             }
         ]
@@ -932,7 +950,7 @@
                             "label": "混元一气 (领悟)",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    // 1. 获取特效模板\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        // 2. 克隆数据\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 3. 修改数值 (领悟 +10)\n        // 模板默认是10，这里其实不用改，但为了代码一致性保留逻辑\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 10;\n\n        // 4. 应用\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            actor.showFloatyText(\"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // 1. 获取特效模板\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        // 2. 克隆数据\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 3. 修改数值 (领悟 +10)\n        // 模板默认是10，这里其实不用改，但为了代码一致性保留逻辑\n        const change = effectData.system.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 10;\n\n        // 4. 应用\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            actor.showFloatyText(\"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -952,7 +970,7 @@
                             "label": "混元一气 (小成)",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 修改数值 (小成 +20)\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 20;\n\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            actor.showFloatyText(\"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 修改数值 (小成 +20)\n        const change = effectData.system.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 20;\n\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            actor.showFloatyText(\"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -972,7 +990,7 @@
                             "label": "混元一气 (圆满)",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 修改数值 (圆满 +30)\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 30;\n\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            actor.showFloatyText(\"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 修改数值 (圆满 +30)\n        const change = effectData.system.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 30;\n\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            actor.showFloatyText(\"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -1002,21 +1020,25 @@
         "effects": [
             {
                 "name": "混元一气",
-                "icon": "systems/xjzl-system/assets/icons/neigong/真武.png",
                 "description": "下次出招提升招式伤害。可手动移除以换取命中加成。",
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": 10
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "stackable": false,
                         "slug": "hunyuanyiqi"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/neigong/真武.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": 10,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },
@@ -1113,7 +1135,6 @@
         "effects": [
             {
                 "name": "清气",
-                "icon": "icons/svg/light.svg",
                 "description": "每层使自身回合末回复5点气血、内力。",
                 "flags": {
                     "xjzl-system": {
@@ -1128,38 +1149,47 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/light.svg",
+                "transfer": false,
+                "showIcon": 2
             },
             {
                 "name": "化力",
-                "icon": "icons/svg/downgrade.svg",
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "description": "招式伤害降低10点，暴击骰+1。",
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.crit_waigong",
-                        "mode": 2,
-                        "value": "1"
-                    },
-                    {
-                        "key": "system.combat.crit_neigong",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "stackable": false,
                         "slug": "huali"
                     }
-                }
+                },
+                "img": "icons/svg/downgrade.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "-10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "value": "1",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     }

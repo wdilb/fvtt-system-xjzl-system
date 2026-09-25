@@ -48,7 +48,7 @@
                         {
                             "label": "架招：施加笨拙",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const effectData = {\n        name: \"笨拙\",\n        icon: \"icons/svg/anchor.svg\",\n        changes: [{ key: \"system.combat.dodge\", mode: 2, value: \"-5\" }],\n        flags: { \"xjzl-system\": { slug: \"benzhuo\", stackable: true, maxStacks: 0 } }\n    };\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n}",
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const effectData = {\n        name: \"笨拙\",\n        img: \"icons/svg/anchor.svg\",\n        system: { changes: [{ key: \"system.combat.dodge\", type: \"add\", value: \"-5\" }] },\n        flags: { \"xjzl-system\": { slug: \"benzhuo\", stackable: true, maxStacks: 0 } }\n    };\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n}",
                             "active": true
                         }
                     ]
@@ -287,7 +287,7 @@
                         {
                             "label": "无架招禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 构造包含系统预设状态 ID 和 持续回合 的数据对象\n    const effectData = { id: \"root\", duration: { rounds: 1 } };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被禁足`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 构造包含系统预设状态 ID 和 持续回合 的数据对象\n    const effectData = { id: \"root\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被禁足`);\n}",
                             "active": true
                         }
                     ]
@@ -319,7 +319,7 @@
                         {
                             "label": "获得随行",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n\n// 规则：随行速度+1... 升级：随行速度+1。即 Lv1=+1, Lv2=+2\nconst val = lvl;\n\n// 1. 获取模板\nconst eff = thisItem.effects.getName(\"随行\").toObject();\n\n// 2. 修改动态数值\n// 修改速度 (Change 索引 0)\neff.changes[0].value = String(val);\n\n// 将等级存入 Flag，供随行自身的脚本读取以计算暴击\neff.flags[\"xjzl-system\"].level = val;\n\n// 设置持续时间\neff.duration = { rounds: 1 };\n\n// 3. 应用\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n\n// 规则：随行速度+1... 升级：随行速度+1。即 Lv1=+1, Lv2=+2\nconst val = lvl;\n\n// 1. 获取模板\nconst eff = thisItem.effects.getName(\"随行\").toObject();\n\n// 2. 修改动态数值\n// 修改速度 (Change 索引 0)\neff.system.changes[0].value = String(val);\n\n// 将等级存入 Flag，供随行自身的脚本读取以计算暴击\neff.flags[\"xjzl-system\"].level = val;\n\n// 设置持续时间\neff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n\n// 3. 应用\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -371,7 +371,6 @@
             "effects": [
                 {
                     "name": "随行",
-                    "icon": "icons/svg/wing.svg",
                     "description": "速度增加，施展《盘蛇刺》招式时暴击骰减少。",
                     "transfer": false,
                     "flags": {
@@ -388,13 +387,17 @@
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "0"
-                        }
-                    ]
+                    "img": "icons/svg/wing.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.speed",
+                                "value": "0",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -536,7 +539,7 @@
                         {
                             "label": "破架应用乏力",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.isBroken) {\n    const effectData = {\n        name: \"乏力\",\n        icon: \"icons/svg/downgrade.svg\",\n        changes: [{ key: \"system.combat.damages.skill.mod\", mode: 2, value: \"-10\" }],\n        flags: { \"xjzl-system\": { slug: \"fali\", stackable: true, maxStacks: 3 } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 乏力层数+1`);\n}"
+                            "script": "if (args.isHit && args.isBroken) {\n    const effectData = {\n        name: \"乏力\",\n        img: \"icons/svg/downgrade.svg\",\n        system: { changes: [{ key: \"system.combat.damages.skill.mod\", type: \"add\", value: \"-10\" }] },\n        flags: { \"xjzl-system\": { slug: \"fali\", stackable: true, maxStacks: 3 } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 乏力层数+1`);\n}"
                         }
                     ]
                 },
@@ -730,7 +733,7 @@
                             "label": "无架招禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n    const eff = foundry.utils.deepClone(root);\n    eff.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被禁足`);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const root = game.xjzl.api.effects.getStatus('root');\n    const eff = foundry.utils.deepClone(root);\n    eff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被禁足`);\n}"
                         }
                     ]
                 },
@@ -774,7 +777,6 @@
             "effects": [
                 {
                     "name": "五毒",
-                    "icon": "icons/svg/acid.svg",
                     "description": "每回合末受到 20 点毒素伤害。",
                     "transfer": false,
                     "flags": {
@@ -791,7 +793,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/svg/acid.svg",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -867,7 +873,7 @@
                             "label": "获得游魂",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "// 1. 校验架招触发条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 2. 获取架招等级 (从 Item 数据中查找当前招式)\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\n\n// 3. 计算速度加成 (基础3 + 升级成长)\n// 升级描述: 游魂速度+1。 Level 1 -> +3, Level 2 -> +4\nconst speedBonus = 3 + (lvl - 1);\n\n// 4. 构建特效数据\nconst effectData = {\n    name: \"游魂\",\n    icon: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n    duration: { rounds: 3 },\n    flags: {\n        \"xjzl-system\": {\n            slug: \"youhun\",\n            stackable: false,\n            tiedToStance: true\n        }\n    },\n    changes: [\n        // 速度加成\n        { key: \"system.combat.speed\", mode: 2, value: speedBonus }\n    ]\n};\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                            "script": "// 1. 校验架招触发条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 2. 获取架招等级 (从 Item 数据中查找当前招式)\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\n\n// 3. 计算速度加成 (基础3 + 升级成长)\n// 升级描述: 游魂速度+1。 Level 1 -> +3, Level 2 -> +4\nconst speedBonus = 3 + (lvl - 1);\n\n// 4. 构建特效数据\nconst effectData = {\n    name: \"游魂\",\n    img: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n    duration: { value: 3, units: \"rounds\", expiry: \"turnStart\"},\n    flags: {\n        \"xjzl-system\": {\n            slug: \"youhun\",\n            stackable: false,\n            tiedToStance: true\n        }\n    },\n    system: { changes: [\n        // 速度加成\n        { key: \"system.combat.speed\", type: \"add\", value: speedBonus }\n    ] }\n};\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
                         }
                     ]
                 },
@@ -906,7 +912,7 @@
                             "label": "施加错乱",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    \n    // 使用系统预设 ID \"cuoluan\"\n    const effectData = {\n        id: \"cuoluan\",\n        icon: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n        duration: { rounds: rounds }\n    };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 陷入错乱！`);\n}"
+                            "script": "if (args.isHit && args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    \n    // 使用系统预设 ID \"cuoluan\"\n    const effectData = {\n        id: \"cuoluan\",\n        img: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n        duration: { value: rounds, units: \"rounds\", expiry: \"turnStart\" }\n    };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 陷入错乱！`);\n}"
                         }
                     ]
                 },
@@ -945,7 +951,7 @@
                             "label": "应用Buff",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n// 计算升级带来的额外固定伤害: (Level - 1) * 20\nconst extraFlatDmg = (lvl - 1) * 20;\n\n// 获取模板\nconst effectData = thisItem.effects.getName(\"神魂颠倒\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\n\n// 将计算好的固定伤害存入 Flag，供特效脚本读取\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.flatBonus\", extraFlatDmg);\n\n// 应用\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\n\n// 标记自动应用，隐藏卡片按钮\nargs.flags.autoApplied = true;"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n// 计算升级带来的额外固定伤害: (Level - 1) * 20\nconst extraFlatDmg = (lvl - 1) * 20;\n\n// 获取模板\nconst effectData = thisItem.effects.getName(\"神魂颠倒\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n\n// 将计算好的固定伤害存入 Flag，供特效脚本读取\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.flatBonus\", extraFlatDmg);\n\n// 应用\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\n\n// 标记自动应用，隐藏卡片按钮\nargs.flags.autoApplied = true;"
                         }
                     ]
                 }
@@ -953,7 +959,6 @@
             "effects": [
                 {
                     "name": "神魂颠倒",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "description": "施展《离魂镖》套路时，招式额外造成内息+固定数值的毒素伤害。",
                     "transfer": false,
                     "flags": {
@@ -969,7 +974,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1053,7 +1062,7 @@
                             "label": "格挡获泣血",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招数据以计算等级\nconst stanceId = actor.system.martial.stance;\nconst stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\nconst level = Math.max(1, stanceMove?.computedLevel || 1);\nconst rounds = 1 + (level - 1);\n\nconst effectData = thisItem.effects.getName(\"泣血\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招数据以计算等级\nconst stanceId = actor.system.martial.stance;\nconst stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\nconst level = Math.max(1, stanceMove?.computedLevel || 1);\nconst rounds = 1 + (level - 1);\n\nconst effectData = thisItem.effects.getName(\"泣血\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
                         }
                     ]
                 },
@@ -1092,7 +1101,7 @@
                             "label": "施加耳鸣",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const level = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (level - 1);\n    // 使用系统预设 ID \"deaf\"\n    const deaf = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n    const effectData = foundry.utils.deepClone(deaf);\n    effectData.duration = { rounds: rounds };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(\"目标被施加耳鸣。请检查周围3米敌人并手动添加。\");\n}"
+                            "script": "if (args.isHit) {\n    const level = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (level - 1);\n    // 使用系统预设 ID \"deaf\"\n    const deaf = game.xjzl.api.effects.getStatus('deaf');\n    const effectData = foundry.utils.deepClone(deaf);\n    effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(\"目标被施加耳鸣。请检查周围3米敌人并手动添加。\");\n}"
                         }
                     ]
                 },
@@ -1144,7 +1153,6 @@
             "effects": [
                 {
                     "name": "泣血",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "description": "暗器招式命中目标后，额外给目标添加一层“流血”。",
                     "transfer": false,
                     "flags": {
@@ -1160,7 +1168,9 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -1222,7 +1232,7 @@
                         {
                             "label": "发起定力检定",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 20,\n        label: \"抵抗自闭\",\n        onFail: { id: \"zibi\", duration: { rounds: 1 } }\n    });\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 20,\n        label: \"抵抗自闭\",\n        onFail: { id: \"zibi\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} }\n    });\n}"
                         }
                     ]
                 },
@@ -1402,7 +1412,6 @@
             "effects": [
                 {
                     "name": "暗器秘录",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "transfer": true,
                     "disabled": false,
                     "description": "秘密暗器武学伤害+10。",
@@ -1420,7 +1429,10 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "system": {
+                        "changes": []
+                    }
                 }
             ]
         }
@@ -1573,7 +1585,7 @@
                         {
                             "label": "阎王索命",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\n// 获取特效模板\nconst sourceEffect = thisItem.effects.getName('冤魂').toObject();\ndelete sourceEffect._id;\nsourceEffect.duration = { rounds: rounds };\nsourceEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: sourceEffect,\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\n// 获取特效模板\nconst sourceEffect = thisItem.effects.getName('冤魂').toObject();\ndelete sourceEffect._id;\nsourceEffect.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\nsourceEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: sourceEffect,\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
                             "active": true
                         }
                     ]
@@ -1582,33 +1594,36 @@
             "effects": [
                 {
                     "name": "冤魂",
-                    "icon": "icons/magic/death/skull-energy-light-purple.webp",
                     "transfer": false,
                     "disabled": false,
                     "description": "命中-10，移动速度-5。",
-                    "changes": [
-                        {
-                            "key": "system.combat.hit_waigong",
-                            "mode": 2,
-                            "value": "-10"
-                        },
-                        {
-                            "key": "system.combat.hit_neigong",
-                            "mode": 2,
-                            "value": "-10"
-                        },
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "-5"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "yuanhun",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "icons/magic/death/skull-energy-light-purple.webp",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.hit_waigong",
+                                "value": "-10",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.hit_neigong",
+                                "value": "-10",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.speed",
+                                "value": "-5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1652,7 +1667,7 @@
                         {
                             "label": "施加绝命",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 2 + (lvl - 1);\n\nconst sourceEffect = thisItem.effects.getName('七步绝命');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.duration = { rounds: rounds };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`已对 ${args.target.name} 施加七步绝命（隐蔽）。`);\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 2 + (lvl - 1);\n\nconst sourceEffect = thisItem.effects.getName('七步绝命');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`已对 ${args.target.name} 施加七步绝命（隐蔽）。`);\n}",
                             "active": true
                         }
                     ]
@@ -1661,17 +1676,20 @@
             "effects": [
                 {
                     "name": "七步绝命",
-                    "icon": "icons/magic/movement/trail-streak-impact-blue.webp",
                     "transfer": false,
                     "disabled": false,
                     "description": "累计移动>7米后，每多1米受10毒伤（结束时结算）。需医术/毒术(DC11)检定发现。",
-                    "changes": [],
                     "flags": {
                         "xjzl-system": {
                             "slug": "qibu-jueming",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "icons/magic/movement/trail-streak-impact-blue.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1730,7 +1748,6 @@
             "effects": [
                 {
                     "name": "五毒",
-                    "icon": "icons/svg/biohazard.svg",
                     "transfer": false,
                     "disabled": false,
                     "description": "你在每回合末受到 20 点毒素伤害。",
@@ -1748,7 +1765,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/svg/biohazard.svg",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1807,17 +1828,20 @@
             "effects": [
                 {
                     "name": "观音泪",
-                    "icon": "icons/svg/ice-aura.svg",
                     "transfer": false,
                     "disabled": false,
                     "description": "消耗内力时受到毒素伤害。",
-                    "changes": [],
                     "flags": {
                         "xjzl-system": {
                             "slug": "guanyin-lei",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "icons/svg/ice-aura.svg",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }

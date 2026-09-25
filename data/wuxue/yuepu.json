@@ -50,7 +50,7 @@
                             "label": "雅乐效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 施加倒地\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n\n    // 施加下盘不稳 (3回合)\n    const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (unstable) {\n        const data = foundry.utils.deepClone(unstable);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    ui.notifications.info(`${args.target.name} 受雅乐影响倒地不稳。`);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 施加倒地\n    const prone = game.xjzl.api.effects.getStatus('prone');\n    if (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n\n    // 施加下盘不稳 (3回合)\n    const unstable = game.xjzl.api.effects.getStatus('unstable');\n    if (unstable) {\n        const data = foundry.utils.deepClone(unstable);\n        data.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    ui.notifications.info(`${args.target.name} 受雅乐影响倒地不稳。`);\n}"
                         }
                     ]
                 }
@@ -283,7 +283,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 13,\n    label: \"抵抗秋杵弄\",\n    onFail: {\n        name: \"捣衣\",\n        img: \"icons/svg/falling.svg\",\n        duration: { rounds: 3 },\n        changes: [\n            { key: \"flags.xjzl-system.unstable\", mode: 5, value: \"true\" }\n        ],\n        flags: {\n            \"xjzl-system\": {\n                slug: \"daoyi\",\n                scripts: [{\n                    label: \"捣衣流失\",\n                    trigger: \"damaged\",\n                    active: true,\n                    script: \"if (args.finalDamage > 0) { await actor.applyHealing({ healer: actor, amount: -5, type: 'mp', showScrolling: true}); }\"\n                }]\n            }\n        }\n    }\n});"
+                            "script": "await Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 13,\n    label: \"抵抗秋杵弄\",\n    onFail: {\n        name: \"捣衣\",\n        img: \"icons/svg/falling.svg\",\n        duration: { value: 3, units: \"rounds\", expiry: \"turnStart\"},\n        system: { changes: [\n            { key: \"flags.xjzl-system.unstable\", type: \"override\", value: \"true\" }\n        ] },\n        flags: {\n            \"xjzl-system\": {\n                slug: \"daoyi\",\n                scripts: [{\n                    label: \"捣衣流失\",\n                    trigger: \"damaged\",\n                    active: true,\n                    script: \"if (args.finalDamage > 0) { await actor.applyHealing({ healer: actor, amount: -5, type: 'mp', showScrolling: true}); }\"\n                }]\n            }\n        }\n    }\n});"
                         }
                     ]
                 }
@@ -350,21 +350,24 @@
             "effects": [
                 {
                     "name": "御风",
-                    "icon": "icons/svg/wing.svg",
                     "description": "速度+2",
                     "transfer": false,
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "yufeng"
                         }
-                    }
+                    },
+                    "img": "icons/svg/wing.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.speed",
+                                "value": "2",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -486,14 +489,15 @@
             "effects": [
                 {
                     "name": "石泉",
-                    "icon": "icons/svg/water.svg",
                     "description": "每第三次出招不耗内力且暴击骰-1 (请手动计算)",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "shiquan"
                         }
-                    }
+                    },
+                    "img": "icons/svg/water.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -555,7 +559,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    // 耳鸣持续一回合：需带duration的完整状态数据，不能用无期限的状态ID\n    const deafTpl = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n    const deafData = deafTpl ? foundry.utils.deepClone(deafTpl) : null;\n    if (deafData) deafData.duration = { rounds: 1 };\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 11,\n        label: \"抵抗月儿高\",\n        onFail: deafData\n    });\n}"
+                            "script": "if (args.isHit) {\n    // 耳鸣持续一回合：需带duration的完整状态数据，不能用无期限的状态ID\n    const deafTpl = game.xjzl.api.effects.getStatus('deaf');\n    const deafData = deafTpl ? foundry.utils.deepClone(deafTpl) : null;\n    if (deafData) deafData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 11,\n        label: \"抵抗月儿高\",\n        onFail: deafData\n    });\n}"
                         }
                     ]
                 }
@@ -613,7 +617,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    // 错骨持续一回合：需带duration的完整状态数据\n    const cuoguTpl = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n    const cuoguData = cuoguTpl ? foundry.utils.deepClone(cuoguTpl) : null;\n    if (cuoguData) cuoguData.duration = { rounds: 1 };\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 13,\n        label: \"抵抗梅花落\",\n        onFail: cuoguData,\n        // hp为资源类型，requestSave 会走负数applyHealing直接流失，无需手动扣除\n        damageOnFail: { value: 30, type: \"hp\" },\n        failureText: \"真气逆行，错骨失血！流失 30 点气血。\",\n        successText: \"心神坚定，未受影响。\"\n    });\n}"
+                            "script": "if (args.isHit) {\n    // 错骨持续一回合：需带duration的完整状态数据\n    const cuoguTpl = game.xjzl.api.effects.getStatus('cuogu');\n    const cuoguData = cuoguTpl ? foundry.utils.deepClone(cuoguTpl) : null;\n    if (cuoguData) cuoguData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 13,\n        label: \"抵抗梅花落\",\n        onFail: cuoguData,\n        // hp为资源类型，requestSave 会走负数applyHealing直接流失，无需手动扣除\n        damageOnFail: { value: 30, type: \"hp\" },\n        failureText: \"真气逆行，错骨失血！流失 30 点气血。\",\n        successText: \"心神坚定，未受影响。\"\n    });\n}"
                         }
                     ]
                 }
@@ -679,17 +683,20 @@
             "effects": [
                 {
                     "name": "阳春",
-                    "icon": "icons/svg/sun.svg",
                     "description": "阳春白雪共鸣标记",
                     "transfer": false,
                     "duration": {
-                        "rounds": 3
+                        "value": 3,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
                             "slug": "yangchun"
                         }
-                    }
+                    },
+                    "img": "icons/svg/sun.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -753,17 +760,20 @@
             "effects": [
                 {
                     "name": "白雪",
-                    "icon": "icons/svg/ice-aura.svg",
                     "description": "阳春白雪共鸣标记",
                     "transfer": false,
                     "duration": {
-                        "rounds": 3
+                        "value": 3,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
                             "slug": "baixue"
                         }
-                    }
+                    },
+                    "img": "icons/svg/ice-aura.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -820,7 +830,7 @@
                             "label": "高山效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasLiuShui = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"liushui\");\nlet blockBonus = 0;\nif (hasLiuShui) blockBonus = 20;\n\nconst eff = thisItem.effects.getName(\"高山\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态写入\neff.changes[1].value = String(blockBonus);\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                            "script": "const hasLiuShui = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"liushui\");\nlet blockBonus = 0;\nif (hasLiuShui) blockBonus = 20;\n\nconst eff = thisItem.effects.getName(\"高山\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态写入\neff.system.changes[1].value = String(blockBonus);\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 }
@@ -828,26 +838,29 @@
             "effects": [
                 {
                     "name": "高山",
-                    "icon": "icons/svg/mountain.svg",
                     "description": "外功防御+10 (共鸣时格挡+20)",
                     "transfer": false,
-                    "changes": [
-                        {
-                            "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "10"
-                        },
-                        {
-                            "key": "system.combat.block",
-                            "mode": 2,
-                            "value": "0"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "gaoshan"
                         }
-                    }
+                    },
+                    "img": "icons/svg/mountain.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.def_waigong",
+                                "value": "10",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.block",
+                                "value": "0",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -904,7 +917,7 @@
                             "label": "流水效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasGaoShan = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gaoshan\");\nlet blockBonus = 0;\nif (hasGaoShan) blockBonus = 20;\n\nconst eff = thisItem.effects.getName(\"流水\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态写入\neff.changes[1].value = String(blockBonus);\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                            "script": "const hasGaoShan = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gaoshan\");\nlet blockBonus = 0;\nif (hasGaoShan) blockBonus = 20;\n\nconst eff = thisItem.effects.getName(\"流水\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态写入\neff.system.changes[1].value = String(blockBonus);\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 }
@@ -912,26 +925,29 @@
             "effects": [
                 {
                     "name": "流水",
-                    "icon": "icons/svg/water.svg",
                     "description": "内功防御+10 (共鸣时格挡+20)",
                     "transfer": false,
-                    "changes": [
-                        {
-                            "key": "system.combat.def_neigong",
-                            "mode": 2,
-                            "value": "10"
-                        },
-                        {
-                            "key": "system.combat.block",
-                            "mode": 2,
-                            "value": "0"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "liushui"
                         }
-                    }
+                    },
+                    "img": "icons/svg/water.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.def_neigong",
+                                "value": "10",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.block",
+                                "value": "0",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -996,16 +1012,8 @@
             "effects": [
                 {
                     "name": "盼归",
-                    "icon": "icons/svg/moon.svg",
                     "description": "造成和受到伤害+20",
                     "transfer": false,
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.global.mod",
-                            "mode": 2,
-                            "value": "20"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "pangui",
@@ -1018,7 +1026,18 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/moon.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.global.mod",
+                                "value": "20",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1197,7 +1216,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 16,\n    label: \"抵抗渔樵问答\",\n    onFail: {\n        name: \"问答\",\n        duration: { rounds: 2 },\n        flags: { \"xjzl-system\": { slug: \"wenda\", \n            scripts: [{\n                label: \"回合初提示\",\n                trigger: \"turnStart\",\n                active: true,\n                script: \"ChatMessage.create({ content: `${actor.name} 需进行说服检定(DC13)以解除[问答]`, speaker: ChatMessage.getSpeaker({actor: actor}) });\"\n            }]\n        }}\n    }\n});"
+                            "script": "await Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 16,\n    label: \"抵抗渔樵问答\",\n    onFail: {\n        name: \"问答\",\n        duration: { value: 2, units: \"rounds\", expiry: \"turnStart\"},\n        flags: { \"xjzl-system\": { slug: \"wenda\", \n            scripts: [{\n                label: \"回合初提示\",\n                trigger: \"turnStart\",\n                active: true,\n                script: \"ChatMessage.create({ content: `${actor.name} 需进行说服检定(DC13)以解除[问答]`, speaker: ChatMessage.getSpeaker({actor: actor}) });\"\n            }]\n        }}\n    }\n});"
                         }
                     ]
                 }
@@ -1256,7 +1275,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 16,\n    label: \"抵抗昭君出塞\",\n    onFail: {\n        name: \"肝肠断\",\n        img: \"icons/svg/ruins.svg\",\n        duration: { rounds: 3 },\n        flags: { \"xjzl-system\": { slug: \"ganchangduan\", \n            scripts: [{\n                label: \"受伤增加\",\n                trigger: \"preTake\",\n                active: true,\n                script: \"args.output.damage += 20;\"\n            }]\n        }}\n    }\n});"
+                            "script": "await Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 16,\n    label: \"抵抗昭君出塞\",\n    onFail: {\n        name: \"肝肠断\",\n        img: \"icons/svg/ruins.svg\",\n        duration: { value: 3, units: \"rounds\", expiry: \"turnStart\"},\n        flags: { \"xjzl-system\": { slug: \"ganchangduan\", \n            scripts: [{\n                label: \"受伤增加\",\n                trigger: \"preTake\",\n                active: true,\n                script: \"args.output.damage += 20;\"\n            }]\n        }}\n    }\n});"
                         }
                     ]
                 }
@@ -1322,29 +1341,34 @@
             "effects": [
                 {
                     "name": "夕阳",
-                    "icon": "icons/svg/sun.svg",
                     "description": "回合末回复气血内力",
                     "transfer": false,
                     "duration": {
-                        "rounds": 3
+                        "value": 3,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenHpTurnEnd",
-                            "mode": 2,
-                            "value": "20"
-                        },
-                        {
-                            "key": "flags.xjzl-system.regenMpTurnEnd",
-                            "mode": 2,
-                            "value": "20"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "xiyang"
                         }
-                    }
+                    },
+                    "img": "icons/svg/sun.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "flags.xjzl-system.regenHpTurnEnd",
+                                "value": "20",
+                                "type": "add"
+                            },
+                            {
+                                "key": "flags.xjzl-system.regenMpTurnEnd",
+                                "value": "20",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1405,7 +1429,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    // 倒地/耳鸣持续三回合：需带duration的完整状态数据\n    const failEffects = [\"prone\", \"deaf\"].map(id => {\n        const tpl = CONFIG.statusEffects.find(e => e.id === id);\n        if (!tpl) return null;\n        const data = foundry.utils.deepClone(tpl);\n        data.duration = { rounds: 3 };\n        return data;\n    }).filter(Boolean);\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 15,\n        label: \"抵抗苍梧引\",\n        onFail: failEffects\n    });\n}"
+                            "script": "if (args.isHit) {\n    // 倒地/耳鸣持续三回合：需带duration的完整状态数据\n    const failEffects = [\"prone\", \"deaf\"].map(id => {\n        const tpl = game.xjzl.api.effects.getStatus(id);\n        if (!tpl) return null;\n        const data = foundry.utils.deepClone(tpl);\n        data.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n        return data;\n    }).filter(Boolean);\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 15,\n        label: \"抵抗苍梧引\",\n        onFail: failEffects\n    });\n}"
                         }
                     ]
                 }
@@ -1599,7 +1623,6 @@
             "effects": [
                 {
                     "name": "映月",
-                    "icon": "icons/svg/moon.svg",
                     "description": "受到暴击移除以减免40伤害",
                     "transfer": false,
                     "flags": {
@@ -1614,7 +1637,9 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/moon.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -1678,14 +1703,15 @@
             "effects": [
                 {
                     "name": "愿者",
-                    "icon": "icons/svg/light.svg",
                     "description": "当施法者回血时，你也回一半 (需手动操作)",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "yuanzhe"
                         }
-                    }
+                    },
+                    "img": "icons/svg/light.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -1881,7 +1907,6 @@
             "effects": [
                 {
                     "name": "哀恨",
-                    "icon": "icons/svg/blood.svg",
                     "description": "受阴乐曲伤害流失气血",
                     "transfer": false,
                     "flags": {
@@ -1897,7 +1922,9 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/blood.svg",
+                    "showIcon": 2
                 }
             ]
         }
@@ -1959,7 +1986,7 @@
                             "label": "广陵提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 持剑/刀/枪(棍)的命中目标自动添加迟滞一回合\nif (args.isHit) {\n    const armedTypes = [\"sword\", \"blade\", \"staff\"]; // 剑、刀、枪/棍\n    const weapon = (args.target.itemTypes.weapon || []).find(w => w.system?.equipped && armedTypes.includes(w.system?.type));\n    if (weapon) {\n        const tpl = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n        if (tpl) {\n            const data = foundry.utils.deepClone(tpl);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 手持兵器，被琴音所滞，陷入 [迟滞]`);\n        }\n    }\n}\n\nChatMessage.create({ content: `<div class=\\\"xjzl-chat-card\\\"><p>请手动给范围内友方添加 [广陵] (招式伤害+20)。</p></div>`, speaker: ChatMessage.getSpeaker({actor: actor}) });"
+                            "script": "// 持剑/刀/枪(棍)的命中目标自动添加迟滞一回合\nif (args.isHit) {\n    const armedTypes = [\"sword\", \"blade\", \"staff\"]; // 剑、刀、枪/棍\n    const weapon = (args.target.itemTypes.weapon || []).find(w => w.system?.equipped && armedTypes.includes(w.system?.type));\n    if (weapon) {\n        const tpl = game.xjzl.api.effects.getStatus('chizhi');\n        if (tpl) {\n            const data = foundry.utils.deepClone(tpl);\n            data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 手持兵器，被琴音所滞，陷入 [迟滞]`);\n        }\n    }\n}\n\nChatMessage.create({ content: `<div class=\\\"xjzl-chat-card\\\"><p>请手动给范围内友方添加 [广陵] (招式伤害+20)。</p></div>`, speaker: ChatMessage.getSpeaker({actor: actor}) });"
                         }
                     ]
                 }
@@ -1967,24 +1994,29 @@
             "effects": [
                 {
                     "name": "广陵",
-                    "icon": "icons/svg/combat.svg",
                     "description": "招式伤害+20",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "20"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "guangling"
                         }
-                    }
+                    },
+                    "img": "icons/svg/combat.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.skill.mod",
+                                "value": "20",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -2169,21 +2201,8 @@
             "effects": [
                 {
                     "name": "笑傲",
-                    "icon": "icons/svg/sun.svg",
                     "description": "命中+5，释放距离+5。受到内外功伤害时，可消耗此状态抵挡30点伤害。",
                     "transfer": false,
-                    "changes": [
-                        {
-                            "key": "system.combat.hit_waigong",
-                            "mode": 2,
-                            "value": "5"
-                        },
-                        {
-                            "key": "system.combat.hit_neigong",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "xiaoao",
@@ -2196,14 +2215,28 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/sun.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.hit_waigong",
+                                "value": "5",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.hit_neigong",
+                                "value": "5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "笑傲 (天籁)",
-                    "icon": "icons/svg/sun.svg",
                     "description": "招式必定命中，释放距离+5。受到内外功伤害时，可消耗此状态抵挡200点伤害。",
                     "transfer": false,
-                    "changes": [],
                     "flags": {
                         "xjzl-system": {
                             "slug": "xiaoao_heaven",
@@ -2222,7 +2255,12 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/sun.svg",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -2287,21 +2325,8 @@
             "effects": [
                 {
                     "name": "笑傲",
-                    "icon": "icons/svg/sun.svg",
                     "description": "命中+5, 距离+5。受到内外功伤害可消耗抵挡30伤害。",
                     "transfer": false,
-                    "changes": [
-                        {
-                            "key": "system.combat.hit_waigong",
-                            "mode": 2,
-                            "value": "5"
-                        },
-                        {
-                            "key": "system.combat.hit_neigong",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ],
                     "flags": {
                         "xjzl-system": {
                             "slug": "xiaoao",
@@ -2314,7 +2339,23 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "icons/svg/sun.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.hit_waigong",
+                                "value": "5",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.hit_neigong",
+                                "value": "5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -2432,7 +2473,7 @@
                             "label": "选择效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"忆江南\" },\n    content: \"<p>选择添加的效果：</p>\",\n    yes: { label: \"养血 (回血)\", icon: \"fas fa-heart\" },\n    no: { label: \"聚气 (回内)\", icon: \"fas fa-bolt\" }\n});\n\nlet slug = confirm ? \"yangxue\" : \"juqi\";\nconst effData = CONFIG.statusEffects.find(e => e.id === slug);\nif (effData) {\n    const data = foundry.utils.deepClone(effData);\n    data.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"忆江南\" },\n    content: \"<p>选择添加的效果：</p>\",\n    yes: { label: \"养血 (回血)\", icon: \"fas fa-heart\" },\n    no: { label: \"聚气 (回内)\", icon: \"fas fa-bolt\" }\n});\n\nlet slug = confirm ? \"yangxue\" : \"juqi\";\nconst effData = game.xjzl.api.effects.getStatus(slug);\nif (effData) {\n    const data = foundry.utils.deepClone(effData);\n    data.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
                         }
                     ]
                 }
@@ -2496,11 +2537,12 @@
             "effects": [
                 {
                     "name": "乘龙快婿",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                     "description": "每次演奏成功时，额外获得一个音阶。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -2508,7 +2550,11 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -2552,7 +2598,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.target.type !== \"character\") {\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootData) rootData.duration = { rounds: 1 };\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 15,\n        label: \"抵抗飞鸣吟\",\n        onFail: rootData\n    });\n} else {\n    ui.notifications.info(`${args.target.name} 为玩家角色，请确认是否为敌方。若是友方请忽略。`);\n}"
+                            "script": "if (args.target.type !== \"character\") {\n    const rootData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (rootData) rootData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 15,\n        label: \"抵抗飞鸣吟\",\n        onFail: rootData\n    });\n} else {\n    ui.notifications.info(`${args.target.name} 为玩家角色，请确认是否为敌方。若是友方请忽略。`);\n}"
                         }
                     ],
                     "actionType": "buff"
@@ -2608,11 +2654,12 @@
             "effects": [
                 {
                     "name": "强击",
-                    "icon": "icons/skills/melee/strike-polearm-red.webp",
                     "description": "每次出招造成暴击后，获得 10 士气。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -2628,7 +2675,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/skills/melee/strike-polearm-red.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -2681,11 +2732,12 @@
             "effects": [
                 {
                     "name": "强击",
-                    "icon": "icons/skills/melee/strike-polearm-red.webp",
                     "description": "每次出招造成暴击后，获得 10 士气。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 2
+                        "value": 2,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -2701,7 +2753,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/skills/melee/strike-polearm-red.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -2754,11 +2810,12 @@
             "effects": [
                 {
                     "name": "采药",
-                    "icon": "icons/tools/scribal/mortar-pestle-green.webp",
                     "description": "服用药物时，额外回复 10 气血内力。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 3
+                        "value": 3,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -2766,7 +2823,11 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "icons/tools/scribal/mortar-pestle-green.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -2810,7 +2871,7 @@
                         {
                             "label": "添加养血",
                             "trigger": "hit",
-                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"yangxue\");\nif(eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
+                            "script": "const eff = game.xjzl.api.effects.getStatus('yangxue');\nif(eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
                             "active": true
                         }
                     ],
@@ -2968,7 +3029,6 @@
             "effects": [
                 {
                     "name": "逢时",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                     "description": "进行属性、技能、对抗检定时，投掷结果+1 或-1 (请手动调整)。",
                     "transfer": false,
                     "flags": {
@@ -2977,11 +3037,14 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "逢时（天籁）",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                     "description": "天籁之音：进行属性、技能、对抗检定时，投掷结果+3 或-3 (请手动调整)。",
                     "transfer": false,
                     "flags": {
@@ -2990,7 +3053,11 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -3058,7 +3125,6 @@
             "effects": [
                 {
                     "name": "粘",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：粘",
                     "transfer": false,
                     "flags": {
@@ -3066,11 +3132,12 @@
                             "slug": "wuxue_bayin_zhan",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "杀",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：杀",
                     "transfer": false,
                     "flags": {
@@ -3078,11 +3145,12 @@
                             "slug": "wuxue_bayin_sha",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "夺",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：夺",
                     "transfer": false,
                     "flags": {
@@ -3090,11 +3158,12 @@
                             "slug": "wuxue_bayin_duo",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "摄",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：摄",
                     "transfer": false,
                     "flags": {
@@ -3102,11 +3171,12 @@
                             "slug": "wuxue_bayin_she",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "牵",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：牵",
                     "transfer": false,
                     "flags": {
@@ -3114,11 +3184,12 @@
                             "slug": "wuxue_bayin_qian",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "拉",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：拉",
                     "transfer": false,
                     "flags": {
@@ -3126,11 +3197,12 @@
                             "slug": "wuxue_bayin_la",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "旋",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：旋",
                     "transfer": false,
                     "flags": {
@@ -3138,11 +3210,12 @@
                             "slug": "wuxue_bayin_xuan",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 },
                 {
                     "name": "锤",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：锤",
                     "transfer": false,
                     "flags": {
@@ -3150,7 +3223,9 @@
                             "slug": "wuxue_bayin_chui",
                             "stackable": false
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "showIcon": 2
                 }
             ]
         }
@@ -3260,11 +3335,12 @@
             "effects": [
                 {
                     "name": "流水静心",
-                    "icon": "icons/magic/water/water-hand.webp",
                     "description": "你的命中、虚招对抗、属性检定、伤残检定、死亡检定结果+1。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -3272,13 +3348,17 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.globalCheckLevel",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
+                    "img": "icons/magic/water/water-hand.webp",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "flags.xjzl-system.globalCheckLevel",
+                                "value": "1",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -3340,11 +3420,12 @@
             "effects": [
                 {
                     "name": "龙龟气",
-                    "icon": "icons/creatures/reptiles/turtle-shell-green.webp",
                     "description": "每次受伤后，回复[忍耐]数值的气血。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 3
+                        "value": 3,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -3360,7 +3441,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/creatures/reptiles/turtle-shell-green.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -3404,7 +3489,7 @@
                         {
                             "label": "裂天地效果",
                             "trigger": "hit",
-                            "script": "// 计算目标总属性\nconst stats = args.target.system.stats;\nlet totalStats = 0;\nfor (const k of [\"liliang\", \"shenfa\", \"neixi\", \"tipo\", \"qigan\", \"shencai\", \"wuxing\"]) {\n    totalStats += (stats[k]?.total || 0);\n}\n\nif (totalStats < 300) {\n    // 禁足/目盲/缚身持续三回合：用带duration的数据施加而非toggleStatus（无期限）\n    for (const id of [\"root\", \"blind\", \"fushen\"]) {\n        const tpl = CONFIG.statusEffects.find(e => e.id === id);\n        if (tpl) {\n            const data = foundry.utils.deepClone(tpl);\n            data.duration = { rounds: 3 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n    }\n    ui.notifications.info(`${args.target.name} (属性<300) 受到严重干扰！`);\n}\nif (totalStats < 200) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}\nif (totalStats < 100) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"stun\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "// 计算目标总属性\nconst stats = args.target.system.stats;\nlet totalStats = 0;\nfor (const k of [\"liliang\", \"shenfa\", \"neixi\", \"tipo\", \"qigan\", \"shencai\", \"wuxing\"]) {\n    totalStats += (stats[k]?.total || 0);\n}\n\nif (totalStats < 300) {\n    // 禁足/目盲/缚身持续三回合：用带duration的数据施加而非toggleStatus（无期限）\n    for (const id of [\"root\", \"blind\", \"fushen\"]) {\n        const tpl = game.xjzl.api.effects.getStatus(id);\n        if (tpl) {\n            const data = foundry.utils.deepClone(tpl);\n            data.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n    }\n    ui.notifications.info(`${args.target.name} (属性<300) 受到严重干扰！`);\n}\nif (totalStats < 200) {\n    const eff = game.xjzl.api.effects.getStatus('fengzhao');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}\nif (totalStats < 100) {\n    const eff = game.xjzl.api.effects.getStatus('stun');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3460,7 +3545,6 @@
             "effects": [
                 {
                     "name": "刀兵",
-                    "icon": "icons/weapons/swords/sword-broad-gold.webp",
                     "description": "出招伤害+10",
                     "transfer": false,
                     "flags": {
@@ -3477,15 +3561,20 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/weapons/swords/sword-broad-gold.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "龟甲",
-                    "icon": "icons/creatures/reptiles/turtle-shell-green.webp",
                     "description": "获得 10 点内外攻防御。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -3493,26 +3582,31 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "10"
-                        },
-                        {
-                            "key": "system.combat.def_neigong",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "img": "icons/creatures/reptiles/turtle-shell-green.webp",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.def_waigong",
+                                "value": "10",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.def_neigong",
+                                "value": "10",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "大旗",
-                    "icon": "icons/tools/navigation/flag-yellow.webp",
                     "description": "移动速度+4。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -3520,13 +3614,17 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "4"
-                        }
-                    ]
+                    "img": "icons/tools/navigation/flag-yellow.webp",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.speed",
+                                "value": "4",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }

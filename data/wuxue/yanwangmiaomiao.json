@@ -49,7 +49,7 @@
                         {
                             "label": "施加夺命",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
+                            "script": "if (args.isBroken) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
                             "active": true
                         }
                     ]
@@ -110,7 +110,7 @@
                         {
                             "label": "格挡反击",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    actor.showFloatyText(\"格挡反震！\", { fill: \"#FFA500\" });\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    actor.showFloatyText(\"格挡反震！\", { fill: \"#FFA500\" });\n}",
                             "active": true
                         }
                     ]
@@ -193,7 +193,6 @@
             "effects": [
                 {
                     "name": "夺命",
-                    "icon": "icons/svg/blood.svg",
                     "description": "每次出招后流失 10 点气血、内力。",
                     "transfer": false,
                     "flags": {
@@ -210,7 +209,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "icons/svg/blood.svg",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -304,7 +307,7 @@
                         {
                             "label": "格挡禁足",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    // 使用系统预设的禁足\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        actor.showFloatyText(\"禁足反击\", {fill: \"#0000FF\"});\n    }\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    // 使用系统预设的禁足\n    const eff = game.xjzl.api.effects.getStatus('root');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        actor.showFloatyText(\"禁足反击\", {fill: \"#0000FF\"});\n    }\n}",
                             "active": true
                         },
                         {
@@ -439,7 +442,7 @@
                         {
                             "label": "应用护盾",
                             "trigger": "hit",
-                            "script": "// 1. 计算护盾数值\nconst exing = actor.system.social?.exing || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst max = 200 + (lvl - 1) * 100;\nconst shieldValue = Math.min(exing, max);\n\n// 2. 发送卡片告知\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\"><b>卞城枉死</b> 护盾激活！<br>护盾强度: <b>${shieldValue}</b><br><i style=\"font-size:0.8em\">将在下次受击前生效。</i></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 3. 施加状态 (将数值带入Flag)\nconst effData = thisItem.effects.getName(\"卞城枉死\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { rounds: 1 };\nfoundry.utils.setProperty(effData, \"flags.xjzl-system.shieldValue\", shieldValue);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "script": "// 1. 计算护盾数值\nconst exing = actor.system.social?.exing || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst max = 200 + (lvl - 1) * 100;\nconst shieldValue = Math.min(exing, max);\n\n// 2. 发送卡片告知\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\"><b>卞城枉死</b> 护盾激活！<br>护盾强度: <b>${shieldValue}</b><br><i style=\"font-size:0.8em\">将在下次受击前生效。</i></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 3. 施加状态 (将数值带入Flag)\nconst effData = thisItem.effects.getName(\"卞城枉死\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\nfoundry.utils.setProperty(effData, \"flags.xjzl-system.shieldValue\", shieldValue);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
@@ -462,7 +465,7 @@
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -496,7 +499,7 @@
                         {
                             "label": "侠义反转与治疗",
                             "trigger": "hit",
-                             "script": "if (!args.isHit || args.target.system.martial.stanceActive) return;\n\n// 1. 读取基础数值 (来自面板)\nlet baseHeal = args.baseDamage || 0;\n\n// 2. 读取目标侠义 (NaN防卫)\nconst xiayi = Number(args.target.system.social?.xiayi) || 0;\n\n// 3. 通过稳定 slug 检查行刑状态，避免依赖可变的显示名称\nconst isXingxing = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xingxing\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = baseHeal - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ healer: actor, amount: finalValue, type: \"hp\", showScrolling: true, item: args.item, move: args.move, source: \"move\" });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor, item: args.item, move: args.move, source: \"move\" });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "if (!args.isHit || args.target.system.martial.stanceActive) return;\n\n// 1. 读取基础数值 (来自面板)\nlet baseHeal = args.baseDamage || 0;\n\n// 2. 读取目标侠义 (NaN防卫)\nconst xiayi = Number(args.target.system.social?.xiayi) || 0;\n\n// 3. 通过稳定 slug 检查行刑状态，避免依赖可变的显示名称\nconst isXingxing = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xingxing\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = baseHeal - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ healer: actor, amount: finalValue, type: \"hp\", showScrolling: true, item: args.item, move: args.move, source: \"move\" });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor, item: args.item, move: args.move, source: \"move\" });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         },
                         {
@@ -640,7 +643,7 @@
                         {
                             "label": "残疾提示",
                             "trigger": "hit",
-                             "script": "if (!args.isHit) return;\nconst isXingxing = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xingxing\");\nif (isXingxing) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const count = 1 + (lvl - 1);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #8b0000;\"><b>楚江剥皮</b> 触发！<br>目标处于行刑状态。<br>请进行 <b>${count}</b> 次残疾检定。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "if (!args.isHit) return;\nconst isXingxing = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xingxing\");\nif (isXingxing) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const count = 1 + (lvl - 1);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #8b0000;\"><b>楚江剥皮</b> 触发！<br>目标处于行刑状态。<br>请进行 <b>${count}</b> 次残疾检定。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -744,7 +747,6 @@
             "effects": [
                 {
                     "name": "行刑",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "标记状态：用于阎王棍其他招式判定。",
                     "transfer": false,
                     "flags": {
@@ -753,11 +755,14 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "阿鼻降难-破",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "下一次出招无视敌方闪避，距离+20米。",
                     "transfer": false,
                     "flags": {
@@ -780,11 +785,14 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "卞城枉死",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "护盾：恶行值减伤。生效一次后销毁。",
                     "transfer": false,
                     "flags": {
@@ -801,11 +809,14 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "禁架 (大侠)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "无法再次开启被击破的架招。",
                     "transfer": false,
                     "flags": {
@@ -814,11 +825,14 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "禁暴 (大恶)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "外功伤害招式无法造成暴击。",
                     "transfer": false,
                     "flags": {
@@ -827,13 +841,17 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 5,
-                            "value": "999"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.crit_waigong",
+                                "value": "999",
+                                "type": "override"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -877,7 +895,7 @@
                         {
                             "label": "潜行与BUFF",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1);\nawait actor.rollAttributeTest(\"qianxing\", { bonus: bonus, flavor: \"蛰伏-潜行检定\" });\n\nconst effData = thisItem.effects.getName(\"蛰伏\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\nconst critRed = 2 + (lvl - 1);\neffData.changes[0].value = String(-critRed);\neffData.changes[1].value = String(-critRed);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1);\nawait actor.rollAttributeTest(\"qianxing\", { bonus: bonus, flavor: \"蛰伏-潜行检定\" });\n\nconst effData = thisItem.effects.getName(\"蛰伏\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\nconst critRed = 2 + (lvl - 1);\neffData.system.changes[0].value = String(-critRed);\neffData.system.changes[1].value = String(-critRed);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
@@ -886,7 +904,6 @@
             "effects": [
                 {
                     "name": "蛰伏",
-                    "icon": "icons/svg/eye.svg",
                     "description": "下一次出招暴击骰减少。",
                     "transfer": false,
                     "flags": {
@@ -903,18 +920,22 @@
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "-2"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "-2"
-                        }
-                    ]
+                    "img": "icons/svg/eye.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.crit_waigong",
+                                "value": "-2",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.crit_neigong",
+                                "value": "-2",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1178,7 +1199,6 @@
             "effects": [
                 {
                     "name": "阎王不死印-被动",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "受伤自动积累不死气。",
                     "transfer": true,
                     "flags": {
@@ -1195,7 +1215,10 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "system": {
+                        "changes": []
+                    }
                 }
             ]
         }
@@ -1476,7 +1499,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const tune = args.scriptFlags?.tuneSelection;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nif (tune === \"gong\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: rounds } });\n} else if (tune === \"shang\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { rounds: rounds } });\n} else if (tune === \"jue\") {\n    ui.notifications.info(`角·百鸟朝凤：请手动对友方使用 [应用治疗] (基础 ${50 + (lvl - 1) * 20})`);\n} else if (tune === \"zhi\") {\n    const buff = {\n        name: \"花轿\",\n        icon: move.img || \"icons/svg/sound.svg\",\n        duration: { rounds: rounds },\n        flags: { \"xjzl-system\": { slug: \"huajiao\", stackable: false } },\n        changes: [\n            { key: \"system.combat.crit_waigong\", mode: 2, value: \"-3\" },\n            { key: \"system.combat.crit_neigong\", mode: 2, value: \"-3\" }\n        ]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, buff);\n} else if (tune === \"yu\") {\n    ui.notifications.info(\"羽·天乐：请手动移除状态\");\n}",
+                            "script": "const tune = args.scriptFlags?.tuneSelection;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nif (tune === \"gong\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { value: rounds, units: \"rounds\", expiry: \"turnStart\" } });\n} else if (tune === \"shang\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { value: rounds, units: \"rounds\", expiry: \"turnStart\" } });\n} else if (tune === \"jue\") {\n    ui.notifications.info(`角·百鸟朝凤：请手动对友方使用 [应用治疗] (基础 ${50 + (lvl - 1) * 20})`);\n} else if (tune === \"zhi\") {\n    const buff = {\n        name: \"花轿\",\n        icon: move.img || \"icons/svg/sound.svg\",\n        duration: { value: rounds, units: \"rounds\", expiry: \"turnStart\" },\n        flags: { \"xjzl-system\": { slug: \"huajiao\", stackable: false } },\n        system: { changes: [\n            { key: \"system.combat.crit_waigong\", type: \"add\", value: \"-3\" },\n            { key: \"system.combat.crit_neigong\", type: \"add\", value: \"-3\" }\n        ] }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, buff);\n} else if (tune === \"yu\") {\n    ui.notifications.info(\"羽·天乐：请手动移除状态\");\n}",
                             "active": true
                         }
                     ]
@@ -1566,7 +1589,7 @@
                         {
                             "label": "击破检定",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"rennai\",\n        dc: dc,\n        label: \"抵抗走火入魔\",\n        onFail: { id: \"rage\", duration: { rounds: 1 } }\n    });\n}",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"rennai\",\n        dc: dc,\n        label: \"抵抗走火入魔\",\n        onFail: { id: \"rage\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -1637,7 +1660,6 @@
             "effects": [
                 {
                     "name": "躲猫猫",
-                    "icon": "icons/svg/mystery-man.svg",
                     "description": "速度增加，条件性无法选中。",
                     "transfer": false,
                     "flags": {
@@ -1647,13 +1669,17 @@
                             "scripts": []
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "0"
-                        }
-                    ]
+                    "img": "icons/svg/mystery-man.svg",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.speed",
+                                "value": "0",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1814,7 +1840,6 @@
             "effects": [
                 {
                     "name": "九命",
-                    "icon": "icons/svg/skull.svg",
                     "description": "满九层必死。",
                     "transfer": false,
                     "flags": {
@@ -1824,7 +1849,11 @@
                             "maxStacks": 9
                         }
                     },
-                    "changes": []
+                    "img": "icons/svg/skull.svg",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }

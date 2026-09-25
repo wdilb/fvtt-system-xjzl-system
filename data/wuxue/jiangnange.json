@@ -147,7 +147,7 @@
                             "label": "添加禁实",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const jinshi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinshi\"));\n    if (jinshi) {\n        jinshi.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, jinshi);\n    }\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const jinshi = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jinshi'));\n    if (jinshi) {\n        jinshi.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, jinshi);\n    }\n}"
                         }
                     ]
                 }
@@ -193,7 +193,7 @@
                             "label": "格挡触发清音",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "const stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nif (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    delete effect._id;\n    effect.duration.rounds = rounds;\n    effect.changes[0].value = String(bonus);\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}"
+                            "script": "const stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nif (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    delete effect._id;\n    effect.duration.value = rounds;\n    effect.system.changes[0].value = String(bonus);\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}"
                         }
                     ]
                 },
@@ -273,7 +273,7 @@
                             "label": "击破添加不怒",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.isBroken) {\n    const sysEffect = CONFIG.statusEffects.find(e => e.id === 'bunu');\n    if(sysEffect) {\n        const data = foundry.utils.deepClone(sysEffect);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入 [不怒] 状态`);\n    }\n}"
+                            "script": "if (args.isHit && args.isBroken) {\n    const sysEffect = game.xjzl.api.effects.getStatus('bunu');\n    if(sysEffect) {\n        const data = foundry.utils.deepClone(sysEffect);\n        data.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入 [不怒] 状态`);\n    }\n}"
                         }
                     ]
                 },
@@ -317,7 +317,6 @@
             "effects": [
                 {
                     "name": "清音",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                     "description": "你的[演奏]检定结果+1。",
                     "transfer": false,
                     "flags": {
@@ -326,13 +325,17 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.arts.yanzou.checkMod",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.arts.yanzou.checkMod",
+                                "value": "1",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -412,7 +415,7 @@
                         {
                             "label": "添加失准",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'shizhun'));\n    if (effectData) {\n        effectData.flags['xjzl-system'].maxStacks = 3;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('shizhun'));\n    if (effectData) {\n        effectData.flags['xjzl-system'].maxStacks = 3;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -495,10 +498,11 @@
         "effects": [
             {
                 "name": "诗酒",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "你的《醉梦笔录》招式命中后，给目标添加 5 醉意值。",
                 "duration": {
-                    "rounds": 10
+                    "value": 10,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -514,7 +518,11 @@
                     }
                 },
                 "transfer": false,
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -715,58 +723,63 @@
         "effects": [
             {
                 "name": "梅",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "四君子之一。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "mei"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             },
             {
                 "name": "兰",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "四君子之一。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "lan"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             },
             {
                 "name": "竹",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "四君子之一。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "zhu"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             },
             {
                 "name": "菊",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "四君子之一。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "ju"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             },
             {
                 "name": "四君子",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "当你受到伤害时，可消耗反应动作释放《四君子画》的招式。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "sijunzi"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             }
         ]
     },
@@ -928,7 +941,7 @@
                             "label": "棋术检定禁实",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const buyu = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'buyu');\n    const stacks = buyu ? (buyu.getFlag('xjzl-system', 'stacks') || 0) : 0;\n    if (stacks >= 3) {\n        const roll = await actor.rollAttributeTest('qishu', { flavor: \"一子定音 (DC10)\" });\n        if (roll && roll.total >= 10) {\n            const jinshi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinshi\"));\n            if(jinshi) {\n                jinshi.duration = { rounds: 2 };\n                await game.xjzl.api.effects.addEffect(args.target, jinshi);\n                ui.notifications.info(`${args.target.name} 被落子镇压，陷入 [禁实] 2回合`);\n            }\n        }\n    }\n}"
+                            "script": "if (args.isHit) {\n    const buyu = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'buyu');\n    const stacks = buyu ? (buyu.getFlag('xjzl-system', 'stacks') || 0) : 0;\n    if (stacks >= 3) {\n        const roll = await actor.rollAttributeTest('qishu', { flavor: \"一子定音 (DC10)\" });\n        if (roll && roll.total >= 10) {\n            const jinshi = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jinshi'));\n            if(jinshi) {\n                jinshi.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n                await game.xjzl.api.effects.addEffect(args.target, jinshi);\n                ui.notifications.info(`${args.target.name} 被落子镇压，陷入 [禁实] 2回合`);\n            }\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -937,7 +950,6 @@
         "effects": [
             {
                 "name": "不语",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "每层使命中+5；当不语叠加满三层，可在出招时选择消耗从而使招式伤害大幅增加。",
                 "transfer": false,
                 "flags": {
@@ -955,18 +967,22 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.hit_waigong",
-                        "mode": 2,
-                        "value": "5"
-                    },
-                    {
-                        "key": "system.combat.hit_neigong",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "value": "5",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1076,7 +1092,7 @@
                             "label": "施加目盲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const blind = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'blind'));\n    if (blind) {\n        blind.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, blind);\n        ui.notifications.info(`${args.target.name} 被笔锋迷眼，陷入目盲(2回合)！`);\n    }\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const blind = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('blind'));\n    if (blind) {\n        blind.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, blind);\n        ui.notifications.info(`${args.target.name} 被笔锋迷眼，陷入目盲(2回合)！`);\n    }\n}"
                         }
                     ],
                     "automationNote": "奔赴目标周围空格需玩家手动位移，命中未开启架招者自动添加2回合目盲。",
@@ -1132,7 +1148,6 @@
         "effects": [
             {
                 "name": "颜体",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "你的下一次招式伤害提升[书写]等级*对应系数的数值，然后转化为“柳体”。",
                 "flags": {
                     "xjzl-system": {
@@ -1154,11 +1169,12 @@
                         ]
                     }
                 },
-                "transfer": false
+                "transfer": false,
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             },
             {
                 "name": "柳体",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "你受到内外功伤害时，减少[书写]等级*对应系数的数值，然后转化为“颜体”。",
                 "flags": {
                     "xjzl-system": {
@@ -1180,7 +1196,9 @@
                         ]
                     }
                 },
-                "transfer": false
+                "transfer": false,
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             }
         ]
     },
@@ -1261,7 +1279,7 @@
                         {
                             "label": "添加乏力",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'fali');\n    const data = foundry.utils.deepClone(effect);\n    data.flags['xjzl-system'].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effect = game.xjzl.api.effects.getStatus('fali');\n    const data = foundry.utils.deepClone(effect);\n    data.flags['xjzl-system'].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
                         }
                     ],
                     "automationNote": "琼楼对虚招值的加成需手动修正。",
@@ -1451,7 +1469,7 @@
                             "label": "判定结果与对抗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\n\nconst chizhi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\nif (!chizhi) return;\n\n// 情况A: 成功击破了架招\nif (args.isBroken) {\n    chizhi.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, chizhi);\n    return;\n}\n\n// 情况B: 没破掉（虚招对抗失败），此时对方一定有架招\nif (args.target.system.martial.stanceActive) {\n    chizhi.duration = { rounds: 1 }; // 这里设为1回合供底下自动发卡使用\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"qishu\",\n        label: \"变胜先手 - 棋术对抗(补救)\",\n        outcome: {\n            win: {\n                 text: \"反将一军！目标陷入迟滞 (1回合)。\",\n                 targetEffect: chizhi  // 直接传对象，附带正确的回合数\n            },\n            lose: { text: \"对方棋路严密，未能反制。\" }\n        }\n    });\n} else {\n    // 兜底：如果完全没有目标，或者其它未知异常\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #8e44ad; background: rgba(142,68,173,0.05); padding: 5px;\">\n        <div style=\"color:#8e44ad; font-weight:bold;\"><i class=\"fas fa-chess\"></i> 变胜先手 (未找到目标架招)</div>\n        <div style=\"font-size:0.9em; color:#555;\">如果虚招被压制，可手动与其进行[棋术]对抗，获胜附加1回合迟滞。</div>\n    </div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                            "script": "if (!args.isHit) return;\n\nconst chizhi = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('chizhi'));\nif (!chizhi) return;\n\n// 情况A: 成功击破了架招\nif (args.isBroken) {\n    chizhi.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, chizhi);\n    return;\n}\n\n// 情况B: 没破掉（虚招对抗失败），此时对方一定有架招\nif (args.target.system.martial.stanceActive) {\n    chizhi.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"}; // 这里设为1回合供底下自动发卡使用\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"qishu\",\n        label: \"变胜先手 - 棋术对抗(补救)\",\n        outcome: {\n            win: {\n                 text: \"反将一军！目标陷入迟滞 (1回合)。\",\n                 targetEffect: chizhi  // 直接传对象，附带正确的回合数\n            },\n            lose: { text: \"对方棋路严密，未能反制。\" }\n        }\n    });\n} else {\n    // 兜底：如果完全没有目标，或者其它未知异常\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #8e44ad; background: rgba(142,68,173,0.05); padding: 5px;\">\n        <div style=\"color:#8e44ad; font-weight:bold;\"><i class=\"fas fa-chess\"></i> 变胜先手 (未找到目标架招)</div>\n        <div style=\"font-size:0.9em; color:#555;\">如果虚招被压制，可手动与其进行[棋术]对抗，获胜附加1回合迟滞。</div>\n    </div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1506,7 +1524,6 @@
         "effects": [
             {
                 "name": "弈理",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "你的属性技能、技艺检定结果提升。",
                 "transfer": false,
                 "flags": {
@@ -1523,7 +1540,11 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1563,7 +1584,7 @@
                             "label": "定力判定与控制",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst diff = 15 + (lvl - 1);\nconst rounds = 1 + (lvl - 1);\n\nconst hasRoot = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'root');\nconst targetEffectId = hasRoot ? 'blind' : 'root';\n\nconst effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === targetEffectId));\nif (effectData) {\n    effectData.duration = { rounds: rounds };\n}\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: diff,\n    label: \"抵抗粉墙黛瓦\",\n    onFail: effectData\n});"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst diff = 15 + (lvl - 1);\nconst rounds = 1 + (lvl - 1);\n\nconst hasRoot = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'root');\nconst targetEffectId = hasRoot ? 'blind' : 'root';\n\nconst effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus(targetEffectId));\nif (effectData) {\n    effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n}\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: diff,\n    label: \"抵抗粉墙黛瓦\",\n    onFail: effectData\n});"
                         }
                     ],
                     "automationNote": "对抗和状态切换全自动。目标如果有禁足，失败自动挂目盲，否则挂禁足。",
@@ -1633,7 +1654,7 @@
                             "label": "剧痛判定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 5 + (lvl - 1) * 5;\n    const painData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'pain'));\n    if (painData) painData.duration = { rounds: rounds };\n    \n    if (args.isBroken) {\n        await game.xjzl.api.effects.addEffect(args.target, painData);\n        ui.notifications.info(`${args.target.name} 被击破架招，直接陷入剧痛！`);\n    } else {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"dingli\",\n            dc: 15,\n            label: \"抵抗江枫渔火\",\n            onFail: painData\n        });\n    }\n}"
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 5 + (lvl - 1) * 5;\n    const painData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('pain'));\n    if (painData) painData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    \n    if (args.isBroken) {\n        await game.xjzl.api.effects.addEffect(args.target, painData);\n        ui.notifications.info(`${args.target.name} 被击破架招，直接陷入剧痛！`);\n    } else {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"dingli\",\n            dc: 15,\n            label: \"抵抗江枫渔火\",\n            onFail: painData\n        });\n    }\n}"
                         }
                     ],
                     "automationNote": "完全自动化。定力检定或击破必输逻辑已处理，剧痛持续回合随等级提升自动变动。",
@@ -1677,7 +1698,7 @@
                             "label": "添加锦绣并提示",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"锦绣\");\n\nif (eff) {\n    const effData = eff.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: rounds };\n    \n    await game.xjzl.api.effects.addEffect(actor, effData);\n    \n    const msg = `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; border-left:3px solid #e74c3c; background:rgba(231,76,60,0.1);\">\n            <p><i class=\"fas fa-fan\"></i> <b>锦绣江南触发！</b></p>\n            <p>已为自身添加 [锦绣] 状态。</p>\n            <p style=\"color:#d35400; font-weight:bold;\">请手动为范围内其余友方添加该状态（持续 ${rounds} 回合）。</p>\n        </div>\n    </div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"锦绣\");\n\nif (eff) {\n    const effData = eff.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    \n    await game.xjzl.api.effects.addEffect(actor, effData);\n    \n    const msg = `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; border-left:3px solid #e74c3c; background:rgba(231,76,60,0.1);\">\n            <p><i class=\"fas fa-fan\"></i> <b>锦绣江南触发！</b></p>\n            <p>已为自身添加 [锦绣] 状态。</p>\n            <p style=\"color:#d35400; font-weight:bold;\">请手动为范围内其余友方添加该状态（持续 ${rounds} 回合）。</p>\n        </div>\n    </div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
                         }
                     ],
                     "automationNote": "绝招打出即对自己增加锦绣，友方请GM手动施加。免疫部分请由玩家自身结合系统显示手动判断。",
@@ -1689,7 +1710,6 @@
         "effects": [
             {
                 "name": "锦绣",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                 "description": "免疫下盘不稳、禁足、缚身、流血、剧痛，且受到《趁虚而入》攻击后速度不会归零。",
                 "flags": {
                     "xjzl-system": {
@@ -1697,7 +1717,9 @@
                         "stackable": false
                     }
                 },
-                "transfer": false
+                "transfer": false,
+                "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                "showIcon": 2
             }
         ]
     },
@@ -1744,7 +1766,7 @@
                             "label": "分发光环",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst maintainCost = 1 + (lvl - 1);\n\n// 1. 给所有人 (包括自己) 添加增伤加护\nconst buffTpl = thisItem.effects.getName(\"江南-加护\");\nif (buffTpl) {\n    const buffData = buffTpl.toObject();\n    delete buffData._id;\n    buffData.origin = thisItem.uuid;\n    buffData.changes[0].value = String(dmgBonus);\n    await game.xjzl.api.effects.addEffect(args.target, buffData);\n}\n\n// 2. 只对自己添加维持核心\nif (args.target.uuid === actor.uuid) {\n    const mainTpl = thisItem.effects.getName(\"江南-维持\");\n    if (mainTpl) {\n        const maintainData = mainTpl.toObject();\n        delete maintainData._id;\n        maintainData.origin = thisItem.uuid;\n        foundry.utils.setProperty(maintainData, \"flags.xjzl-system.maintainCost\", maintainCost);\n        await game.xjzl.api.effects.addEffect(actor, maintainData);\n    }\n}"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst maintainCost = 1 + (lvl - 1);\n\n// 1. 给所有人 (包括自己) 添加增伤加护\nconst buffTpl = thisItem.effects.getName(\"江南-加护\");\nif (buffTpl) {\n    const buffData = buffTpl.toObject();\n    delete buffData._id;\n    buffData.origin = thisItem.uuid;\n    buffData.system.changes[0].value = String(dmgBonus);\n    await game.xjzl.api.effects.addEffect(args.target, buffData);\n}\n\n// 2. 只对自己添加维持核心\nif (args.target.uuid === actor.uuid) {\n    const mainTpl = thisItem.effects.getName(\"江南-维持\");\n    if (mainTpl) {\n        const maintainData = mainTpl.toObject();\n        delete maintainData._id;\n        maintainData.origin = thisItem.uuid;\n        foundry.utils.setProperty(maintainData, \"flags.xjzl-system.maintainCost\", maintainCost);\n        await game.xjzl.api.effects.addEffect(actor, maintainData);\n    }\n}"
                         }
                     ]
                 }
@@ -1752,7 +1774,6 @@
             "effects": [
                 {
                     "name": "江南-加护",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                     "description": "置身书香江南，招式伤害提升。",
                     "transfer": false,
                     "flags": {
@@ -1761,17 +1782,20 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.damages.skill.mod",
+                                "value": "5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "江南-维持",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                     "description": "光环核心。回合初自动扣除内力维持，中断则全队失效。",
                     "transfer": false,
                     "flags": {
@@ -1788,7 +1812,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -1875,7 +1903,6 @@
             "effects": [
                 {
                     "name": "高雅 (散手被动)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                     "transfer": true,
                     "description": "施展笔/乐器/棋类武学时获得加成。不使用此类武器时请禁用此状态。",
                     "flags": {
@@ -1890,7 +1917,8 @@
                                 }
                             ]
                         }
-                    }
+                    },
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png"
                 }
             ]
         }

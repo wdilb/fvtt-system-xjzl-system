@@ -335,10 +335,11 @@ export async function seedWuxue() {
                 // 基础结构
                 const effectData = {
                     name: e.name,
-                    img: d.img, // 如果特效没配图标，默认用物品图标，暂时使用物品图标吧，AI会给特效配上不存在的图标 e.icon（V14 字段为 img）
+                    img: d.img, // 使用物品图标，避免模板引用不存在的图标路径。
                     transfer: e.transfer ?? false,
+                    showIcon: e.showIcon,
                     disabled: e.disabled ?? false,
-                    system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) }, // V14 变更数组在 system 下；旧 JSON 的数字 mode 在此转换（核心只迁移顶层 changes）
+                    system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) },
                     flags: e.flags || {},
                     description: e.description || "",
                     // 补上 duration

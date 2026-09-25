@@ -118,7 +118,7 @@
                             "label": "击破缚身",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const fushen = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    if (fushen) {\n        fushen.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, fushen);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const fushen = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen'));\n    if (fushen) {\n        fushen.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, fushen);\n    }\n}"
                         }
                     ]
                 },
@@ -155,7 +155,7 @@
                             "label": "倒地与消耗缠劲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\nawait game.xjzl.api.effects.addEffect(args.target, prone);\n\nconst chanjin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chanjin\");\nif (chanjin) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"鳄尾扫击\" },\n        content: `<p>你身上有[缠劲]。</p><p>是否消耗 1 层以使目标陷入 <b>禁足</b> (1回合)？</p>`,\n        yes: { label: \"消耗施加\", icon: \"fas fa-check\" },\n        no: { label: \"保留层数\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"chanjin\", 1);\n        const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n        if (root) {\n            root.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, root);\n            ui.notifications.info(`已消耗缠劲，施加禁足。`);\n        }\n    }\n}"
+                            "script": "if (!args.isHit) return;\nconst prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\nawait game.xjzl.api.effects.addEffect(args.target, prone);\n\nconst chanjin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chanjin\");\nif (chanjin) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"鳄尾扫击\" },\n        content: `<p>你身上有[缠劲]。</p><p>是否消耗 1 层以使目标陷入 <b>禁足</b> (1回合)？</p>`,\n        yes: { label: \"消耗施加\", icon: \"fas fa-check\" },\n        no: { label: \"保留层数\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"chanjin\", 1);\n        const root = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n        if (root) {\n            root.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            await game.xjzl.api.effects.addEffect(args.target, root);\n            ui.notifications.info(`已消耗缠劲，施加禁足。`);\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -207,7 +207,6 @@
         "effects": [
             {
                 "name": "缠劲",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "每层使该架招提供的格挡值+5。",
                 "transfer": false,
                 "flags": {
@@ -217,17 +216,20 @@
                         "maxStacks": 1
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.block",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "蛙毒",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "每回合初流失5点气血，移动速度-1。",
                 "transfer": false,
                 "flags": {
@@ -236,18 +238,22 @@
                         "stackable": true
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnStart",
-                        "mode": 2,
-                        "value": "-5"
-                    },
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnStart",
+                            "value": "-5",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.speed",
+                            "value": "-1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -341,7 +347,7 @@
                             "label": "击破目盲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const blind = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"blind\"));\n    if (blind) {\n        blind.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, blind);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const blind = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('blind'));\n    if (blind) {\n        blind.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, blind);\n    }\n}"
                         }
                     ]
                 },
@@ -465,7 +471,6 @@
         "effects": [
             {
                 "name": "瘴毒",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "每回合初受到10点毒素伤害，移动速度-1。",
                 "transfer": false,
                 "flags": {
@@ -482,13 +487,17 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "-1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -574,7 +583,7 @@
                             "label": "击破倒地与窒息提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #34495e;\"><p><b style=\"color:#2c3e50;\"><i class=\"fas fa-dizzy\"></i> 陷入窒息</b><br>目标必须在<b>三个回合内</b>呼吸到空气，否则在第三个回合末陷入濒死，且回复气血不会使其脱离濒死。<br><span style=\"font-size:0.85em; color:#888;\">(如果在水上会被击倒到水底，请主持人自行判断是否呼吸到空气)</span></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: args.target}) });\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #34495e;\"><p><b style=\"color:#2c3e50;\"><i class=\"fas fa-dizzy\"></i> 陷入窒息</b><br>目标必须在<b>三个回合内</b>呼吸到空气，否则在第三个回合末陷入濒死，且回复气血不会使其脱离濒死。<br><span style=\"font-size:0.85em; color:#888;\">(如果在水上会被击倒到水底，请主持人自行判断是否呼吸到空气)</span></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: args.target}) });\n}"
                         }
                     ]
                 },
@@ -644,7 +653,7 @@
                             "label": "命中缴械",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const jx = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jiaoxie\"));\n    if (jx) {\n        jx.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, jx);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const jx = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jiaoxie'));\n    if (jx) {\n        jx.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, jx);\n    }\n}"
                         }
                     ]
                 },
@@ -689,7 +698,7 @@
                             "label": "控制与击退",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (root) {\n        root.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, root);\n    }\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; margin-left: 5px; color:#2c3e50;\"><i class=\"fas fa-arrow-right\"></i> 巨力冲击！将 <b>${args.target.name}</b> 击退 <b>1 米</b>！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                            "script": "if (args.isHit) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const root = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (root) {\n        root.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, root);\n    }\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; margin-left: 5px; color:#2c3e50;\"><i class=\"fas fa-arrow-right\"></i> 巨力冲击！将 <b>${args.target.name}</b> 击退 <b>1 米</b>！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 }
@@ -775,7 +784,7 @@
                             "label": "添加流血",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const bleed = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"bleed_stack\"));\n    await game.xjzl.api.effects.addEffect(args.target, bleed);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const bleed = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('bleed_stack'));\n    await game.xjzl.api.effects.addEffect(args.target, bleed);\n}"
                         }
                     ]
                 },
@@ -819,7 +828,7 @@
                             "label": "击破禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootData) {\n        rootData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const rootData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (rootData) {\n        rootData.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n    }\n}"
                         }
                     ]
                 },
@@ -1030,7 +1039,7 @@
                             "label": "击破错骨",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const cuoguData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n    if (cuoguData) {\n        cuoguData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, cuoguData);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const cuoguData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('cuogu'));\n    if (cuoguData) {\n        cuoguData.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, cuoguData);\n    }\n}"
                         }
                     ]
                 },
@@ -1068,7 +1077,7 @@
                             "label": "命中禁虚",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const jx = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinxu\"));\n    if (jx) {\n        jx.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, jx);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const jx = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jinxu'));\n    if (jx) {\n        jx.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, jx);\n    }\n}"
                         }
                     ]
                 },
@@ -1119,7 +1128,7 @@
                             "label": "施加破甲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const pj = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n    if (pj) {\n        pj.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, pj);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const pj = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('pojia'));\n    if (pj) {\n        pj.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, pj);\n    }\n}"
                         }
                     ]
                 }
@@ -1223,7 +1232,6 @@
         "effects": [
             {
                 "name": "邪凤涅槃",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "濒死时可手动清除不利Buff。",
                 "transfer": false,
                 "flags": {
@@ -1240,7 +1248,11 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1299,7 +1311,7 @@
                         {
                             "label": "击破施加状态",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n    const fushen = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    if (cuogu && fushen) {\n        cuogu.duration = { rounds: rounds };\n        fushen.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        await game.xjzl.api.effects.addEffect(args.target, fushen);\n        actor.showFloatyText(\"错骨！缚身！\", { fill: \"#ff0000\" });\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const cuogu = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('cuogu'));\n    const fushen = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen'));\n    if (cuogu && fushen) {\n        cuogu.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        fushen.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        await game.xjzl.api.effects.addEffect(args.target, fushen);\n        actor.showFloatyText(\"错骨！缚身！\", { fill: \"#ff0000\" });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1373,7 +1385,7 @@
                         {
                             "label": "施加耳鸣",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const deaf = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"deaf\"));\n    if (deaf) {\n        deaf.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, deaf);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const deaf = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('deaf'));\n    if (deaf) {\n        deaf.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, deaf);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1509,7 +1521,7 @@
                         {
                             "label": "武学对抗与长生绝",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = lvl - 1;\n    const rounds = (lvl >= 4) ? 2 : 1;\n    \n    const effectData = thisItem.effects.getName(\"长生绝\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: rounds };\n    \n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"wuxue\",\n        label: `混元归一 - 功法压制 (建议己方加值: +${bonus})`,\n        outcome: {\n            win: {\n                text: \"真气镇压！目标陷入【长生绝】状态。\",\n                targetEffect: effectData\n            },\n            lose: {\n                text: \"目标武学根基深厚，未被镇压。\"\n            }\n        }\n    });\n}",
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = lvl - 1;\n    const rounds = (lvl >= 4) ? 2 : 1;\n    \n    const effectData = thisItem.effects.getName(\"长生绝\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    \n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"wuxue\",\n        label: `混元归一 - 功法压制 (建议己方加值: +${bonus})`,\n        outcome: {\n            win: {\n                text: \"真气镇压！目标陷入【长生绝】状态。\",\n                targetEffect: effectData\n            },\n            lose: {\n                text: \"目标武学根基深厚，未被镇压。\"\n            }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -1519,7 +1531,6 @@
         "effects": [
             {
                 "name": "长生绝",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "当前运行的内功和武学无法使用。(请自觉手动遵守)",
                 "transfer": false,
                 "flags": {
@@ -1528,7 +1539,11 @@
                         "stackable": false
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1588,7 +1603,6 @@
         "effects": [
             {
                 "name": "长生气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "招式伤害增加 10 点，受到的招式伤害减少 10 点。",
                 "transfer": false,
                 "flags": {
@@ -1598,18 +1612,22 @@
                         "maxStacks": 1
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "10"
-                    },
-                    {
-                        "key": "system.combat.resistances.skill.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.resistances.skill.mod",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1659,7 +1677,7 @@
                             "label": "施加惭愧",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"惭愧\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 心生惭愧！`);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"惭愧\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        eff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 心生惭愧！`);\n    }\n}"
                         }
                     ]
                 },
@@ -1729,7 +1747,7 @@
                             "label": "格挡获剑舞",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"剑舞\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        eff.duration = { rounds: lvl };\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"剑舞\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        eff.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}"
                         }
                     ]
                 },
@@ -1807,13 +1825,13 @@
                             "label": "落英效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const hasJianwu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianwu\");\n    if (hasJianwu) {\n        // 额外精神伤害\n        const shencai = actor.system.stats.shencai.total;\n        await args.target.applyDamage({ amount: shencai, type: \"mental\", attacker: actor, isHit: true });\n        \n        // 定力对抗\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const contestBonus = (lvl - 1) * 2;\n        await Macros.requestContest({\n            attacker: actor,\n            defender: args.target,\n            type: \"dingli\",\n            label: `缤纷落英 (我方对抗+${contestBonus})`,\n            outcome: {\n                win: {\n                    text: \"被舞姿迷住，走火入魔！\",\n                    targetEffect: { id: \"rage\", duration: { rounds: 1 } }\n                },\n                lose: { text: \"目标心如止水。\" }\n            }\n        });\n    }\n}"
+                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const hasJianwu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianwu\");\n    if (hasJianwu) {\n        // 额外精神伤害\n        const shencai = actor.system.stats.shencai.total;\n        await args.target.applyDamage({ amount: shencai, type: \"mental\", attacker: actor, isHit: true });\n        \n        // 定力对抗\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const contestBonus = (lvl - 1) * 2;\n        await Macros.requestContest({\n            attacker: actor,\n            defender: args.target,\n            type: \"dingli\",\n            label: `缤纷落英 (我方对抗+${contestBonus})`,\n            outcome: {\n                win: {\n                    text: \"被舞姿迷住，走火入魔！\",\n                    targetEffect: { id: \"rage\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} }\n                },\n                lose: { text: \"目标心如止水。\" }\n            }\n        });\n    }\n}"
                         },
                         {
                             "label": "命中获剑舞",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "if (args.hitCount > 0) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"剑舞\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        eff.duration = { rounds: lvl }; // 基础1 + (lvl-1)\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}"
+                            "script": "if (args.hitCount > 0) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"剑舞\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        eff.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" }; // 基础1 + (lvl-1)\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}"
                         }
                     ]
                 }
@@ -1822,7 +1840,6 @@
         "effects": [
             {
                 "name": "惭愧",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "无法以状态添加者为攻击目标。",
                 "transfer": false,
                 "flags": {
@@ -1830,11 +1847,14 @@
                         "slug": "cankui"
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "剑舞",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "你的反应动作可以当作主要动作使用。",
                 "transfer": false,
                 "flags": {
@@ -1842,7 +1862,11 @@
                         "slug": "jianwu"
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1886,7 +1910,7 @@
                             "label": "获得霓裳",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst defBonus = lvl * 2;\nconst spdBonus = lvl * 1;\n\nconst eff = foundry.utils.deepClone(thisItem.effects.getName(\"霓裳\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 3 };\n    eff.changes.find(c => c.key === \"system.combat.def_waigong\").value = String(defBonus);\n    eff.changes.find(c => c.key === \"system.combat.def_neigong\").value = String(defBonus);\n    eff.changes.find(c => c.key === \"system.combat.speed\").value = String(spdBonus);\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst defBonus = lvl * 2;\nconst spdBonus = lvl * 1;\n\nconst eff = foundry.utils.deepClone(thisItem.effects.getName(\"霓裳\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    eff.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    eff.system.changes.find(c => c.key === \"system.combat.def_waigong\").value = String(defBonus);\n    eff.system.changes.find(c => c.key === \"system.combat.def_neigong\").value = String(defBonus);\n    eff.system.changes.find(c => c.key === \"system.combat.speed\").value = String(spdBonus);\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
                         }
                     ]
                 }
@@ -1895,7 +1919,6 @@
         "effects": [
             {
                 "name": "霓裳",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "内外功防御、速度提升。",
                 "transfer": false,
                 "flags": {
@@ -1903,23 +1926,27 @@
                         "slug": "nishang"
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "0"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "0"
-                    },
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "0"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "0",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "0",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.speed",
+                            "value": "0",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1975,7 +2002,7 @@
                             "label": "施加幻影",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"幻影\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}"
+                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"幻影\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        eff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}"
                         }
                     ]
                 }
@@ -1984,7 +2011,6 @@
         "effects": [
             {
                 "name": "幻影",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "命中-10，命中劣势。",
                 "transfer": false,
                 "flags": {
@@ -1992,23 +2018,27 @@
                         "slug": "huanying"
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.hit_waigong",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.hit_neigong",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "flags.xjzl-system.attackLevel",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "value": "-10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "value": "-10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "flags.xjzl-system.attackLevel",
+                            "value": "-1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2058,7 +2088,7 @@
                             "label": "获得翩跹",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = foundry.utils.deepClone(thisItem.effects.getName(\"翩跹\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
+                            "script": "const eff = foundry.utils.deepClone(thisItem.effects.getName(\"翩跹\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    eff.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
                         }
                     ]
                 }
@@ -2067,7 +2097,6 @@
         "effects": [
             {
                 "name": "翩跹",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "移动速度提高 5 米，移动中残影可对敌人造成精神伤害。",
                 "transfer": false,
                 "flags": {
@@ -2083,13 +2112,17 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2187,7 +2220,7 @@
                             "label": "击破禁疗与天命",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const jinliao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'jinliao'));\n    if (jinliao) {\n        jinliao.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, jinliao);\n        ui.notifications.info(`${args.target.name} 被击破架招，陷入禁疗！`);\n    }\n    \n    // 检查是否有断天命状态，有则不获得天命\n    const hasDuan = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'duantianming_state');\n    if (!hasDuan) {\n        const eff = thisItem.effects.getName('天命').toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    } else {\n        ui.notifications.warn('处于[断天命]状态中，无法获得[天命]。');\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const jinliao = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jinliao'));\n    if (jinliao) {\n        jinliao.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, jinliao);\n        ui.notifications.info(`${args.target.name} 被击破架招，陷入禁疗！`);\n    }\n    \n    // 检查是否有断天命状态，有则不获得天命\n    const hasDuan = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'duantianming_state');\n    if (!hasDuan) {\n        const eff = thisItem.effects.getName('天命').toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    } else {\n        ui.notifications.warn('处于[断天命]状态中，无法获得[天命]。');\n    }\n}"
                         }
                     ]
                 },
@@ -2322,7 +2355,6 @@
         "effects": [
             {
                 "name": "天命",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "移除一层“天命”，对抗结果+1（每次至多移除一层）。",
                 "transfer": false,
                 "flags": {
@@ -2332,11 +2364,14 @@
                         "maxStacks": 3
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "断天命",
-                "icon": "icons/magic/death/skull-energy-light-purple.webp",
                 "description": "使用《断天命》招式时上升动作等级，招式伤害无视格挡，攻击距离+2，且最多可以选中三个目标。每次出招必须移除一层。",
                 "transfer": false,
                 "flags": {
@@ -2354,7 +2389,11 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "icons/magic/death/skull-energy-light-purple.webp",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2462,7 +2501,6 @@
         "effects": [
             {
                 "name": "影色舞·无光",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "处于无光之处，潜行获得优势。命中与伤害获得等同于[潜行]数值的加值。",
                 "transfer": true,
                 "disabled": true,
@@ -2480,13 +2518,16 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.qianxingCheckLevel",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.qianxingCheckLevel",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                }
             }
         ]
     },
@@ -2536,7 +2577,7 @@
                             "label": "施展云游",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"云游\").toObject();\neff.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left:5px;\"><b>九霄云梯：</b>腾空跃起最高 15 米，并在空中进行一次 8 米横向移动（不消耗移动速度，请手动移动Token）。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                            "script": "const eff = thisItem.effects.getName(\"云游\").toObject();\neff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left:5px;\"><b>九霄云梯：</b>腾空跃起最高 15 米，并在空中进行一次 8 米横向移动（不消耗移动速度，请手动移动Token）。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
                         }
                     ]
                 }
@@ -2545,7 +2586,6 @@
         "effects": [
             {
                 "name": "云游",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "处于该状态时，攻击你的命中劣势。",
                 "transfer": false,
                 "flags": {
@@ -2554,13 +2594,17 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.grantAttackLevel",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.grantAttackLevel",
+                            "value": "-1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2606,7 +2650,7 @@
                             "label": "格挡反击",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst bonus = lvl * 5;\nconst eff = thisItem.effects.getName(\"野兽反击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: 3 };\neff.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"野兽反击！\", { fill: \"#FFA500\" });"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst bonus = lvl * 5;\nconst eff = thisItem.effects.getName(\"野兽反击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\neff.system.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"野兽反击！\", { fill: \"#FFA500\" });"
                         }
                     ]
                 },
@@ -2684,7 +2728,7 @@
                             "label": "击破降防",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const defDrop = thisItem.effects.getName(\"狂野破甲\").toObject();\n    delete defDrop._id;\n    defDrop.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, defDrop);\n    if (actor.effects.some(e => e.name === \"野兽反击\")) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n        if(cuogu) {\n            cuogu.duration = { rounds: lvl };\n            await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        }\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const defDrop = thisItem.effects.getName(\"狂野破甲\").toObject();\n    delete defDrop._id;\n    defDrop.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, defDrop);\n    if (actor.effects.some(e => e.name === \"野兽反击\")) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const cuogu = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('cuogu'));\n        if(cuogu) {\n            cuogu.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n            await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -2743,7 +2787,6 @@
         "effects": [
             {
                 "name": "野兽反击",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "架招反击状态，增加招式伤害。",
                 "transfer": false,
                 "flags": {
@@ -2753,17 +2796,20 @@
                         "tiedToStance": true
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "0"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "0",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "狂野破甲",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "降低内外功防御。",
                 "transfer": false,
                 "flags": {
@@ -2772,18 +2818,22 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "-10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "-10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "-10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2829,7 +2879,7 @@
                             "label": "格挡反击",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst bonus = lvl * 5;\nconst eff = thisItem.effects.getName(\"野兽反击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: 3 };\neff.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"野兽反击！\", { fill: \"#FFA500\" });"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst bonus = lvl * 5;\nconst eff = thisItem.effects.getName(\"野兽反击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\neff.system.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"野兽反击！\", { fill: \"#FFA500\" });"
                         }
                     ]
                 },
@@ -2907,7 +2957,7 @@
                             "label": "击破降防",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const defDrop = thisItem.effects.getName(\"狂野破甲\").toObject();\n    delete defDrop._id;\n    defDrop.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, defDrop);\n    if (actor.effects.some(e => e.name === \"野兽反击\")) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n        if(cuogu) {\n            cuogu.duration = { rounds: lvl };\n            await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        }\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const defDrop = thisItem.effects.getName(\"狂野破甲\").toObject();\n    delete defDrop._id;\n    defDrop.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, defDrop);\n    if (actor.effects.some(e => e.name === \"野兽反击\")) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const cuogu = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('cuogu'));\n        if(cuogu) {\n            cuogu.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n            await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -2966,7 +3016,6 @@
         "effects": [
             {
                 "name": "野兽反击",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "架招反击状态，增加招式伤害。",
                 "transfer": false,
                 "flags": {
@@ -2975,17 +3024,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "0"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "0",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "狂野破甲",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "降低内外功防御。",
                 "transfer": false,
                 "flags": {
@@ -2994,18 +3046,22 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "-10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "-10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "-10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -3057,7 +3113,7 @@
                             "label": "命中破甲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const pojia = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n    if (pojia) {\n        pojia.duration = { rounds: lvl };\n        await game.xjzl.api.effects.addEffect(args.target, pojia);\n        ui.notifications.info(`${args.target.name} 被破甲！`);\n    }\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const pojia = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('pojia'));\n    if (pojia) {\n        pojia.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, pojia);\n        ui.notifications.info(`${args.target.name} 被破甲！`);\n    }\n}"
                         }
                     ]
                 },
@@ -3138,7 +3194,7 @@
                             "label": "怒吼Buff",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = lvl * 10;\nconst feintBonus = lvl;\nconst rounds = (lvl >= 4) ? 2 : 1;\nconst eff = thisItem.effects.getName(\"怒吼\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\neff.changes.find(c => c.key === \"system.combat.damages.skill.mod\").value = String(dmgBonus);\neff.changes.find(c => c.key === \"system.combat.xuzhao\").value = String(feintBonus);\neff.changes.find(c => c.key === \"system.combat.kanpo\").value = String(feintBonus);\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = lvl * 10;\nconst feintBonus = lvl;\nconst rounds = (lvl >= 4) ? 2 : 1;\nconst eff = thisItem.effects.getName(\"怒吼\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\neff.system.changes.find(c => c.key === \"system.combat.damages.skill.mod\").value = String(dmgBonus);\neff.system.changes.find(c => c.key === \"system.combat.xuzhao\").value = String(feintBonus);\neff.system.changes.find(c => c.key === \"system.combat.kanpo\").value = String(feintBonus);\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 },
@@ -3178,7 +3234,7 @@
                             "label": "破甲进阶",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst hasPojia = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojia\");\nlet statusId = hasPojia ? \"poyi\" : \"pojia\";\nconst statusObj = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === statusId));\nif (statusObj) {\n    statusObj.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, statusObj);\n    ui.notifications.info(`${args.target.name} 被施加了 ${statusObj.name}！`);\n}"
+                            "script": "if (!args.isHit) return;\nconst hasPojia = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojia\");\nlet statusId = hasPojia ? \"poyi\" : \"pojia\";\nconst statusObj = foundry.utils.deepClone(game.xjzl.api.effects.getStatus(statusId));\nif (statusObj) {\n    statusObj.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, statusObj);\n    ui.notifications.info(`${args.target.name} 被施加了 ${statusObj.name}！`);\n}"
                         }
                     ]
                 },
@@ -3230,7 +3286,7 @@
                             "label": "群体控制与击飞",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\nconst jinliao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinliao\"));\njinliao.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, prone);\nawait game.xjzl.api.effects.addEffect(args.target, jinliao);"
+                            "script": "if (!args.isHit) return;\nconst prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\nconst jinliao = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jinliao'));\njinliao.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\nawait game.xjzl.api.effects.addEffect(args.target, prone);\nawait game.xjzl.api.effects.addEffect(args.target, jinliao);"
                         },
                         {
                             "label": "击飞提示",
@@ -3245,7 +3301,6 @@
         "effects": [
             {
                 "name": "怒吼",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "伤害和虚招对抗增加。",
                 "transfer": false,
                 "flags": {
@@ -3254,23 +3309,27 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "0"
-                    },
-                    {
-                        "key": "system.combat.xuzhao",
-                        "mode": 2,
-                        "value": "0"
-                    },
-                    {
-                        "key": "system.combat.kanpo",
-                        "mode": 2,
-                        "value": "0"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "0",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.xuzhao",
+                            "value": "0",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.kanpo",
+                            "value": "0",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -3314,7 +3373,7 @@
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     }
@@ -3459,7 +3518,7 @@
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -3468,7 +3527,7 @@
                             "label": "佛光环绕",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst eff = thisItem.effects.getName(\"佛光环绕\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: lvl };\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst eff = thisItem.effects.getName(\"佛光环绕\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 }
@@ -3477,7 +3536,6 @@
         "effects": [
             {
                 "name": "佛光环绕",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "佛光庇护，每回合初回复 10 点气血。",
                 "transfer": false,
                 "flags": {
@@ -3486,13 +3544,17 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnStart",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnStart",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -3596,7 +3658,7 @@
                             "label": "引燃",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const eff = thisItem.effects.getName(\"引燃\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: lvl };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const eff = thisItem.effects.getName(\"引燃\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
                         }
                     ]
                 },
@@ -3671,7 +3733,7 @@
                             "label": "震退与引燃",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"引燃\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    const cardHtml = `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left: 4px solid #e74c3c; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n            <strong style=\"color: #c0392b;\">魔焰涤罪！</strong><br>\n            <span style=\"color:#555;\">震开敌人 <b>1 米</b>！</span>\n        </div>\n    </div>`;\n    ChatMessage.create({ author: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });\n}"
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"引燃\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    const cardHtml = `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left: 4px solid #e74c3c; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n            <strong style=\"color: #c0392b;\">魔焰涤罪！</strong><br>\n            <span style=\"color:#555;\">震开敌人 <b>1 米</b>！</span>\n        </div>\n    </div>`;\n    ChatMessage.create({ author: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });\n}"
                         }
                     ]
                 },
@@ -3723,7 +3785,7 @@
                             "label": "魔焰审判",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const eff = thisItem.effects.getName(\"魔焰审判\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: lvl };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const eff = thisItem.effects.getName(\"魔焰审判\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
                         }
                     ]
                 }
@@ -3732,7 +3794,6 @@
         "effects": [
             {
                 "name": "引燃",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "每回合初受到 10 点火焰伤害。每五回合随机损毁装备/物品。",
                 "transfer": false,
                 "flags": {
@@ -3749,11 +3810,14 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "魔焰审判",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "每回合初受到 10 点火焰伤害。",
                 "transfer": false,
                 "flags": {
@@ -3770,7 +3834,11 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -3972,7 +4040,7 @@
                         {
                             "label": "施加四象元身",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"四象元身\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"四象元身\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\neff.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
                         }
                     ]
@@ -4044,7 +4112,7 @@
                         {
                             "label": "施加轮回",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"轮回\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"轮回\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\neff.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
                         }
                     ]
@@ -4109,7 +4177,7 @@
                         {
                             "label": "存储内力",
                             "trigger": "hit",
-                            "script": "const costMp = args.costConsumed.mp || 0;\nif (costMp <= 0) return;\nconst eff = thisItem.effects.getName(\"八荒之气\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\n// 使用 mode 2 写入 flag\neff.changes.push({ key: \"flags.xjzl-system.bahuang_bonus\", mode: 2, value: String(costMp) });\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "const costMp = args.costConsumed.mp || 0;\nif (costMp <= 0) return;\nconst eff = thisItem.effects.getName(\"八荒之气\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\n// 使用 mode 2 写入 flag\neff.system.changes.push({ key: \"flags.xjzl-system.bahuang_bonus\", type: \"add\", value: String(costMp) });\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
                         }
                     ]
@@ -4164,7 +4232,6 @@
             "effects": [
                 {
                     "name": "四象元身",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "绝招怒气消耗降低2点，绝招伤害提高0.1气感。",
                     "transfer": false,
                     "flags": {
@@ -4181,21 +4248,26 @@
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.costs.ultimateRageDiscount.mod",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.costs.ultimateRageDiscount.mod",
+                                "value": "2",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "经脉紊乱",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "随机一条经脉失效。",
                     "transfer": false,
                     "duration": {
-                        "rounds": 1
+                        "value": 1,
+                        "units": "rounds",
+                        "expiry": "turnStart"
                     },
                     "flags": {
                         "xjzl-system": {
@@ -4203,11 +4275,14 @@
                             "stackable": false
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "轮回",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "回合末回蓝。受击可手动以蓝抵血。",
                     "transfer": false,
                     "flags": {
@@ -4216,17 +4291,20 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenMpTurnEnd",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "flags.xjzl-system.regenMpTurnEnd",
+                                "value": "5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "八荒之气",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "下次出招伤害提高。",
                     "transfer": false,
                     "flags": {
@@ -4243,11 +4321,14 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "九宫庇护",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "抵御致死伤害，起死回生。",
                     "transfer": false,
                     "flags": {
@@ -4264,7 +4345,11 @@
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -4314,7 +4399,7 @@
                         {
                             "label": "施加状态与剑影",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nif (!args.target.system.martial?.stanceActive) {\n    const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (unstable) await game.xjzl.api.effects.addEffect(args.target, unstable);\n    const eff = thisItem.effects.getName(\"剑影\").toObject();\n    delete eff._id; eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (!args.isHit) return;\nif (!args.target.system.martial?.stanceActive) {\n    const unstable = game.xjzl.api.effects.getStatus('unstable');\n    if (unstable) await game.xjzl.api.effects.addEffect(args.target, unstable);\n    const eff = thisItem.effects.getName(\"剑影\").toObject();\n    delete eff._id; eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ]
@@ -4384,7 +4469,7 @@
                         {
                             "label": "格挡剑意",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst hasShishen = args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shishen\");\nif (hasShishen) return;\nconst eff = thisItem.effects.getName(\"剑意\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);\n\n// 检查层数爆发\nconst stacks = args.attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianyi\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nif (stacks >= 5) {\n    await game.xjzl.api.effects.removeEffect(args.attacker, \"jianyi\", 5);\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const ss = thisItem.effects.getName(\"失神\").toObject();\n    delete ss._id; ss.origin = thisItem.uuid;\n    ss.duration = { rounds: 1 + (lvl > 1 ? lvl - 1 : 0) };\n    await game.xjzl.api.effects.addEffect(args.attacker, ss);\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #9b59b6; background: rgba(155, 89, 182, 0.1); margin-left: 2px;\"><b>剑意爆发！</b><br>目标 <b>${args.attacker.name}</b> 的<b style=\"color:red;\">下一次攻击必定会被闪避</b>！请防守方注意手动处理！<br>目标已陷入[失神]状态。</div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst hasShishen = args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shishen\");\nif (hasShishen) return;\nconst eff = thisItem.effects.getName(\"剑意\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);\n\n// 检查层数爆发\nconst stacks = args.attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianyi\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nif (stacks >= 5) {\n    await game.xjzl.api.effects.removeEffect(args.attacker, \"jianyi\", 5);\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const ss = thisItem.effects.getName(\"失神\").toObject();\n    delete ss._id; ss.origin = thisItem.uuid;\n    ss.duration = { value: 1 + (lvl > 1 ? lvl - 1 : 0), units: \"rounds\", expiry: \"turnStart\" };\n    await game.xjzl.api.effects.addEffect(args.attacker, ss);\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #9b59b6; background: rgba(155, 89, 182, 0.1); margin-left: 2px;\"><b>剑意爆发！</b><br>目标 <b>${args.attacker.name}</b> 的<b style=\"color:red;\">下一次攻击必定会被闪避</b>！请防守方注意手动处理！<br>目标已陷入[失神]状态。</div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}",
                             "active": true
                         }
                     ]
@@ -4493,7 +4578,7 @@
                         {
                             "label": "花瓣干扰",
                             "trigger": "hit",
-                            "script": "const hasJianying = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianying\");\nif (args.isHit && hasJianying) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const cz = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n    const czData = foundry.utils.deepClone(cz);\n    czData.duration = { rounds: 1 + (lvl > 1 ? lvl - 1 : 0) };\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"dingli\",\n        label: \"繁花似锦 - 花瓣干扰\",\n        outcome: {\n            win: { text: \"花瓣干扰成功！\", targetEffect: czData },\n            lose: { text: \"干扰失败。\" }\n        }\n    });\n}",
+                            "script": "const hasJianying = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianying\");\nif (args.isHit && hasJianying) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const cz = game.xjzl.api.effects.getStatus('chizhi');\n    const czData = foundry.utils.deepClone(cz);\n    czData.duration = { value: 1 + (lvl > 1 ? lvl - 1 : 0), units: \"rounds\", expiry: \"turnStart\" };\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"dingli\",\n        label: \"繁花似锦 - 花瓣干扰\",\n        outcome: {\n            win: { text: \"花瓣干扰成功！\", targetEffect: czData },\n            lose: { text: \"干扰失败。\" }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -4547,7 +4632,6 @@
             "effects": [
                 {
                     "name": "剑影",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "命中即可自动发起对抗，胜后致使对方耳鸣一回合。",
                     "transfer": false,
                     "flags": {
@@ -4559,16 +4643,19 @@
                                     "label": "惊鸿照影-定力对抗",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "if (!args.isHit) return;\nconst jinghongMove = thisItem.system.moves.find(m => m.name === \"惊鸿照影\");\nconst lvl = Math.max(1, jinghongMove?.computedLevel || 1);\nconst bonus = 1 + (lvl > 1 ? (lvl - 1) : 0);\n\nawait Macros.requestContest({\n    attacker: actor, defender: args.target, type: \"dingli\",\n    attBonus: bonus,\n    label: \"惊鸿照影 - 剑影缠绕\",\n    outcome: { \n        win: { \n            text: \"目标陷入幻境！<br><span style='color:red;font-weight:bold;'>对抗成功！请手动移除自身的 [剑影] 状态。</span>\", \n            targetEffect: { id: \"deaf\", duration: { rounds: 1 } } \n        }, \n        lose: { \n            text: \"对抗失败。\" \n        } \n    }\n});"
+                                    "script": "if (!args.isHit) return;\nconst jinghongMove = thisItem.system.moves.find(m => m.name === \"惊鸿照影\");\nconst lvl = Math.max(1, jinghongMove?.computedLevel || 1);\nconst bonus = 1 + (lvl > 1 ? (lvl - 1) : 0);\n\nawait Macros.requestContest({\n    attacker: actor, defender: args.target, type: \"dingli\",\n    attBonus: bonus,\n    label: \"惊鸿照影 - 剑影缠绕\",\n    outcome: { \n        win: { \n            text: \"目标陷入幻境！<br><span style='color:red;font-weight:bold;'>对抗成功！请手动移除自身的 [剑影] 状态。</span>\", \n            targetEffect: { id: \"deaf\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} } \n        }, \n        lose: { \n            text: \"对抗失败。\" \n        } \n    }\n});"
                                 }
                             ]
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "剑意",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "剑意潜伏，满 5 层爆发。",
                     "transfer": false,
                     "flags": {
@@ -4578,11 +4665,14 @@
                             "maxStacks": 5
                         }
                     },
-                    "changes": []
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 },
                 {
                     "name": "失神",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "出招命中检定劣势。",
                     "transfer": false,
                     "flags": {
@@ -4591,13 +4681,17 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.attackLevel",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
+                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "flags.xjzl-system.attackLevel",
+                                "value": "-1",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -4699,7 +4793,7 @@
                             "label": "击破封招",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n  const fz = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n  if (fz) {\n    const eff = { ...fz, name: game.i18n.localize(fz.name), description: game.i18n.localize(fz.description), duration: { rounds: 1 }, origin: thisItem.uuid };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    actor.showFloatyText(\"封招！\", { fill: \"#8e44ad\" });\n  }\n}"
+                            "script": "if (args.isBroken) {\n  const fz = game.xjzl.api.effects.getStatus('fengzhao');\n  if (fz) {\n    const eff = { ...fz, name: game.i18n.localize(fz.name), description: game.i18n.localize(fz.description), duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"}, origin: thisItem.uuid };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    actor.showFloatyText(\"封招！\", { fill: \"#8e44ad\" });\n  }\n}"
                         }
                     ]
                 },
@@ -4881,7 +4975,7 @@
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -4926,13 +5020,13 @@
         "effects": [
             {
                 "name": "无极",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "你无法被实招指定为目标。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 1
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
-                "changes": [],
                 "flags": {
                     "xjzl-system": {
                         "slug": "wuxue_bahuang_wuji",
@@ -4946,14 +5040,17 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "千道·借势",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "下一次施展【千道万法无岁月】的怒气消耗-4，触发一次后消失。",
                 "transfer": false,
-                "changes": [],
                 "flags": {
                     "xjzl-system": {
                         "slug": "wuxue_bahuang_rage_down",
@@ -4967,7 +5064,12 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -5021,7 +5123,7 @@
                             "label": "寒毒与迟滞",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit || !args.target) return;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n        return;\n    }\n}\n\nif (oldStacks >= 5) {\n    const chizhi = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n    if (chizhi) {\n        const data = foundry.utils.deepClone(chizhi);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(target, data);\n    }\n}\n\nif (!existing) {\n    const stale = target.getFlag(\"xjzl-system\", key) || 0;\n    if (stale > 0) await target.setFlag(\"xjzl-system\", key, 0);\n}\n\nlet cap = 5;\nconst wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\nif (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\ncap += target.getFlag(\"xjzl-system\", key) || 0;\n\nif (oldStacks >= cap) {\n    ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    return;\n}\nconst count = target.system.martial?.stanceActive ? 1 : 2;\nconst addCount = Math.min(count, cap - oldStacks);\nconst effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\nif (!effTemplate) return;\nconst effData = effTemplate.toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(target, effData, addCount);\nconst newStacks = oldStacks + addCount;\n\nif (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\nif (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}"
+                            "script": "if (!args.isHit || !args.target) return;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n        return;\n    }\n}\n\nif (oldStacks >= 5) {\n    const chizhi = game.xjzl.api.effects.getStatus('chizhi');\n    if (chizhi) {\n        const data = foundry.utils.deepClone(chizhi);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(target, data);\n    }\n}\n\nif (!existing) {\n    const stale = target.getFlag(\"xjzl-system\", key) || 0;\n    if (stale > 0) await target.setFlag(\"xjzl-system\", key, 0);\n}\n\nlet cap = 5;\nconst wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\nif (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\ncap += target.getFlag(\"xjzl-system\", key) || 0;\n\nif (oldStacks >= cap) {\n    ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    return;\n}\nconst count = target.system.martial?.stanceActive ? 1 : 2;\nconst addCount = Math.min(count, cap - oldStacks);\nconst effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\nif (!effTemplate) return;\nconst effData = effTemplate.toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(target, effData, addCount);\nconst newStacks = oldStacks + addCount;\n\nif (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\nif (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -5069,7 +5171,7 @@
                             "label": "击破附加寒毒与禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isBroken || !args.target) return;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nlet immune = false;\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        immune = true;\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n    }\n}\n\nif (!immune) {\n    if (!existing) {\n        const stale = target.getFlag(\"xjzl-system\", key) || 0;\n        if (stale > 0) await target.setFlag(\"xjzl-system\", key, 0);\n    }\n\n    let cap = 5;\n    const wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\n    if (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\n    cap += target.getFlag(\"xjzl-system\", key) || 0;\n\n    if (oldStacks >= cap) {\n        ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    } else {\n        const addCount = Math.min(2, cap - oldStacks);\n        const effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\n        if (!effTemplate) return;\n        const effData = effTemplate.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(target, effData, addCount);\n        const newStacks = oldStacks + addCount;\n\n        if (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\n        if (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}\n    }\n}\n\nconst root = CONFIG.statusEffects.find(e => e.id === \"root\");\nif (root) {\n    const data = foundry.utils.deepClone(root);\n    data.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(target, data);\n}\n\nconst html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #3498db; background:rgba(52,152,219,0.06); margin-left:4px;\">' +\n    '<div style=\"font-weight:bold; color:#1f618d;\"><i class=\"fas fa-link\"></i> 寒锁封脉·破架连携</div>' +\n    '<div style=\"font-size:0.85em; color:#555;\">' + actor.name + ' 以【寒锁封脉】击破架招！若友方有【玄冰虚拍】，可消耗<b>反应动作</b>跟进施展。</div>' +\n    '</div>';\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });"
+                            "script": "if (!args.isBroken || !args.target) return;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nlet immune = false;\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        immune = true;\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n    }\n}\n\nif (!immune) {\n    if (!existing) {\n        const stale = target.getFlag(\"xjzl-system\", key) || 0;\n        if (stale > 0) await target.setFlag(\"xjzl-system\", key, 0);\n    }\n\n    let cap = 5;\n    const wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\n    if (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\n    cap += target.getFlag(\"xjzl-system\", key) || 0;\n\n    if (oldStacks >= cap) {\n        ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    } else {\n        const addCount = Math.min(2, cap - oldStacks);\n        const effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\n        if (!effTemplate) return;\n        const effData = effTemplate.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(target, effData, addCount);\n        const newStacks = oldStacks + addCount;\n\n        if (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\n        if (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}\n    }\n}\n\nconst root = game.xjzl.api.effects.getStatus('root');\nif (root) {\n    const data = foundry.utils.deepClone(root);\n    data.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(target, data);\n}\n\nconst html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #3498db; background:rgba(52,152,219,0.06); margin-left:4px;\">' +\n    '<div style=\"font-weight:bold; color:#1f618d;\"><i class=\"fas fa-link\"></i> 寒锁封脉·破架连携</div>' +\n    '<div style=\"font-size:0.85em; color:#555;\">' + actor.name + ' 以【寒锁封脉】击破架招！若友方有【玄冰虚拍】，可消耗<b>反应动作</b>跟进施展。</div>' +\n    '</div>';\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });"
                         }
                     ]
                 },
@@ -5202,7 +5304,6 @@
         "effects": [
             {
                 "name": "玄冥寒毒",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "<p>初始上限5层。每有1层，每次出招受到10点毒素伤害，持续到战斗结束（至阳真经免疫）。同时，每有五层触发一次“玄冥寒毒”的毒素伤害。若目标“玄冥寒毒”≥20层，则使其进入“冻脉”，持续到战斗结束。</p>",
                 "transfer": false,
                 "flags": {
@@ -5219,11 +5320,14 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "冻脉",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                 "description": "<p>每次出招，流失【2×“玄冥寒毒”层数】点内力，持续到战斗结束。</p>",
                 "transfer": false,
                 "flags": {
@@ -5240,7 +5344,11 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },

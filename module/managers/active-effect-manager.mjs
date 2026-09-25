@@ -129,6 +129,9 @@ export class ActiveEffectManager {
         if (foundry.utils.isPlainObject(effectData.duration)) {
             this.#normalizeDuration(effectData.duration);
         }
+
+        // 手写入参缺少 showIcon 时采用常显；toObject() 已带核心默认值，模板须自行显式设置。
+        effectData.showIcon ??= 2;
     }
 
     /**
@@ -258,7 +261,7 @@ export class ActiveEffectManager {
             effectData.description = game.i18n.localize(effectData.description);
         }
 
-        // D2 入参归一化：把 V13 风格的 changes/mode/icon/duration 转为 V14 格式，后续逻辑只读 V14 结构
+        // 入参归一化后，后续逻辑只读取当前 AE 结构。
         this.#normalizeEffectData(effectData);
 
         // 补全 statuses (用于系统逻辑判定)
@@ -810,7 +813,7 @@ export class ActiveEffectManager {
         if (val1 > val2) return 1;
         if (val1 < val2) return -1;
 
-        // 数值折算等长时考虑到期事件（AE-04 要求）。同一时长内到期越晚效果存续越久：
+        // 数值折算等长时考虑到期事件；同一时长内到期越晚，效果存续越久。
         // 纯时间制（expiry 为 null，到点即失效，秒制归一化的产物）< turnStart < turnEnd，
         // 避免等值但更早到期的效果覆盖现有效果。
         // 其余事件（combatEnd、roundStart 等）本系统未使用，与 turnStart 同级保守处理。

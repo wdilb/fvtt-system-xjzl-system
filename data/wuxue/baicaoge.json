@@ -30,7 +30,7 @@
                             "label": "按压推拿",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target) return;\n\n// 1. 移除状态 (走系统状态 API，保留飘字与 GM 权限代理)\nconst slugs = [\"unstable\", \"root\"];\nconst hasAny = args.target.effects.some(e => slugs.includes(e.getFlag(\"xjzl-system\", \"slug\")));\nfor (const slug of slugs) {\n    await game.xjzl.api.effects.removeEffect(args.target, slug, 999);\n}\nif (hasAny) ui.notifications.info(`${args.target.name} 的下盘不稳/禁足状态已移除。`);\n\n// 2. 添加乘风\n// 计算层数: 基础1 + 升级\nconst lvl = args.move.computedLevel;\nconst stacksToAdd = 1 + (lvl - 1);\n\nconst chengfengData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\nchengfengData.name = \"乘风\";\n\n// 循环添加多次以叠加层数\nfor (let i = 0; i < stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
+                            "script": "if (!args.target) return;\n\n// 1. 移除状态 (走系统状态 API，保留飘字与 GM 权限代理)\nconst slugs = [\"unstable\", \"root\"];\nconst hasAny = args.target.effects.some(e => slugs.includes(e.getFlag(\"xjzl-system\", \"slug\")));\nfor (const slug of slugs) {\n    await game.xjzl.api.effects.removeEffect(args.target, slug, 999);\n}\nif (hasAny) ui.notifications.info(`${args.target.name} 的下盘不稳/禁足状态已移除。`);\n\n// 2. 添加乘风\n// 计算层数: 基础1 + 升级\nconst lvl = args.move.computedLevel;\nconst stacksToAdd = 1 + (lvl - 1);\n\nconst chengfengData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('chengfeng'));\nchengfengData.name = \"乘风\";\n\n// 循环添加多次以叠加层数\nfor (let i = 0; i < stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
                         }
                     ],
                     "weaponType": "unarmed",
@@ -122,7 +122,7 @@
                             "label": "拔伸牵引",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const lvl = args.move.computedLevel;\n    const durationRounds = 5 + (lvl - 1) * 5;\n\n    const painData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pain\"));\n    painData.duration = { rounds: durationRounds };\n\n    await game.xjzl.api.effects.addEffect(args.target, painData);\n}"
+                            "script": "if (args.isHit) {\n    const lvl = args.move.computedLevel;\n    const durationRounds = 5 + (lvl - 1) * 5;\n\n    const painData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('pain'));\n    painData.duration = { value: durationRounds, units: \"rounds\", expiry: \"turnStart\" };\n\n    await game.xjzl.api.effects.addEffect(args.target, painData);\n}"
                         }
                     ],
                     "weaponType": "unarmed",
@@ -201,7 +201,7 @@
                         {
                             "label": "白虎摇头",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 基础1层，升级额外加1层 -> Lv1=1, Lv2=2, Lv3=3\nconst stacks = 1 + (lvl - 1);\n\nconst yanzhanData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yanzhan\"));\nfoundry.utils.setProperty(yanzhanData, \"flags.xjzl-system.maxStacks\", 3); // 描述上限：至多三层\n\n// 一次性添加指定层数\nawait game.xjzl.api.effects.addEffect(args.target, yanzhanData, stacks);\nawait game.xjzl.api.effects.addEffect(actor, yanzhanData, stacks);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 基础1层，升级额外加1层 -> Lv1=1, Lv2=2, Lv3=3\nconst stacks = 1 + (lvl - 1);\n\nconst yanzhanData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('yanzhan'));\nfoundry.utils.setProperty(yanzhanData, \"flags.xjzl-system.maxStacks\", 3); // 描述上限：至多三层\n\n// 一次性添加指定层数\nawait game.xjzl.api.effects.addEffect(args.target, yanzhanData, stacks);\nawait game.xjzl.api.effects.addEffect(actor, yanzhanData, stacks);",
                             "active": true
                         }
                     ]
@@ -232,7 +232,7 @@
                         {
                             "label": "苍龟探穴反击",
                             "trigger": "damaged",
-                            "script": "// 检查架招条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 检查是否有格挡值 (被动格挡也算)\nconst blockValue = system.combat.blockTotal || 0;\nif (blockValue > 0) {\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    // 限制最大层数3\n    foundry.utils.setProperty(yangxueData, \"flags.xjzl-system.maxStacks\", 3);\n  foundry.utils.setProperty(yangxueData, \"flags.xjzl-system.tiedToStance\", true);\n   await game.xjzl.api.effects.addEffect(actor, yangxueData);\n}",
+                            "script": "// 检查架招条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 检查是否有格挡值 (被动格挡也算)\nconst blockValue = system.combat.blockTotal || 0;\nif (blockValue > 0) {\n    const yangxueData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('yangxue'));\n    // 限制最大层数3\n    foundry.utils.setProperty(yangxueData, \"flags.xjzl-system.maxStacks\", 3);\n  foundry.utils.setProperty(yangxueData, \"flags.xjzl-system.tiedToStance\", true);\n   await game.xjzl.api.effects.addEffect(actor, yangxueData);\n}",
                             "active": true
                         }
                     ]
@@ -269,7 +269,7 @@
                         {
                             "label": "赤凤迎源",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lianjiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    \n    await game.xjzl.api.effects.addEffect(args.target, lianjiData);\n    await game.xjzl.api.effects.addEffect(actor, lianjiData);\n}",
+                            "script": "if (args.isHit) {\n    const lianjiData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('lianji'));\n    \n    await game.xjzl.api.effects.addEffect(args.target, lianjiData);\n    await game.xjzl.api.effects.addEffect(actor, lianjiData);\n}",
                             "active": true
                         }
                     ]
@@ -452,7 +452,6 @@
         "effects": [
             {
                 "name": "春雨",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "下次出招伤害增加。",
                 "transfer": false,
                 "flags": {
@@ -475,11 +474,14 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "随风潜入夜",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "周围队友残疾检定回怒。",
                 "transfer": false,
                 "flags": {
@@ -489,7 +491,11 @@
                         "tiedToStance": true
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -537,7 +543,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_spleen');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    // 锋针: 持续回血 (基础3回合 + 升级)\n    const template = thisItem.effects.getName(\"蕴脾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const amount = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"hp\", showScrolling: true });\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_spleen');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    // 锋针: 持续回血 (基础3回合 + 升级)\n    const template = thisItem.effects.getName(\"蕴脾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { value: 3 + (lvl - 1), units: \"rounds\", expiry: \"turnStart\" };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const amount = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"hp\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -581,7 +587,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_lung');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"理肺-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"mp\", showScrolling: true });\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_lung');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"理肺-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { value: 3 + (lvl - 1), units: \"rounds\", expiry: \"turnStart\" };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"mp\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -625,7 +631,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_kidney');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"生肾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"huti\", showScrolling: true });\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_kidney');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"生肾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { value: 3 + (lvl - 1), units: \"rounds\", expiry: \"turnStart\" };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"huti\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -669,7 +675,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_liver');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"养肝-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针：applyHealing 原生支持 rage（自带禁怒锁定与上限处理）\n    await args.target.applyHealing({ healer: actor, amount: 1, type: \"rage\", showScrolling: true });\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_liver');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"养肝-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { value: 3 + (lvl - 1), units: \"rounds\", expiry: \"turnStart\" };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针：applyHealing 原生支持 rage（自带禁怒锁定与上限处理）\n    await args.target.applyHealing({ healer: actor, amount: 1, type: \"rage\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -723,7 +729,6 @@
         "effects": [
             {
                 "name": "蕴脾-锋针",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "每回合末恢复 10 气血。",
                 "transfer": false,
                 "flags": {
@@ -732,17 +737,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnEnd",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnEnd",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "理肺-锋针",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "每回合末恢复 5 内力。",
                 "transfer": false,
                 "flags": {
@@ -751,17 +759,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenMpTurnEnd",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenMpTurnEnd",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "生肾-锋针",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "每回合初获得 5 点护体真气。",
                 "transfer": false,
                 "flags": {
@@ -778,11 +789,14 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "养肝-锋针",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "每回合初获得 1 怒气。",
                 "transfer": false,
                 "flags": {
@@ -791,13 +805,17 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenRageTurnStart",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenRageTurnStart",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -876,7 +894,7 @@
                             "label": "流失与气虚",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n// 流失内力\nconst mpDrain = 10 + (lvl - 1) * 10;\nawait args.target.applyHealing({ healer: actor,  amount: -mpDrain, type: 'mp', showScrolling: true });\n\n// 子午加成：叠加气虚 (限制最多加三层)\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nif (hasZiwu) {\n    const stacks = Math.min(3, 1 + (lvl - 1));\n    const qixuData = CONFIG.statusEffects.find(e => e.id === 'qixu');\n    if (qixuData) {\n        const eff = foundry.utils.deepClone(qixuData);\n        eff.origin = thisItem.uuid;\n        for(let i=0; i<stacks; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, eff);\n        }\n    }\n}"
+                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n// 流失内力\nconst mpDrain = 10 + (lvl - 1) * 10;\nawait args.target.applyHealing({ healer: actor,  amount: -mpDrain, type: 'mp', showScrolling: true });\n\n// 子午加成：叠加气虚 (限制最多加三层)\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nif (hasZiwu) {\n    const stacks = Math.min(3, 1 + (lvl - 1));\n    const qixuData = game.xjzl.api.effects.getStatus('qixu');\n    if (qixuData) {\n        const eff = foundry.utils.deepClone(qixuData);\n        eff.origin = thisItem.uuid;\n        for(let i=0; i<stacks; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, eff);\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -908,7 +926,7 @@
                             "label": "添加流注",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nlet val = 10 + (lvl - 1) * 5;\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\n\nif (hasZiwu) {\n    const isDrain = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"流经注气 - 子午特效\" },\n        content: \"<p>你具有【子午】状态。是否将[流注]的效果从回复改为<b>流失</b>？</p>\",\n        yes: { label: \"改为流失\", icon: \"fas fa-tint-slash\" },\n        no: { label: \"保持回复\", icon: \"fas fa-heart\" }\n    });\n    if (isDrain) val = -val;\n}\n\nconst effectData = {\n    name: '流注',\n    icon: 'icons/svg/regen.svg',\n    duration: { rounds: 3 },\n    description: `每次出招后${val > 0 ? '回复' : '流失'} ${Math.abs(val)} 点气血和内力。`,\n    origin: thisItem.uuid,\n    flags: { 'xjzl-system': { slug: 'liuzhu' } },\n    changes:[\n        { key: 'flags.xjzl-system.regenHpAttack', mode: 2, value: String(val) },\n        { key: 'flags.xjzl-system.regenMpAttack', mode: 2, value: String(val) }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(args.target, effectData);\nui.notifications.info(`已对 ${args.target.name} 应用 [流注] 效果。`);"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nlet val = 10 + (lvl - 1) * 5;\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\n\nif (hasZiwu) {\n    const isDrain = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"流经注气 - 子午特效\" },\n        content: \"<p>你具有【子午】状态。是否将[流注]的效果从回复改为<b>流失</b>？</p>\",\n        yes: { label: \"改为流失\", icon: \"fas fa-tint-slash\" },\n        no: { label: \"保持回复\", icon: \"fas fa-heart\" }\n    });\n    if (isDrain) val = -val;\n}\n\nconst effectData = {\n    name: '流注',\n    img: 'icons/svg/regen.svg',\n    duration: { value: 3, units: \"rounds\", expiry: \"turnStart\"},\n    description: `每次出招后${val > 0 ? '回复' : '流失'} ${Math.abs(val)} 点气血和内力。`,\n    origin: thisItem.uuid,\n    flags: { 'xjzl-system': { slug: 'liuzhu' } },\n    system: { changes: [\n        { key: 'flags.xjzl-system.regenHpAttack', type: \"add\", value: String(val) },\n        { key: 'flags.xjzl-system.regenMpAttack', type: \"add\", value: String(val) }\n    ] }\n};\nawait game.xjzl.api.effects.addEffect(args.target, effectData);\nui.notifications.info(`已对 ${args.target.name} 应用 [流注] 效果。`);"
                         }
                     ]
                 },
@@ -940,7 +958,7 @@
                             "label": "疗伤与加势",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\n\n// 1. 发起带等级加值的疗伤检定\nconst roll = await actor.rollAttributeTest('liaoshang', { dc: 15, bonus: bonus });\nif (!roll) return;\n\nif (roll.total >= 15) {\n    const totalHeal = roll.total;\n    \n    // 2. 治疗\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'hp', showScrolling: true });\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'mp', showScrolling: true });\n    \n    // 3. 生成X势（不做全局命中修改，由 AE 的 check 脚本按当前招式武器类型匹配，\n    //    换用其他武器时该势自然不生效）\n    const weapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (weapon) {\n        const wType = weapon.system.type;\n        const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType] || wType);\n        const effectData = {\n            name: `${wLabel}势`,\n            icon: 'icons/svg/upgrade.svg',\n            description: `使用${wLabel}的招式时命中+10（每层）`,\n            origin: thisItem.uuid,\n            changes: [],\n            flags: {\n                'xjzl-system': {\n                    slug: `xjzl_shi_${wType}`,\n                    stackable: true,\n                    weaponType: wType,\n                    scripts: [{\n                        label: \"X势命中加成\",\n                        trigger: \"check\",\n                        active: true,\n                        script: \"const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\\nconst wType = thisEffect.getFlag('xjzl-system', 'weaponType');\\n// 普攻虚拟招式同样带 weaponType（actor.mjs 构建时取当前装备武器），可直接匹配\\nif (!wType || args.move?.weaponType !== wType) return;\\nargs.flags.grantHit += 10 * stacks;\"\n                    }]\n                }\n            }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [${wLabel}势]！`);\n    }\n} else {\n    ui.notifications.warn('疗伤检定失败。');\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\n\n// 1. 发起带等级加值的疗伤检定\nconst roll = await actor.rollAttributeTest('liaoshang', { dc: 15, bonus: bonus });\nif (!roll) return;\n\nif (roll.total >= 15) {\n    const totalHeal = roll.total;\n    \n    // 2. 治疗\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'hp', showScrolling: true });\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'mp', showScrolling: true });\n    \n    // 3. 生成X势（不做全局命中修改，由 AE 的 check 脚本按当前招式武器类型匹配，\n    //    换用其他武器时该势自然不生效）\n    const weapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (weapon) {\n        const wType = weapon.system.type;\n        const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType] || wType);\n        const effectData = {\n            name: `${wLabel}势`,\n            img: 'icons/svg/upgrade.svg',\n            description: `使用${wLabel}的招式时命中+10（每层）`,\n            origin: thisItem.uuid,\n            changes: [],\n            flags: {\n                'xjzl-system': {\n                    slug: `xjzl_shi_${wType}`,\n                    stackable: true,\n                    weaponType: wType,\n                    scripts: [{\n                        label: \"X势命中加成\",\n                        trigger: \"check\",\n                        active: true,\n                        script: \"const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\\nconst wType = thisEffect.getFlag('xjzl-system', 'weaponType');\\n// 普攻虚拟招式同样带 weaponType（actor.mjs 构建时取当前装备武器），可直接匹配\\nif (!wType || args.move?.weaponType !== wType) return;\\nargs.flags.grantHit += 10 * stacks;\"\n                    }]\n                }\n            }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [${wLabel}势]！`);\n    }\n} else {\n    ui.notifications.warn('疗伤检定失败。');\n}"
                         }
                     ]
                 },
@@ -993,7 +1011,6 @@
         "effects": [
             {
                 "name": "阳盛",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "以运行阳刚内功或武学的人为目标时，命中、属性技能、[医术]检定结果增加。",
                 "flags": {
                     "xjzl-system": {
@@ -1006,11 +1023,13 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "transfer": false,
+                "showIcon": 2
             },
             {
                 "name": "阴盛",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "以运行阴柔内功或武学的人为目标时，命中、属性技能、[医术]检定结果增加。",
                 "flags": {
                     "xjzl-system": {
@@ -1023,30 +1042,37 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "transfer": false,
+                "showIcon": 2
             },
             {
                 "name": "子午",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
                 "description": "你在自己的回合末回复 5 点气血、内力。",
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnEnd",
-                        "mode": 2,
-                        "value": "5"
-                    },
-                    {
-                        "key": "flags.xjzl-system.regenMpTurnEnd",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "slug": "zi-wu",
                         "tiedToStance": true
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnEnd",
+                            "value": "5",
+                            "type": "add"
+                        },
+                        {
+                            "key": "flags.xjzl-system.regenMpTurnEnd",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },

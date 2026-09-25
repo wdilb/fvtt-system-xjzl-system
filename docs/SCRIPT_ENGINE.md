@@ -636,6 +636,22 @@ await game.xjzl.api.effects.removeEffect(args.target, "prone", 1);
 
 限时效果的源数据使用 `duration: { value, units, expiry }`，例如持续 3 回合、在 `turnStart` 事件到期时设为 `{ value: 3, units: "rounds", expiry: "turnStart" }`。不限时设为 `{ value: null, expiry: null }`；新建效果不需要填写 `start`，由系统在施加时初始化。
 
+AE 数据使用 `img`、`system.changes` 和字符串变更类型 `type`（如 `"add"`、`"override"`）。自行构造非被动的施加型效果时，显式设置 `transfer: false` 和 `showIcon: 2`，使无时长效果的图标也能常显：
+
+```javascript
+await game.xjzl.api.effects.addEffect(args.target, {
+  name: "流注",
+  img: "icons/svg/regen.svg",
+  transfer: false,
+  showIcon: 2,
+  duration: { value: 3, units: "rounds", expiry: "turnStart" },
+  system: { changes: [{ key: "system.resources.hp.bonus", type: "add", value: 5 }] },
+  flags: { "xjzl-system": { slug: "liuzhu_example" } }
+});
+```
+
+系统预置数据与脚本统一使用上述结构。`addEffect` 兼容外部宏和玩家脚本传入的 `icon`、顶层 `changes`、数字 `mode` 及旧式 `duration`；读取已有 AE 时须使用 `effect.system.changes`、`effect.duration.value`、`effect.duration.units` 和 `effect.duration.expiry`。入参兼容不适用于文档字段读取。
+
 从来源 Item 复制 AE 时先转为普通对象并清除 `_id`：
 
 ```javascript
