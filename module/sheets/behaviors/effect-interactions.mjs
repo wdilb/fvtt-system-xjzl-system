@@ -25,7 +25,7 @@ export function prepareEffects(sheet, context) {
         if (e.disabled) continue;
 
         // 2. 准备显示数据
-        // sourceName 是 V13 ActiveEffect 的原生 Getter，会自动解析 origin
+        // 核心 sourceName 解析 origin；无法解析时回退到内嵌物品名。
         let source = e.sourceName;
         if (source === "Unknown" || !source) {
             if (e.parent instanceof Item) source = e.parent.name;
@@ -45,6 +45,8 @@ export function prepareEffects(sheet, context) {
             description: e.description,
             sourceName: source,
             isItemEffect: (e.parent instanceof Item) && e.transfer,
+            // 核心 Actor 卡拖拽只查询 actor.effects；物品衍生效果必须保持不可拖。
+            isActorEffect: e.parent instanceof Actor,
             isStackable: e.isStackable,
             stacks: e.stacks,
             durationLabel: durationLabel,

@@ -21,6 +21,88 @@ export class ActiveEffectManager {
     }
 
     /**
+     * 获取 Actor 当前架招的武学来源、武学名和招式名，供跨角色比较。
+     * Item 和招式 ID 只在各自 Actor 内有效，不用于跨角色比较。
+     * @param {Actor|null} actor 来源或目标角色（可为合成 Actor）
+     * @returns {{wuxueSource: string|null, wuxueName: string, moveName: string|null}|null}
+     *   未开启架招或武学缺失时返回 null；招式 ID 无法定位时 moveName 为 null。
+     */
+    static getActiveStanceSignature(actor) {
+        const martial = actor?.system?.martial;
+        if (!martial?.stanceActive || !martial.stance || !martial.stanceItemId) return null;
+        const wuxue = actor.items.get(martial.stanceItemId);
+        if (!wuxue || wuxue.type !== "wuxue") return null;
+        const move = (wuxue.system.moves ?? []).find(m => m.id === martial.stance);
+        return {
+            wuxueSource: wuxue._stats?.compendiumSource ?? null,
+            wuxueName: wuxue.name,
+            moveName: move?.name ?? null
+        };
+    }
+
+    /**
+     * 按武学来源或名称及招式名，判断来源与目标是否正在使用同一架招。
+     * 缺少活动架招、武学或招式名时拒绝，调用方不得产生施加副作用。
+     * @param {Actor|null} sourceActor 来源特效所属 Actor
+     * @param {Actor} targetActor 施加目标 Actor
+     * @returns {boolean}
+     */
+    static canApplyStanceTiedEffect(sourceActor, targetActor) {
+        const src = this.getActiveStanceSignature(sourceActor);
+        const tgt = this.getActiveStanceSignature(targetActor);
+        if (!src?.moveName || !tgt?.moveName) return false;
+        // 合集包来源相同时，武学身份已确定，只需比较招式名。
+        if (src.wuxueSource && src.wuxueSource === tgt.wuxueSource) {
+            return src.moveName === tgt.moveName;
+        }
+        // 来源缺失或不同时，按武学名和招式名比较。
+        return src.wuxueName === tgt.wuxueName && src.moveName === tgt.moveName;
+    }
+
+    /**
+     * 将拖放的 AE 复制施加到 Actor，保留来源文档与效果数据。
+     * 物品内嵌的 transfer:true 被动 AE 不可施加；独立 AE 不受此限制。
+     * 绑定架招的 AE 须先确认双方当前架招相同，再交由 addEffect 处理叠层和权限。
+     * @param {Actor} targetActor 目标 Actor（可为合成 Actor）
+     * @param {ActiveEffect} effect 已解析的来源特效文档
+     * @returns {Promise<ActiveEffect|undefined>} 施加结果；被拦截时返回 undefined，底层错误继续抛出
+     */
+    static async applyDraggedEffect(targetActor, effect) {
+        if (!targetActor || !effect) return undefined;
+
+        const parent = effect.parent;
+        let sourceActor = null;
+        if (parent instanceof foundry.documents.Actor) sourceActor = parent;
+        else if (parent instanceof foundry.documents.Item && parent.parent instanceof foundry.documents.Actor) {
+            sourceActor = parent.parent;
+        }
+
+        if (parent instanceof foundry.documents.Item && effect.transfer) {
+            ui.notifications.warn(game.i18n.localize("XJZL.Effect.PassiveNoDrag"));
+            return undefined;
+        }
+
+        // 架招判定必须先于叠层、飘字和聊天副作用。
+        if (effect.getFlag?.("xjzl-system", "tiedToStance")) {
+            if (!sourceActor) {
+                ui.notifications.warn(game.i18n.localize("XJZL.Effect.TiedStanceNoSource"));
+                return undefined;
+            }
+            if (!this.canApplyStanceTiedEffect(sourceActor, targetActor)) {
+                ui.notifications.warn(game.i18n.localize("XJZL.Effect.TiedStanceMismatch"));
+                return undefined;
+            }
+        }
+
+        // 新父级不能沿用来源文档的 _id；其余效果数据保留。
+        const data = effect.toObject();
+        delete data._id;
+        if (!data.origin) data.origin = effect.uuid;
+        return this.addEffect(targetActor, data, 1);
+    }
+
+
+    /**
      * 把已到达门面的 V13 风格入参就地归一化为 V14 格式（D2 兼容层，仅归一化不回写）。
      * 覆盖：icon→img、顶层 changes 数组→system.changes、数字 mode→字符串 type、
      * 旧 duration 结构 {rounds/turns/seconds/startTime...}→{value,units,expiry}。
@@ -783,7 +865,7 @@ export class ActiveEffectManager {
             if (e.isTemporary) {
                 // 2. 获取剩余时间 (FVTT 核心已经帮我们算好了)
                 const duration = e.duration;
-                // 注意：remaining 属性在 V13 中通常是剩下的秒数或轮数
+                // 核心 remaining 是派生剩余量；缺失时不判为过期。
                 // 如果 remaining 存在且 <= 0，说明过期了
                 // 使用 typeof 严格判断 number，防止 null <= 0 为 true 的 JS 陷阱
                 if (typeof duration.remaining === "number" && duration.remaining <= 0) {

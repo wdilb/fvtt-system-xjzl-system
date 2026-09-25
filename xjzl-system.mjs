@@ -1,7 +1,7 @@
 /**
  * 侠界之旅 - 系统主入口
  * Author: Tiwelee
- * Tech Stack: Foundry V13, ESM, DataModels
+ * Tech Stack: Foundry V14, ESM, DataModels
  */
 
 // 导入 Document 类
@@ -307,8 +307,10 @@ Hooks.once("init", async function () {
   CONFIG.Item.documentClass = XJZLItem;
   // 注册 ActiveEffect 类，用来处理装备的自动抑制和其他我们自定义的AE规则
   CONFIG.ActiveEffect.documentClass = XJZLActiveEffect;
+  // 使用核心过期事件物理删除特效，避免与系统回合逻辑重复清理。
+  CONFIG.ActiveEffect.expiryAction = "delete";
 
-  // 3. 注册 DataModels (数据层) - V13 核心
+  // 3. 注册 DataModels (数据层)
   // 将 system.json 中定义的类型与 JS 类绑定
   CONFIG.Actor.dataModels = {
     character: XJZLCharacterData,
@@ -1306,10 +1308,6 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
         await EncounterManager.runFieldTrigger(combat, "combatantTurnStart", { combatant: currCombatant, round: currentRound, turn: transition.currentTurn });
       }
     }
-
-    for (const combatant of combat.combatants) {
-      if (combatant.actor) await ActiveEffectManager.cleanExpiredEffects(combatant.actor);
-    }
   });
 });
 
@@ -1331,7 +1329,36 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
 });
 
 /**
- * 在 V13 战斗追踪器中同步紧凑入口：先移除上次插入的控件，再按当前状态判断是否重建。
+ * 将画布上的 ActiveEffect 拖放路由到特效门面。
+ * 必须同步返回 false 阻止核心直建；异步任务负责解析来源、查找 Token 并施加。
+ * @param {Canvas} canvas 目标画布
+ * @param {object} data 拖放数据，包含画布坐标
+ * @param {DragEvent} event 拖放事件
+ * @returns {boolean|undefined} ActiveEffect 拖放返回 false；其他类型交给核心处理
+ */
+Hooks.on("dropCanvasData", (canvas, data, event) => {
+  if (data?.type !== "ActiveEffect") return;
+  // 钩子无法等待异步施加；失败时须反馈，因为核心落点已被阻止。
+  (async () => {
+    try {
+      const effect = await foundry.documents.ActiveEffect.fromDropData(data);
+      if (!effect) return;
+      // 落点判定与核心 TokensLayer._onDropActiveEffect 相同：取命中 Token 中索引最靠前者
+      const collisionTest = ({ t: token }) => token.visible && token.renderable && token.interactive
+        && token.hitArea?.contains(data.x - token.x, data.y - token.y);
+      const target = Array.from(canvas.tokens.quadtree.getObjects(new PIXI.Rectangle(data.x, data.y, 0, 0), { collisionTest }))
+        .sort((a, b) => a._lastSortedIndex - b._lastSortedIndex).at(0);
+      if (target?.actor) await ActiveEffectManager.applyDraggedEffect(target.actor, effect);
+    } catch (err) {
+      console.error("XJZL | 画布拖放施加特效失败:", err);
+      ui.notifications.error(game.i18n.localize("XJZL.Effect.DropFailed"));
+    }
+  })();
+  return false;
+});
+
+/**
+ * 在战斗追踪器中同步紧凑入口：先移除上次插入的控件，再按当前状态判断是否重建。
  * 每次渲染幂等清理，保证删除战斗、解绑或删除源战局后旧按钮不会残留。
  */
 function renderEncounterTrackerControls(app, html) {

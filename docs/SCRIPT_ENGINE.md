@@ -70,7 +70,7 @@
 | `Macros` | `XJZLMacros` | 系统公开宏工具，例如 `requestSave()`、`requestContest()` 和 `checkStance()`。 |
 | `game` / `ui` / `console` | Foundry 全局对象 | 游戏对象、通知对象和控制台。 |
 
-脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 V13 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。
+脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 Foundry 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。
 
 ### `args` 与同名顶层变量
 
@@ -634,6 +634,8 @@ await game.xjzl.api.effects.removeEffect(args.target, "prone", 1);
 
 `addEffect(actor, effectDataOrId, count = 1)` 接受系统状态 ID 或 AE 数据，负责权限委托、本地化、slug 匹配、叠层和刷新，返回 `Promise<ActiveEffect|undefined>`。`removeEffect(actor, effectIdOrSlug, amount = 1)` 按文档 ID 或 slug 移除/减层；成功删除时返回删除结果，减层时通常返回 `undefined`。对可叠层效果，`removeEffect` 的 `amount` 默认只减一层；需要整体移除时传入不小于当前层数的数值。
 
+限时效果的源数据使用 `duration: { value, units, expiry }`，例如持续 3 回合、在 `turnStart` 事件到期时设为 `{ value: 3, units: "rounds", expiry: "turnStart" }`。不限时设为 `{ value: null, expiry: null }`；新建效果不需要填写 `start`，由系统在施加时初始化。
+
 从来源 Item 复制 AE 时先转为普通对象并清除 `_id`：
 
 ```javascript
@@ -680,7 +682,7 @@ const change = status.system.changes[0]; // 命中返回可安全修改的深拷
 - 穿透与防御：`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`passiveBlock`、`brokenDefense`、`ignoreArmorEffects`。
 - 自动资源变化：`regenHp/Mp/Rage` 加 `TurnStart`、`TurnEnd` 或 `Attack` 后缀。
 
-数值计数器通常使用 AE mode `2`（`CONST.ACTIVE_EFFECT_MODES.ADD`）；布尔覆盖通常使用 mode `5`（`CONST.ACTIVE_EFFECT_MODES.OVERRIDE`）。新增键必须先进入 `CONFIG.XJZL.statusFlags`，不能只在数据中自创系统状态键。
+AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`，布尔覆盖通常使用 `type: "override"`。新增键必须先进入 `CONFIG.XJZL.statusFlags`，不能只在数据中自创系统状态键。
 
 ## Macros API
 
@@ -831,7 +833,7 @@ await actor.unsetFlag("xjzl-system", "example_last_hit");
 
 ### 玩家决策
 
-已有检定或对抗能力时使用 `Macros`。确实需要简单选择时使用 V13 命名空间：
+已有检定或对抗能力时使用 `Macros`。确实需要简单选择时使用 Foundry 的 `DialogV2`：
 
 ```javascript
 const confirmed = await foundry.applications.api.DialogV2.confirm({

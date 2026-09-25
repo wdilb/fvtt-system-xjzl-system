@@ -10,6 +10,7 @@ import { XJZLAuditLog } from "../applications/audit-log.mjs";
 import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 import { XJZLManageXPDialog } from "../applications/manage-xp.mjs";
 import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } from "./behaviors/effect-interactions.mjs";
+import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { XJZLCharacterPreviewApp } from "../applications/character-preview.mjs";
 import { XJZLCharacterWizardApp } from "../applications/character-wizard.mjs";
@@ -24,7 +25,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         classes: ["xjzl-window", "actor", "character", "theme-dark"],
         position: { width: 1100, height: 750 },
         window: { resizable: true },
-        // 告诉 V13："请帮我监听 Input 变化，并且在重绘时保持滚动位置"
+        // 输入变更自动保存；提交后保持角色卡打开。
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -1786,6 +1787,17 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     /**
      * @override
+     * 通过特效门面处理角色卡拖放，保留被动效果拦截、架招判定和叠层语义。
+     * @param {DragEvent} event 拖放事件
+     * @param {ActiveEffect} effect 来源特效
+     * @returns {Promise<ActiveEffect|undefined>} 施加结果；被拦截时返回 undefined
+     */
+    async _onDropActiveEffect(event, effect) {
+        return ActiveEffectManager.applyDraggedEffect(this.actor, effect);
+    }
+
+    /**
+     * @override
      * 物品处理逻辑
      * 职责：
      * 1. 仅当 _onDrop 判定为"外来物品"并调用 super 时，此方法才会被触发。
@@ -1943,8 +1955,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
         const itemId = el.dataset.itemId;
 
-        // 如果没有 ID，不管
-        if (!itemId) return;
+        // 非物品卡片由核心生成对应文档的拖拽数据。
+        if (!itemId) return super._onDragStart(event);
 
         const item = this.actor.items.get(itemId);
         if (!item) return;

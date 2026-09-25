@@ -14,7 +14,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         classes: ["xjzl-window", "xjzl-martial-editor", "item", "wuxue"],
         position: { width: 980, height: 720 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        // 输入变更自动保存；提交后保持编辑器打开。
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -52,7 +52,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 内容 Parts
         details: {
             template: "systems/xjzl-system/templates/item/wuxue/tab-details.hbs",
-            // 只登记真正产生滚动的节点，交给 V13 在 Part 替换前后同步 scrollTop/scrollLeft。
+            // 只登记实际滚动容器，供核心在 Part 替换后恢复滚动位置。
             // 不额外监听 scroll 事件，避免与 Foundry 原生恢复重复执行。
             scrollable: [
                 ".directory-list",
@@ -220,7 +220,8 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 img: e.img,
                 disabled: e.disabled,
                 description: e.description,
-                isSuppressed: e.isSuppressed
+                isSuppressed: e.isSuppressed,
+                transfer: e.transfer // 物品被动效果不提供拖拽入口
             };
         });
 

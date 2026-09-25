@@ -2,214 +2,173 @@ const { ActiveEffectConfig } = foundry.applications.sheets;
 import { TRIGGER_CHOICES } from "../data/common.mjs";
 
 /**
- * 逻辑层：负责数据准备与自定义按钮的保存逻辑
- * 继承 ActiveEffectConfig 以保留核心功能
+ * ActiveEffect 配置窗口：保留核心页签，并提供叠层、架招绑定和脚本配置。
+ * PARTS/TABS 在子类中遮蔽父类，因此核心部件与页签必须完整声明。
  */
 export class XJZLActiveEffectConfig extends ActiveEffectConfig {
 
-    static get defaultOptions() {
-        return foundry.utils.mergeObject(super.defaultOptions, {
-            classes: ["sheet", "active-effect-config", "xjzl-config"],
-            width: 580,
-            height: "auto",
-            // 让核心管理 Tab 基础样式
-            tabs: [{ navSelector: ".tabs", contentSelector: "form", initial: "details" }]
-        });
+    /** @type {ApplicationConfiguration} */
+    static DEFAULT_OPTIONS = {
+        classes: ["xjzl-config"],
+        position: { width: 580 },
+        actions: {
+            addScript: XJZLActiveEffectConfig.prototype._onAddScript,
+            deleteScript: XJZLActiveEffectConfig.prototype._onDeleteScript
+        }
+    };
+
+    /** @type {Record<string, HandlebarsTemplatePart>} */
+    static PARTS = {
+        header: { template: "templates/sheets/active-effect/header.hbs" },
+        tabs: { template: "templates/generic/tab-navigation.hbs" },
+        details: { template: "templates/sheets/active-effect/details.hbs", scrollable: [""] },
+        duration: { template: "templates/sheets/active-effect/duration.hbs" },
+        changes: {
+            template: "templates/sheets/active-effect/changes.hbs",
+            templates: ["templates/sheets/active-effect/change.hbs"],
+            scrollable: ["ol[data-changes]"]
+        },
+        xjzl: { template: "systems/xjzl-system/templates/apps/active-effect-xjzlconfig.hbs", scrollable: [""] },
+        footer: { template: "templates/generic/form-footer.hbs" }
+    };
+
+    /** @type {Record<string, ApplicationTabsConfiguration>} */
+    static TABS = {
+        sheet: {
+            tabs: [
+                { id: "details", icon: "fa-solid fa-book" },
+                { id: "duration", icon: "fa-solid fa-clock" },
+                { id: "changes", icon: "fa-solid fa-gears" },
+                { id: "xjzl", icon: "fa-solid fa-dragon", label: "XJZL.Effect.ConfigTitle" }
+            ],
+            initial: "details",
+            labelPrefix: "EFFECT.TABS"
+        }
+    };
+
+    /* -------------------------------------------- */
+
+    /** @inheritDoc */
+    async _preparePartContext(partId, context) {
+        const partContext = await super._preparePartContext(partId, context);
+        if (partId === "xjzl") partContext.xjzl = this.#prepareXjzlContext();
+        return partContext;
     }
 
     /**
-     * 准备数据供 Handlebars 模板使用
-     * 覆盖父类方法以提供自定义数据结构
+     * 准备"侠界配置"页上下文：flags 快照 + 脚本数组 + 变更 key 自动补全选项。
+     * @returns {object} 供 active-effect-xjzlconfig.hbs 使用的 xjzl 子上下文
      */
-    async getData(options = {}) {
-        // 不调用 super.getData() 避免 V13 报错
+    #prepareXjzlContext() {
         const effect = this.document;
-        const flags = effect.flags["xjzl-system"] || {};
+        const flags = effect.flags["xjzl-system"] ?? {};
 
-        let rawScripts = flags.scripts || [];
-        // 容错处理：如果数据库里存的是对象，转为数组
-        if (typeof rawScripts === 'object' && !Array.isArray(rawScripts)) {
-            rawScripts = Object.values(rawScripts);
-        }
+        // 历史数据可能把 scripts 存成数字键对象，统一还原为数组
+        let rawScripts = flags.scripts ?? [];
+        if (!Array.isArray(rawScripts)) rawScripts = Object.values(rawScripts ?? {});
 
         const scripts = rawScripts.map(s => ({ ...s, active: s.active !== false }));
-
-        let maxStacks = flags.maxStacks;
-        if (!Number.isFinite(maxStacks)) maxStacks = 0;
+        const listId = `xjzl-status-list-${effect.id ?? "new"}`;
 
         return {
-            xjzl: {
-                slug: flags.slug || "",
-                autoSlug: effect.name ? (typeof effect.name.slugify === 'function' ? effect.name.slugify() : effect.name) : "auto-slug",
-                isStackable: !!flags.stackable,
-                maxStacks: maxStacks,
-                isTiedToStance: !!flags.tiedToStance, //是否随架招解除
-                scripts: scripts,
-                triggerChoices: TRIGGER_CHOICES
-            }
+            slug: flags.slug ?? "",
+            autoSlug: effect.name?.slugify ? effect.name.slugify() : (effect.name ?? "auto-slug"),
+            isStackable: !!flags.stackable,
+            maxStacks: Number.isFinite(flags.maxStacks) ? flags.maxStacks : 0,
+            isTiedToStance: !!flags.tiedToStance,
+            scripts,
+            triggerChoices: TRIGGER_CHOICES,
+            listId,
+            autocompleteKeys: this.#buildAutocompleteKeys()
         };
     }
 
     /**
-     * 自定义按钮保存逻辑 (点击添加/删除脚本时触发)
-     * 这里必须手动抓取表单数据，否则会丢失用户在其他 Tab 修改但未保存的内容
+     * 汇总变更 key 自动补全候选项：系统状态 flags + 常用数值字段。
+     * @returns {{value: string, label: string}[]}
      */
-    async _onSaveXJZL(event) {
-        event.preventDefault();
-        const btn = event.currentTarget;
-        const form = btn.closest("form");
-
-        // 使用 V13 兼容的 FormDataExtended 获取当前页面所有输入值
-        const FormDataClass = foundry.applications.ux?.FormDataExtended || FormDataExtended;
-        const formData = new FormDataClass(form).object;
-
-        const action = btn.dataset.action;
-        const currentScripts = this._getCleanScripts(this.document.getFlag("xjzl-system", "scripts"));
-
-        // 处理数组逻辑
-        if (action === "add-script") {
-            currentScripts.push({ label: "新特效", trigger: "passive", active: true, script: "" });
-        } else if (action === "delete-script") {
-            const index = parseInt(btn.dataset.index);
-            currentScripts.splice(index, 1);
+    #buildAutocompleteKeys() {
+        const keys = [];
+        const statusFlags = CONFIG.XJZL?.statusFlags ?? {};
+        for (const [key, label] of Object.entries(statusFlags)) {
+            keys.push({ value: `flags.xjzl-system.${key}`, label: game.i18n.localize(label) });
         }
+        keys.push(
+            { value: "system.resources.hp.value", label: "气血 (HP)" },
+            { value: "system.resources.mp.value", label: "内力 (MP)" },
+            { value: "system.combat.speed", label: "速度" }
+        );
+        return keys;
+    }
 
-        // 清理 FormData 中的干扰项 
-        // 删除自动生成的 flags.xjzl-system.scripts.0.xx 等键，防止污染数组
-        for (const key of Object.keys(formData)) {
-            if (key.startsWith("flags.xjzl-system.scripts.")) {
-                delete formData[key];
+    /* -------------------------------------------- */
+
+    /** @inheritDoc */
+    _onRender(context, options) {
+        super._onRender(context, options);
+        // 变更 key 输入框位于核心 changes 页，渲染时按需挂上 datalist 实现自动补全
+        const listId = context.xjzl?.listId;
+        if (!listId) return;
+        this.element.querySelectorAll('input[name$=".key"]').forEach(input => {
+            if (!input.hasAttribute("list")) {
+                input.setAttribute("list", listId);
+                input.setAttribute("placeholder", "flags...");
             }
+        });
+    }
+
+    /* -------------------------------------------- */
+
+    /** @inheritDoc */
+    _processFormData(event, form, formData) {
+        const submitData = super._processFormData(event, form, formData);
+        // 表单可能把数字索引字段展开为对象；持久化的 scripts 应为密集数组。
+        const flags = submitData.flags?.["xjzl-system"];
+        if (flags && flags.scripts !== undefined && !Array.isArray(flags.scripts)) {
+            flags.scripts = Object.values(flags.scripts ?? {});
         }
+        return submitData;
+    }
 
-        // 赋值纯净的数组
-        formData["flags.xjzl-system.scripts"] = currentScripts;
+    /* -------------------------------------------- */
 
-        // 提交更新 (这会自动触发 Hook 重绘界面)
-        await this.document.update(formData);
+    /**
+     * 添加脚本：从当前表单读取未保存状态后追加一条空脚本再整体提交，
+     * 保证其他页签（含核心 details/duration/changes）未保存的字段不丢失。
+     * @param {PointerEvent} _event
+     * @param {HTMLElement} _target
+     * @this {XJZLActiveEffectConfig}
+     */
+    async _onAddScript(_event, _target) {
+        const scripts = this.#currentScriptsFromForm();
+        scripts.push({ label: "新特效", trigger: "passive", active: true, script: "" });
+        return this.submit({ updateData: { flags: { "xjzl-system": { scripts } } } });
     }
 
     /**
-     * 辅助方法：确保获取到的是数组
+     * 删除脚本：按行内 data-index 从当前表单状态中移除后整体提交。
+     * 数组在 mergeObject 中是整体覆盖语义，长度缩短也能正确落库。
+     * @param {PointerEvent} _event
+     * @param {HTMLElement} target 触发删除的行内按钮（携带 data-index）
+     * @this {XJZLActiveEffectConfig}
      */
-    _getCleanScripts(scripts) {
-        let clean = scripts || [];
-        if (typeof clean === 'object' && !Array.isArray(clean)) {
-            clean = Object.values(clean);
-        }
-        return clean;
-    }
-}
-
-/**
- * 视图层：使用 Hook 强行注入 HTML
- * 这保证了无论核心如何重绘，我们的界面一定会出现
- */
-Hooks.on("renderXJZLActiveEffectConfig", async (app, html, data) => {
-    // 兼容性处理：将 html 转为 jQuery 对象
-    const $html = $(html);
-
-    // 查找关键容器
-    const nav = $html.find("nav.sheet-tabs");
-    const form = $html.is("form") ? $html : $html.find("form");
-
-    if (!nav.length || !form.length) return;
-
-    // 1. 注入导航按钮 (总是移除旧的添加新的，保证状态最新)
-    nav.find('[data-tab="xjzl-config"]').remove();
-
-    const tabBtn = $(`
-        <a class="item" data-action="tab" data-group="sheet" data-tab="xjzl-config">
-            <i class="fas fa-dragon"></i> <span>侠界配置</span>
-        </a>
-    `);
-    nav.append(tabBtn);
-
-    // 2. 渲染并注入内容
-    form.find('section[data-tab="xjzl-config"]').remove();
-
-    const context = await app.getData();
-    // 使用 V13 推荐的渲染方法
-    const renderFunc = foundry.applications.handlebars?.renderTemplate || renderTemplate;
-    const templateHtml = await renderFunc("systems/xjzl-system/templates/apps/active-effect-xjzlconfig.hbs", context);
-
-    // 插入位置逻辑：尝试插在最后一个 tab 后面
-    const lastTab = form.find('section.tab').last();
-    if (lastTab.length) lastTab.after(templateHtml);
-    else form.append(templateHtml);
-
-    // =====================================================
-    // 3. 智能激活状态修正 (修复跳页与白屏的问题)
-    // =====================================================
-    const internalActive = app._tabs?.[0]?.active; // Foundry 内部记录
-    const coreTabs = ["details", "duration", "changes", "effects"]; // 核心 Tab 列表
-
-    if (coreTabs.includes(internalActive)) {
-        // A. 如果 Foundry 明确在核心 Tab，什么都不做，防止跳页
-    }
-    else if (internalActive === "xjzl-config") {
-        // B. 如果 Foundry 明确在我们的 Tab，强制激活
-        _forceActivate(nav, form);
-    }
-    else {
-        // C. 如果 Foundry 状态迷失 (undefined)，检查 DOM 上有没有亮着的 Tab
-        const anyActive = nav.find('.active').length > 0;
-        if (!anyActive) {
-            // 如果一片漆黑 (白屏)，说明就是我们的 Tab 该显示了
-            _forceActivate(nav, form);
-        }
+    async _onDeleteScript(_event, target) {
+        const index = Number(target.dataset.index);
+        const scripts = this.#currentScriptsFromForm();
+        if (!Number.isInteger(index) || index < 0 || index >= scripts.length) return;
+        scripts.splice(index, 1);
+        return this.submit({ updateData: { flags: { "xjzl-system": { scripts } } } });
     }
 
-    // 4. 重新计算高度
-    app.setPosition({ height: "auto" });
-
-    // 5. 绑定交互事件
-    const newContent = form.find('section[data-tab="xjzl-config"]');
-    // 使用 .off().on() 防止重复绑定，并绑定到 app 实例
-    newContent.find('button[data-action="add-script"]').off("click").on("click", app._onSaveXJZL.bind(app));
-    newContent.find('a[data-action="delete-script"]').off("click").on("click", app._onSaveXJZL.bind(app));
-
-    // 6. 注入输入框自动补全 (Datalist)
-    _injectDatalist(app, $html, form);
-});
-
-/**
- * 辅助：强制激活自定义 Tab
- */
-function _forceActivate(nav, form) {
-    nav.find('.item').removeClass("active");
-    nav.find('a[data-action="tab"]').removeClass("active");
-    form.find('section.tab').removeClass("active");
-
-    nav.find('[data-tab="xjzl-config"]').addClass("active");
-    form.find('section[data-tab="xjzl-config"]').addClass("active");
-}
-
-/**
- * 辅助：注入 Datalist
- */
-function _injectDatalist(app, html, form) {
-    const listId = `xjzl-status-list-${app.document.id}`;
-    if (!html.find(`#${listId}`).length) {
-        let optionsHtml = "";
-        const statusFlags = CONFIG.XJZL?.statusFlags || {};
-        for (const [key, label] of Object.entries(statusFlags)) {
-            optionsHtml += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
-        }
-        const commonStats = [
-            { val: "system.resources.hp.value", label: "气血 (HP)" },
-            { val: "system.resources.mp.value", label: "内力 (MP)" },
-            { val: "system.combat.speed", label: "速度" }
-        ];
-        optionsHtml += commonStats.map(o => `<option value="${o.val}">${o.label}</option>`).join("");
-        form.append(`<datalist id="${listId}">${optionsHtml}</datalist>`);
+    /**
+     * 从当前表单读取 scripts 的最新未保存状态。
+     * @returns {object[]} 当前表单中的脚本数组（无脚本时为空数组）
+     */
+    #currentScriptsFromForm() {
+        const FormDataClass = foundry.applications.ux?.FormDataExtended || FormDataExtended;
+        const submitData = this._processFormData(null, this.form, new FormDataClass(this.form));
+        const scripts = submitData.flags?.["xjzl-system"]?.scripts;
+        if (Array.isArray(scripts)) return scripts;
+        return Object.values(scripts ?? {});
     }
-
-    html.on("focusin", 'input[name$="key"]', (ev) => {
-        const target = ev.currentTarget;
-        if (!target.hasAttribute("list")) {
-            target.setAttribute("list", listId);
-            target.setAttribute("placeholder", "flags...");
-        }
-    });
 }

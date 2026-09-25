@@ -3,6 +3,7 @@
  */
 import { localizeConfig } from "../utils/utils.mjs";
 import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } from "./behaviors/effect-interactions.mjs";
+import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -129,7 +130,7 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         </div>`;
 
         ChatMessage.create({
-            author: game.user.id, // V13
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: this.document }),
             content: content
         });
@@ -189,5 +190,16 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
 
     async _onDeleteEffect(event, target) {
         return onDeleteEffect(this, event, target);
+    }
+
+    /**
+     * @override
+     * 通过特效门面处理生物卡拖放，保留被动效果拦截、架招判定和叠层语义。
+     * @param {DragEvent} event 拖放事件
+     * @param {ActiveEffect} effect 来源特效
+     * @returns {Promise<ActiveEffect|undefined>} 施加结果；被拦截时返回 undefined
+     */
+    async _onDropActiveEffect(event, effect) {
+        return ActiveEffectManager.applyDraggedEffect(this.actor, effect);
     }
 }
