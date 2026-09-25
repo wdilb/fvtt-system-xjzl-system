@@ -9,7 +9,9 @@ export class XJZLActiveEffectConfig extends ActiveEffectConfig {
 
     /** @type {ApplicationConfiguration} */
     static DEFAULT_OPTIONS = {
-        classes: ["xjzl-config"],
+        // active-effect-config：核心 CSS 以该类为作用域写了本套模板的布局修正
+        // （duration 页标签 flex 比例、changes 页间距等），子类换类名会全部失配
+        classes: ["xjzl-config", "active-effect-config"],
         position: { width: 580 },
         actions: {
             addScript: XJZLActiveEffectConfig.prototype._onAddScript,

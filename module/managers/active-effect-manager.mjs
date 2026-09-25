@@ -60,9 +60,11 @@ export class ActiveEffectManager {
     }
 
     /**
-     * 将拖放的 AE 复制施加到 Actor，保留来源文档与效果数据。
+     * 将拖放的 AE 施加到 Actor。
      * 物品内嵌的 transfer:true 被动 AE 不可施加；独立 AE 不受此限制。
      * 绑定架招的 AE 须先确认双方当前架招相同，再交由 addEffect 处理叠层和权限。
+     * 语义按来源区分：角色身上内嵌的 AE 拖到**其他**角色视为转移（施加成功后删除
+     * 来源特效，施加失败或被拦截不动来源）；物品模板、合集包 AE 仍是复制，来源保留。
      * @param {Actor} targetActor 目标 Actor（可为合成 Actor）
      * @param {ActiveEffect} effect 已解析的来源特效文档
      * @returns {Promise<ActiveEffect|undefined>} 施加结果；被拦截时返回 undefined，底层错误继续抛出
@@ -98,7 +100,16 @@ export class ActiveEffectManager {
         const data = effect.toObject();
         delete data._id;
         if (!data.origin) data.origin = effect.uuid;
-        return this.addEffect(targetActor, data, 1);
+        const result = await this.addEffect(targetActor, data, 1);
+
+        // 转移语义：来源是角色身上的特效且施加到了另一角色，成功后移除来源。
+        // 拖回自身（含同一 Token）不删；无权限时走 GM socket 委托，与 removeEffect 同路径。
+        if (result && sourceActor && sourceActor !== targetActor
+            && parent instanceof foundry.documents.Actor) {
+            if (sourceActor.isOwner) await effect.delete();
+            else await xjzlSocket.executeAsGM("deleteEmbedded", sourceActor.uuid, "ActiveEffect", [effect.id]);
+        }
+        return result;
     }
 
 
