@@ -2,6 +2,7 @@ import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./managers/encounter-manager.mjs";
 import { XJZLContainerTransactionManager } from "./managers/container-transaction-manager.mjs";
 import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
+import { AuraLedger } from "./region/xjzl-aura-ledger.mjs";
 
 export let xjzlSocket;
 
@@ -22,6 +23,8 @@ export function setupSocket() {
     xjzlSocket.register("createEmbedded", _socketCreateEmbedded);
     xjzlSocket.register("deleteEmbedded", _socketDeleteEmbedded);
     xjzlSocket.register("stopStance", _socketStopStance);
+    // 非活动 GM 的 Region 事件经此委托活动 GM 结算。
+    xjzlSocket.register("auraLedger", _socketAuraLedger);
     // 注册战斗动作计数器
     xjzlSocket.register("recordCombatStat", _socketRecordCombatStat);
     xjzlSocket.register("broadcastCombatStats", _socketBroadcastCombatStats);
@@ -359,6 +362,16 @@ async function _socketStopStance(targetUuid) {
 
     // 3. 执行
     return await actor.stopStance();
+}
+
+/**
+ * 光环结算队列入口：操作对象由行为 handler 组装（含 payloadKey 串行键），
+ * 只允许活动 GM 入队执行，多 GM 在线时其余端忽略。
+ * @param {object} op - {op, behaviorId, regionUuid, tokenUuid, payloadKey, ...}
+ */
+async function _socketAuraLedger(op) {
+    if (isNotActiveGM()) return null;
+    return AuraLedger.enqueue(op);
 }
 
 /**

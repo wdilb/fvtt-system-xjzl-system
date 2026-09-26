@@ -4,6 +4,7 @@
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { DEFAULT_CONTAINER_IMAGES } from "../data/actor/container.mjs";
@@ -3931,6 +3932,9 @@ export class XJZLActor extends Actor {
 
     // 4. 清理绑定特效 (只清理标记了 tiedToStance 标签的AE)
     await this.clearStanceTiedEffects();
+
+    // 解除架招时同步销毁其光环；关招、被破和濒死均走此入口。
+    await AuraManager.dismissBySource({sourceActorUuid: this.uuid, lifecycle: "stance"});
 
     // 5. 视觉反馈
     this.showFloatyText("解除架招", {

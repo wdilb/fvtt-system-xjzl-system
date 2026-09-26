@@ -700,6 +700,27 @@ const change = status.system.changes[0]; // 命中返回可安全修改的深拷
 
 AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`，布尔覆盖通常使用 `type: "override"`。新增键必须先进入 `CONFIG.XJZL.statusFlags`，不能只在数据中自创系统状态键。
 
+## 光环 API
+
+`game.xjzl.aura` 在 `ready` 后提供 Region 光环管理。创建、重建和删除会写入场景文档，应在异步脚本时机调用并 `await`；`passive`、`calc` 不可使用。
+
+| 方法 | 用途与返回值 |
+|---|---|
+| `await game.xjzl.aura.create(source, params)` | 创建光环；同场景同 `label` 的旧光环先删除。返回 `RegionDocument`；缺少标签、源不可用、无网格或半径非法时返回 `null`。矩形尺寸、锚点非法时抛错。 |
+| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene})` | 按标签或 Region ID 删除光环，返回删除数量。`scene` 默认当前画布场景。 |
+| `game.xjzl.aura.query(label, {scene})` | 查询同标签的 Region，返回数组。`scene` 默认当前画布场景。 |
+| `game.xjzl.aura.queryLabels({scene})` | 返回场景中去重后的光环标签数组。`scene` 默认当前画布场景。 |
+| `await game.xjzl.aura.refreshAura(label, overrides, {scene})` | 用已有实例的参数和覆盖项重建光环，返回新 Region；标签不存在或源失效时返回 `null`。 |
+| `await game.xjzl.aura.queryTokens(source, opts)` | 按范围即时查询，返回命中的 `Actor[]`，不创建 Region。一个关联 Actor 有多个命中 Token 时可重复出现。 |
+
+`source` 可传 `TokenDocument`、画布 `Token`、在当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随 Token，`follow: false` 可固定在创建位置；坐标源始终固定。创建坐标源光环时，若需按阵营过滤，可在 `params` 中传 `sourceActorUuid`，该角色须在当前画布上有活动 Token。范围以网格格数计，圆形使用非负整数 `radius`（默认 `0`）；矩形设置 `shapeKind: "rect"`、`rectWidth`、`rectHeight`，可用 `anchorX`、`anchorY` 指定锚格。`quarterTurns` 为 90° 转数，传 `"auto"` 时按源 Token 朝向吸附。`displayName`、`color` 控制 Region 展示，`levelIds` 可指定楼层。`queryTokens` 还接受形状生成器输出的相对 `offsets`（`i` 为列、`j` 为行），此时无需创建光环。
+
+`params.label` 必填。`faction` 可为 `"all"`、`"ally"`、`"enemy"`，`includeSelf` 控制是否包含源；按阵营过滤需要可解析的源 Token。`queryTokens` 使用坐标源时应采用 `"all"`，且无法识别自身；使用 Token/Actor 源时，`includeSelf: false` 按源 Actor 排除。持久光环的 `includeSelf: false` 则按源 Token 排除。进入范围时可用 `payloadItemUuid` 和 `payloadEffectName` 指向源物品中的 AE；`enterAction` 配置直接伤害或治疗，`moveWithin` 使区域内移动复用该动作。`roundEnabled: true` 时按 `roundTiming`（`tokenRoundStart`、`tokenRoundEnd`、`tokenTurnStart` 或 `tokenTurnEnd`）执行 `roundAction`。动作对象的 `kind` 为 `"none"`、`"damage"` 或 `"healing"`，`amount` 为数值或按源角色数据计算的公式，`type` 为伤害类型或资源键；`pierce` 仅用于伤害。`enterEnabled` 默认开启、`roundEnabled` 默认关闭；两者关闭且未启用 `moveWithin` 时，光环仅标记范围。
+
+`throttlePerRound` 将同一目标的进入结算限制为每战斗轮一次，战斗外不节流。`exitClear` 使退出时移除整条对应 AE，包括目标进入前已有的同名效果；默认只摘除本光环的贡献。`durationRounds` 控制存活轮数，仅在创建时已有进行中的战斗轮次时生效。`maintain: {resource, amount, perTarget}` 在绑定战斗的源角色回合末消耗资源；`perTarget` 是每名覆盖敌人的追加消耗。未显式传 `combatId` 时，管理器使用创建时的当前战斗。`lifecycle` 默认为 `"manual"`；`"combat"` 在所属战斗结束时清理，`"equip"` 在对应 `sourceItemUuid` 物品卸下或删除时清理，`"yungong"` 在源角色运功切换时清理，`"stance"` 在源角色解除架招时清理。按源清理需要正确设置 `sourceActorUuid` 或 `sourceItemUuid`；Token/Actor 源会自动记录源角色 UUID。
+
+删除或重建光环会触发区域退出清理；需要按标签更新半径、动作或效果时使用 `refreshAura`。直接修改 Region 行为配置中的范围字段也会重算形状，但已施加目标的效果引用在退出并重新进入前保持不变。
+
 ## Macros API
 
 ### 单向检定

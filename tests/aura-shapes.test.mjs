@@ -10,7 +10,8 @@ import {
     generateCircleOffsets,
     generateRectangleOffsets,
     rotateOffsets90,
-    snapDirectionToQuarterTurns
+    snapDirectionToQuarterTurns,
+    toCoreOffsets
 } from "../module/utils/aura-shapes.mjs";
 
 let passed = 0;
@@ -176,5 +177,17 @@ assert.equal(snapDirectionToQuarterTurns(45), 1, "45° 边界按四舍五入进�
 assert.equal(snapDirectionToQuarterTurns(44), 0);
 assert.equal(snapDirectionToQuarterTurns(720 + 90), 1, "超一圈角度");
 group("朝向 90° 吸附：整角/负角/回绕/边界");
+
+/* -------------------------------------------- */
+/*  轴映射（写入 GridShapeData 的运行时契约）      */
+/* -------------------------------------------- */
+
+// 生成器 (i=列, j=行) → 核心 (i=行, j=列)，锚格叠加后为绝对格坐标
+const relAxis = [{i: 0, j: 0}, {i: 1, j: 0}, {i: 0, j: 1}];
+const coreOffsets = toCoreOffsets(relAxis, {i: 10, j: 20});
+assert.deepEqual(coreOffsets, [{i: 10, j: 20}, {i: 10, j: 21}, {i: 11, j: 20}]);
+// 锚格必在集合内（生成器恒含 (0,0) 中心格）
+assert.ok(coreOffsets.some(o => o.i === 10 && o.j === 20), "锚格保留在映射结果中");
+group("轴映射：i/j 轴交换与锚格叠加");
 
 console.log(`\n全部 ${passed} 组断言通过。`);

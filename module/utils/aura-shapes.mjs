@@ -95,6 +95,17 @@ export function rotateOffsets90(offsets, quarterTurns) {
 }
 
 /**
+ * 将生成器输出（相对偏移，i=列、j=行）映射为核心 GridShapeData 的绝对格
+ * 坐标（i=行(y)、j=列(x)）并叠加锚格。
+ * @param {{i: number, j: number}[]} relOffsets  生成器相对偏移（已含旋转）
+ * @param {{i: number, j: number}} anchorOffset  锚格（核心格式 i=行、j=列）
+ * @returns {{i: number, j: number}[]}
+ */
+export function toCoreOffsets(relOffsets, anchorOffset) {
+    return relOffsets.map(o => ({i: anchorOffset.i + o.j, j: anchorOffset.j + o.i}));
+}
+
+/**
  * 将源 token 的朝向角度吸附为最近的 90° 转数（顺时针，0~3）。
  * 仅做数值吸附；角度零点与实际朝向的对应关系由调用方确定。
  * @param {number} direction  朝向角度（度，任意实数，如 token.direction）
