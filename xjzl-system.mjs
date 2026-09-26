@@ -69,6 +69,7 @@ import { ActionTracker } from "./module/applications/action-tracker.mjs";
 import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 import { xjzlSocket } from "./module/socket.mjs";
+import { registerAuraBehaviorSpike, getAuraSpikeApi } from "./module/region/xjzl-aura-behavior.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
 import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
@@ -87,6 +88,9 @@ Hooks.once("init", async function () {
 
   // 1. 将自定义配置挂载到全局 CONFIG
   CONFIG.XJZL = XJZL;
+
+  // 类型声明位于 system.json；客户端模型需在本地化扫描前注册。
+  registerAuraBehaviorSpike();
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
@@ -748,6 +752,9 @@ Hooks.once("ready", async function () {
   };
 
   game.xjzl.Macros = XJZLMacros;
+
+  // 临时调试入口，完整光环行为接入后移除；不属于脚本公共 API。
+  game.xjzl.auraSpike = getAuraSpikeApi();
 
   // 3. 挂载 GM 专用 API (生成器)
   // 此时 game.user 已经不是 null 了，可以安全检查权限

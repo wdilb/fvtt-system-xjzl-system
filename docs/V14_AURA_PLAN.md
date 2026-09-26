@@ -2,7 +2,7 @@
 
 本文件是 [`V14_PLAN.md`](V14_PLAN.md) 中 M3（S3.1–S3.7）与 S4.3 光环宏改写的专项计划文件，对应总纲 §3 与 Q4 决策。AE 侧实施仍以 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 为准，本文件不复述 AE 契约。
 
-**当前状态（2026-09-26）**：盘点、分类、实现框架决策与专项开发计划（第 7 节）均已定稿，并经外部审阅与数据作者多轮修订（决策 14～38）；自 AURA-01 起实施，S3.6 已随本计划关闭。第 1～5 节是事实基础与 94 条盘点清单，第 6 节是决策记录，第 7 节是唯一施工与验收依据。
+**当前状态（2026-09-26）**：盘点、分类、实现框架决策与专项开发计划（第 7 节）均已定稿，并经外部审阅与数据作者多轮修订（决策 14～39）；AURA-01 机制 spike 与 AURA-02 形状生成器已完成（结论见第 7.2 节对应条目），AURA-03～05 框架主线可开工。第 1～5 节是事实基础与 94 条盘点清单，第 6 节是决策记录，第 7 节是唯一施工与验收依据。
 
 ## 1. 盘点口径
 
@@ -16,7 +16,7 @@
 - **当前施加方式全部无区域支持**：手动拖拽 payload AE 给范围内单位、combatStart 等脚本一次性分发（马头琴、书香江南、惜余琴自身、青海）、或事件脚本提示手动结算。`automationNote` 逐条记录了现状。
 - **旧可视化工具已停用**：`data/macros/utility.json` 的"⭕ [快捷] 创建跟随光环"宏基于 MeasuredTemplate（S1.14 已停用），其改写归 S4.3，并入本专项。
 - **脚本式光环先例**：水中战斗（青海）AE 以 `flags.xjzl-system.radius` 存半径、`turnEnd` 脚本做维持消耗与广播——证明"AE 自带脚本 + 区域参数"路线可行，但无法覆盖进出结算与可视化。
-- **S0.4 机制结论（光环实现的地基）**：Region 行为 `applyActiveEffect` 可对进出 Token 施加/移除特效；事件仅由官方移动驱动派发；**非链接 Token 的 `token.actor` 是合成 Actor**，光环施加/清理必须处理该分支；`RegionDocument.createTokenEmanation` 可生成跟随区域；`attachment.token` 提供原生跟随。
+- **S0.4 机制结论（光环实现的地基）**：Region 行为 `applyActiveEffect` 可对进出 Token 施加/移除特效；**区域进出/回合事件的派发口径（AURA-01 复测修正，见第 6 节决策 39）**：官方移动与 `document.update` 裸传送均派发进出事件，`updateSource` 纯内存写则无钩子、无事件、包含性跟踪也不更新；**非链接 Token 的 `token.actor` 是合成 Actor**，光环施加/清理必须处理该分支；`RegionDocument.createTokenEmanation` 可生成跟随区域；`attachment.token` 提供原生跟随（AURA-01 实测：须传 token id，grid 形状随源整格平移，源删除自动删区并补发 exit）。
 
 ## 3. 实现框架（2026-09-26 与数据作者讨论定稿）
 
@@ -39,7 +39,7 @@
 ### 3.2 范围与判定口径（2026-09-26 两轮拍板）
 
 - 区域形状一律用 `grid` 类型（GridShapeData）：`offsets` 格子集合的成员判定、渲染、附着平移三者天然一致——**生效范围 = 可见范围 = 我们按 1-2-2-2 算出的格子集合**；`circle`/`emanation` 是欧氏几何圆，只配当视觉，不做生效判定。
-- **单位（定案，决策 20）**：规则描述中的"米"即"格"，无任何换算、不读 `scene.grid.distance`；半径 N 米 = N 格。光环圆心一律吸附**格心**（从源 token 所在格中心按 1-2-2-2 公式算出覆盖格集合，复用 measured-template.mjs 保留的遍历算法；核心 Region 可锚格子顶点，这是我们的差异点）。附着跟随由核心整格平移 offsets。
+- **单位（定案，决策 20）**：规则描述中的"米"即"格"，无任何换算、不读 `scene.grid.distance`；半径 N 米 = N 格，N 为非负整数。光环圆心一律吸附**格心**（从源 token 所在格中心按 1-2-2-2 公式算出覆盖格集合，复用 measured-template.mjs 保留的遍历算法；核心 Region 可锚格子顶点，这是我们的差异点）。附着跟随由核心整格平移 offsets。
 - **进出判定直接采用核心包含语义**（决策 15，审阅修订）：核心 `testInsideRegion` 对 1×1 token 只测中心点（源码 `#getUnconstrainedTestPoints`："If at most 1x1, test center point"），即我们的中心格口径；多格 token 为足迹多测试点（任一命中即在内），按用户拍板接受核心口径、**不自研中心格状态机**。进出事件由核心派发，行为不做二次判定。
 - **形状生成器**以圆形为主（约 99% 条目），支持矩形（3×1、3×3 等）与创建时按源 token 朝向的 90° 吸附旋转作为变体（剑气白云、刀气旋风）；多边形（星罗棋布棋子锚点）不支持，维持仅标记/手动。万剑归宗为**单 region + 大 offsets 集合**（剑痕触发不逐格消耗、湮灭一次性全清），不做逐格实例；区域内格间移动不重触发 `tokenEnter`，经 `tokenMoveWithin` 按**每次移动**结算一次（决策 23）。
 - 无网格场景：grid 形状为空，系统直接禁用光环创建。**无实例查询（`queryTokens`）与 Region 判定同口径**：1×1 测中心、多格测足迹任一点（决策 35）。
@@ -259,13 +259,15 @@
     ① 裸 update 传送不触发进出的对账兜底（回合事件时补扫或 updateToken 钩子）；
     ② 非链接 Token 合成 Actor 的施加/清理分支；
     ③ region 删除补发 `tokenExit` 与门面清理的执行顺序；
-    ④ 万剑归宗 20 米全格 offsets（1200+ 格）的渲染与判定性能；
+    ④ 万剑归宗 20 米全格 offsets（921 格）的渲染与判定性能；
     ⑤ `modifyMovementCost` × 1-2-2-2 measurePath 劫持的叠加；
     ⑥ 多光环并存（10+ region/场景）的帧率摸底（粒子开关阈值依据）；
     ⑦ 濒死/死亡时点脚本是否仍随 Actor 正常执行（监听 AE 依赖）；
     ⑧ 1×1 token 核心包含判定的运行时复验（源码已核实单点中心，见第 3.2 节）；
     ⑨ 核心回合事件（fire-and-forget 已从源码确认）与我方 EncounterManager 回合队列的实际交错（幂等设计依据）；
     ⑩ 矩形形状与按源朝向 90° 吸附旋转 offsets 的正确性，及 `tokenMoveWithin` 事件携带的 movement 数据形态与触发粒度（决策 23"每移动结算一次"的依据）。
+
+    **销项记录（2026-09-26，AURA-01 spike，14.368 实测）**：③④⑤⑥⑧⑨⑩ 已实测销项；AURA-01 工作项中的玩家移动派发端与 isSelf 门控已实测，socketlib 委托 GM 全链路与竞态转 AURA-03 验收；① 的"裸传送不派发事件"前提已被决策 39 修正（对账兜底保留为保险层）；②⑦ 维持原归属（②随 AURA-03/05 验收、⑦濒死脚本归 AURA-10）。逐项结论见第 7.2 节 AURA-01 条目。
 
 **第二轮修订决策（2026-09-26，外部审阅后与数据作者确认，14～21）**：
 
@@ -275,7 +277,7 @@
 17. **结算幂等**：核心回合事件为 fire-and-forget 且与我方回合队列并发（源码确认），不规定全局顺序（沿 Q5 口径）；要求每个结算幂等——同一单位同一回合不重复扣血/扣维持，维持消耗**单一归属管理器源侧**（区域行为不扣钱），从机制上杜绝双扣。
 18. **对账必选**：`updateToken` 钩子去抖对账为必选项（战斗外传送没有回合事件，仅靠回合对账永远不会补正），回合事件对账降为补充。
 19. **G5 范围**：属性倒转/招式替换/免压制延后维持手动；无法暴击/濒死不暴击/怒气封锁的实现方式经第三轮修订为状态 flag 抑制路径（决策 24，其中怒气封锁仍为零改动）。
-20. **单位定案**：规则"米"=格，半径按格数存储，无任何换算、不读场景 grid 设置。
+20. **单位定案**：规则"米"=格，半径按非负整数格存储，无任何换算、不读场景 grid 设置。
 21. **实施优先级**：框架先行，94 条内容自动化是最后一步；逐条评估自动化成本，能用框架与现成机制表达的全自动，超出框架能力的条目降级为"提示卡片 + 手动"，不强行实现，并在 automationNote 与第 4 节清单如实标注。
 
 **第三轮修订决策（2026-09-26，第二轮审阅后与数据作者确认，22～26）**：
@@ -313,6 +315,10 @@
 37. **enter 施加以账本存在性幂等**：串行队列内逐条重放事件仍可能重复施加——同一 Region＋Token 的重复 enter 事件（区域边界重算、行为重激活等引起）各自通过"在范围内"检查。改为：**每次成功处理的 enter 记录独立账本条目 `{active: true, contributedStacks, created}`**；enter 执行时该 Region＋Token 已存在条目即不再施加、直接视为已生效；exit 按条目摘除后清除账目；"按当前覆盖与账本差异对账"为其等价形式，取实现更简者。（**第九轮修订细化：`active` 是唯一的幂等与对账依据——贡献层数为 0（叠层已满）或 created 为 false（AE 已由其他来源创建）的 enter 同样记 `active: true` 条目；若以"贡献>0 或创建标记"作为有效性判据，这两种已处理的 enter 会被重复施加，触发门面的时长刷新/数值覆盖（facade 有更新行为，源码核实）。**）
 38. **账本闸门用例修正**：预存层数用例原为空操作——maxStacks:3 下预存 3 层时 enter 贡献恒为 0，即使预存保护失效用例也通过——改为"预存 1 层→进入变 2 层→退出回 1 层"，满层钳制独立用例（预存满 3 层，进退均为 3 层）；测试 payload 须置于**临时物品的 effects 中**，经"源物品 UUID＋效果名"解析路径施加，覆盖 AURA-03 的 payload 引用契约。
 
+**机制修正决策（2026-09-26，AURA-01 spike 实测，39）**：
+
+39. **S0.4 传送派发结论修正**：14.368 testsystem 世界多复现实测——`token.update({x, y})` 裸传送**会**派发 `tokenEnter/Exit/MoveWithin`（`animate:false` 与 `noHook:true` 变体均然，movement 数据携带、region.tokens 同步更新；服务端 preUpdate 对任何含移动字段的 update 都重算 `_regions` 并捕获 `_priorRegions`）。M0"裸传送不派发"的记录与本轮矛盾，原因未明（推测当时复现路径不同），**以本轮为准**。**`updateSource` 的边界（2026-09-26 二次复测确认）**：其为纯内存数据模型更新——不产生数据库更新操作、**不触发 updateToken 钩子**、不派发区域事件、`region.tokens`/`_regions` 包含性跟踪也不更新，故它**不在** updateToken 对账的可达范围内；其漂移仅是单端内存态与数据库的暂时背离，不改变服务端权威状态（账本、已施加 AE、区域成员的数据库记录均不变），由后续真实同步自然收敛，不设专项承接；决策 18 的 `updateToken` 去抖对账保留为防御未知无事件路径与未来核心行为变化的保险层，AURA-05 的定位由"唯一补正手段"调整为"兜底校验"。
+
 ## 7. 专项开发计划（2026-09-26 定稿）
 
 本节是 M3 光环/区域施工与验收的唯一依据；状态约定、验证要求与提交规范沿用 [`V14_PLAN.md`](V14_PLAN.md) "使用方式与状态约定"。工作项编号 AURA-xx，与总计划 S3.x 的映射记录在总计划 M3 节。
@@ -342,18 +348,30 @@
 
 #### A. 机制验证
 
-- [ ] AURA-01（承接 S3.3 悬案与第 6 节 13 条待实测）机制 spike：注册 `xjzlAura` 最小骨架（空 schema + 事件日志），在测试世界逐项实测并记录结论（构建号）：①行为注册与核心 RegionConfig/RegionBehaviorConfig 对行为字段的原生渲染（含本地化键挂载方式）；②grid 形状经 API 创建与进出事件，含 1×1 中心判定的运行时复验（源码已核实 1×1 仅测中心点，见第 3.2 节）；③`attachment.token` 跟随 grid 形状的整格平移；**源 Token 删除时核心自动删除附着区域**（源码 `TokenDocument._onDeleteOperation` 已核实，运行时复验）及区域内 token 的 exit 补发；④行为创建/启用时对已在区域内的 token 补发 enter（constants 契约注释为据，放置型光环的生效前提）；⑤`tokenTurnStart/End`、`tokenRoundStart/End` 到行为 handler 的派发端、相对 `ActiveEffect.registry.refresh` 的时序，以及与我方 EncounterManager 回合队列的实际交错（fire-and-forget 已从源码确认，实测交错形态作为幂等设计依据，决策 17）；⑥玩家移动 → 行为 handler → socketlib 委托 GM 的完整链路与竞态；⑦性能三项：万剑归宗 20 米全格 offsets（1200+ 格）渲染/判定、10+ 光环并存帧率、`modifyMovementCost` × 1-2-2-2 `measurePath` 劫持叠加；⑧矩形形状与按源朝向 90° 吸附旋转 offsets 的正确性（剑气白云 3×1、刀气旋风 3×3）。第 6 节 13 条的 ③④⑤⑥⑧⑨⑩ 在此销项；①传送对账归 AURA-05、②合成 Actor 归 AURA-03/05 验收、⑦濒死脚本归 AURA-10；另验证 `tokenMoveWithin` 事件携带的 movement 数据形态与触发粒度（决策 23"每移动结算一次"的依据），以及 Region 显示名在玩家视角的画布可见性（不可见则补自绘标签任务，复用旧模板标签绘制要点）。spike 不写业务代码，产出机制结论与实现取舍。
+- [x] AURA-01（承接 S3.3 悬案与第 6 节 13 条待实测）机制 spike：注册 `xjzlAura` 最小骨架（空 schema + 事件日志，`module/region/xjzl-aura-behavior.mjs`），在测试世界逐项实测并记录结论（构建号）：①行为注册与核心 RegionConfig/RegionBehaviorConfig 对行为字段的原生渲染（含本地化键挂载方式）；②grid 形状经 API 创建与进出事件，含 1×1 中心判定的运行时复验（源码已核实 1×1 仅测中心点，见第 3.2 节）；③`attachment.token` 跟随 grid 形状的整格平移；**源 Token 删除时核心自动删除附着区域**（源码 `TokenDocument._onDeleteOperation` 已核实，运行时复验）及区域内 token 的 exit 补发；④行为创建/启用时对已在区域内的 token 补发 enter（constants 契约注释为据，放置型光环的生效前提）；⑤`tokenTurnStart/End`、`tokenRoundStart/End` 到行为 handler 的派发端、相对 `ActiveEffect.registry.refresh` 的时序，以及与我方 EncounterManager 回合队列的实际交错（fire-and-forget 已从源码确认，实测交错形态作为幂等设计依据，决策 17）；⑥a 玩家移动的派发端与 isSelf 门控；⑥b socketlib 委托 GM 全链路与竞态归 AURA-03 验收；⑦性能三项：万剑归宗 20 米全格 offsets（921 格）渲染/判定、10+ 光环并存帧率、`modifyMovementCost` × 1-2-2-2 `measurePath` 劫持叠加；⑧矩形形状与按源朝向 90° 吸附旋转 offsets 的正确性（剑气白云 3×1、刀气旋风 3×3）。第 6 节 13 条的 ③④⑤⑥⑧⑨⑩ 在此销项；①传送对账归 AURA-05、②合成 Actor 归 AURA-03/05 验收、⑦濒死脚本归 AURA-10；另验证 `tokenMoveWithin` 事件携带的 movement 数据形态与触发粒度（决策 23"每移动结算一次"的依据），以及 Region 显示名在玩家视角的画布可见性（不可见则补自绘标签任务，复用旧模板标签绘制要点）。spike 不写业务代码，产出机制结论与实现取舍。→ **已完成（2026-09-26，14.368 实测，testsystem 世界，GM Gamemaster + `loginAs` 玩家身份）。完成范围界定：①～⑤、⑦、⑧、⑥ 的派发端与 isSelf 门控（⑥a）、movement 形态、显示名；⑥ 的 socketlib 委托全链路（⑥b）不在本项完成范围，已转 AURA-03 明确验收项**。逐项结论：
+  - **① 注册三件套缺一不可**：system.json `documentTypes.RegionBehavior.xjzlAura`（服务端 game.model 于**世界启动时**构建，缺失则嵌入行为服务端校验直接失败，仅改客户端 CONFIG 无效）+ `CONFIG.RegionBehavior.dataModels.xjzlAura`（init 钩子注册，早于 i18n 的 schema 本地化扫描）+ zh-cn `TYPES.RegionBehavior.xjzlAura`（Localization.initialize 对 documentTypes 自动挂 typeLabels/typeHints 键，实测配置页标题"侠界光环: <名>"、身份/状态分区原生渲染，空 schema 无业务字段无报错）；`typeIcons` 无自动兜底需手动补键。
+  - **② grid 形状与判定**：`shapes:[{type:"grid", offsets}]` 经 API 创建成功；**offsets 为场景绝对格坐标，核心 `getOffset` 返回 `{i: floor(y/size) 行, j: floor(x/size) 列}`——与生成器的 (i=列, j=行) 相反，AURA-04 写入时须轴映射**。1×1 token 中心点判定运行时复验通过；8 项边界矩阵（直邻/斜邻/二斜/混合步的界内外）全部与 AURA-02 生成器口径一致。
+  - **③ 跟随与源删除**：`attachment.token` 必须传 token **id**（传 UUID 静默失效、不跟随）；grid 形状随源移动**整格平移 offsets**（GridShapeData.move 按前后 origin 的格差平移，`origin` 字段可省略、默认取 offsets[0] 格心）；**源 Token 删除 → 核心自动删除附着区域**，删除前对其内每个 token（含源自身）补发 `tokenExit`（movement:null）+ `behaviorDeactivated`（S3.3 悬案关闭）。
+  - **④ 补发 enter**：行为创建（region 内已站 token）时对 `region.tokens` 逐个补发 `tokenEnter`（movement:null，user=行为创建者）；region 创建本身不补发（内联 behaviors 创建同样触发补发）；源码核对 disabled 翻转（启用）走同路径。
+  - **⑤ 回合事件**：turn/round 四事件均由**活动 GM 端**工作流派发；时序恒为 `registry.refresh(阶段)` 先于对应区域事件；**战斗开始（round 0→1）会先派发一轮 tokenRoundEnd**（行为实现须 gate round≥1）；round 事件对区域内每个战斗员各派发一次、turn 事件仅当前行动者；我方 `updateCombat` 钩子（EncounterManager）**先于**核心区域事件执行 → 交错形态实测，幂等设计（决策 17）确认必要。
+  - **⑥a 派发端与门控（本项已验）**：事件由触发者客户端本地 `_handleEvent` 执行、同时 socket 广播 `regionEvent`（各端收后同样执行，需 handler 内 `event.user.isSelf` 门控单端——applyActiveEffect 同款）；**玩家移动实测：handler 在玩家（发起者）客户端执行**（isSelf=true、isGM=false、user=Player2），决策 5 委托链路的前半段（发起者端触发）实锤。**⑥b socketlib 委托 GM 全链路与竞态未在本项验证**（spike 不写业务代码），转 AURA-03 明确验收项，竞态由决策 28/34 串行队列设计承接。
+  - **⑦ 性能三项（921 格）**：20 米 offsets 实为 921 格（1-2-2-2 度量）；创建 ~14ms、`testPoint` 1000 次 0.3ms（Set 查表 ~0.3µs）、`testInsideRegion` 100 次 0.3ms、渲染帧率不受损（vsync 封顶）；12 个 r=5 光环并存批量创建 36~42ms、帧率中位 80（创建瞬时最低 53）→ **AURA-07 粒子可行，阈值可放宽**；`modifyMovementCost` × 1-2-2-2 **叠加成立**：`movement.passed.cost` 承载"1-2-2-2 × 地形倍率"终值（6 直格穿 3 格 walk=2 → cost 9；3 连斜 → cost 5=1+2+2），G1"地形成本"后门实测可行。
+  - **⑧ 矩形与旋转**：3×1 生成器输出经 `rotateOffsets90` 顺旋 1 次后建区，覆盖格逐格验证一致（中心+正南两格在内、东西北不在）；`snapDirectionToQuarterTurns` 吸附数值正确。
+  - **movement 数据形态与粒度（决策 23 依据）**：movement 携带 `{id, subpathId, chain[], origin, destination, passed:{waypoints[{x,y,elevation,action,cost,…}], distance, cost, spaces, diagonals}, pending, history, split, method, …}`；**触发粒度=每次移动操作（一次拖动 N 格 = 1 次 moveWithin，与输入方式无关）**；**行为订阅 TOKEN_MOVE_* 会令核心把移动路径按区域边界切分 checkpoint**（一次跨多区域的移动拆成链式子移动）；**进入移动同时触发 tokenEnter+tokenMoveWithin、移出移动触发 tokenMoveWithin+tokenExit、同格重放也发 moveWithin** → AURA-03 的"每移动结算一次"须按 movement.id 去重并在 enter 分流，防踏入双结算。
+  - **S0.4 结论修正（决策 39）**：裸 update x/y 传送在 14.368 **会**派发 enter/exit/moveWithin（animate:false 与 noHook:true 均然），与 M0 记录矛盾，以本轮多复现为准。
+  - **显示名**：核心不在画布渲染区域名（placeable 无文本子节点、无 label API，GM/玩家一致）→ 需自绘标签，归 AURA-06/快建工具（复用旧模板标签绘制要点）。
+  - 临时数据（9 token、7 region、1 combat、运行时探针）已全部清理。
 
 #### B. 核心框架
 
-- [ ] AURA-02（S3.5 前半）1-2-2-2 offsets 形状生成器：从 `module/measured-template.mjs` 提取圆形覆盖格遍历算法至 `module/utils/`，扩展为形状生成器——圆形（中心格 + 半径格数 → offsets，主体形态，约 99% 条目）、矩形（W×H 格）、创建时按源 token 朝向的 90° 吸附旋转变换（决策与实现见第 3.2 节）；Node 断言覆盖若干半径的期望格子集合（含对角 1-2-2-2 口径样例：直邻、斜邻、二斜等距）与矩形/旋转用例；measured-template.mjs 本项暂保留（AURA-12 删除）。无依赖，可先行。
-- [ ] AURA-03（S3.5 后半）`xjzlAura` 行为类型完整实现：`CONFIG.RegionBehavior.dataModels` 注册 + 本地化；schema 字段：结算模式（enter/round/mark 三选一或组合）、半径（格）、形状（圆/矩形 + 朝向）、阵营过滤（友方/敌方/全体）、是否含自身、payload 引用（源物品 UUID + 效果名 + 档位）、每回合限一次节流、直接结算动作（伤害/治疗；数值支持固定值或按源角色 rollData 解析的公式，如 `0.4*@neixi`）、显示名、颜色、粒子样式（AURA-07 才启用）。enter/exit 对称结算：进出判定直接采用核心包含语义（第 3.2 节，不做二次判定、不自研状态机）；enter 正常走门面 `addEffect`（叠层/刷新/满层语义照旧）并记录贡献账本（决策 22：叠加前后层数差存 region flags，非叠层记"是否本光环创建"）；**enter 以账本存在性幂等**——同一 Region＋Token 已有账本条目（`active: true`）时不再施加、直接视为已生效；每次成功处理的 enter 均记录条目（含贡献 0 与 created=false 的情况，`active` 是唯一幂等与对账依据，`contributedStacks`/`created` 只决定 exit 摘除方式，exit 后清除账目，防重复 enter 触发门面重复刷新/覆盖，决策 37）；exit 按账本摘除——可叠层按贡献数 `removeEffect`，非叠层被其他同 payload 光环覆盖时账本转移、否则删除，清空型条目按 schema 选项全清；直接伤害/治疗走 `applyDamage/applyHealing` 事务；区域内格间移动经 `tokenMoveWithin` 按**每次移动**结算一次（决策 23，万剑归宗用）；非 GM 客户端收到事件一律经 socketlib 委托活动 GM，本端即 GM 时直接执行，**账本操作按目标 Actor ＋ payload 串行队列执行、在执行回合核对覆盖状态**（入队前重查仅作快速过滤；写入完成后二次核对兜底 region 删除等场景；串行化解决"进→出→再进"交错与并发贡献记重，决策 28/34）；回合事件对区域内单位结算（固定数值动作；复杂规则按统一原则落 payload AE 脚本）；mark 模式零结算；节流不用计数器重置，以 {战斗 ID, 轮次} 为键（区域外整轮的 token 收不到该区域的 roundStart，决策依据第二轮审阅）；所有结算幂等——同一单位同一事件不重复结算（决策 17）。
+- [x] AURA-02（S3.5 前半）1-2-2-2 offsets 形状生成器：从 `module/measured-template.mjs` 提取圆形覆盖格遍历算法至 `module/utils/`，扩展为形状生成器——圆形（中心格 + 半径格数 → offsets，主体形态，约 99% 条目）、矩形（W×H 格）、创建时按源 token 朝向的 90° 吸附旋转变换（决策与实现见第 3.2 节）；Node 断言覆盖若干半径的期望格子集合（含对角 1-2-2-2 口径样例：直邻、斜邻、二斜等距）与矩形/旋转用例；measured-template.mjs 本项暂保留（AURA-12 删除）。无依赖，可先行。→ **已完成（2026-09-26；2026-09-26 审阅修订：收紧为整数半径契约）**：`module/utils/aura-shapes.mjs`（纯函数、零 Foundry 依赖，Node 可测）——`gridStepDistance`（单段中心到中心 1-2-2-2 计费，与 measurePath 劫持一致：直行 1、首斜 1、后续斜 2）、`generateCircleOffsets`、`generateRectangleOffsets`（W×H + 锚格）、`rotateOffsets90`（90° 吸附，整数格天然吸附、-0 归一化）、`snapDirectionToQuarterTurns`；输出统一行优先排序去重、序列化稳定。**与旧模板的等价范围：整数半径 0～20 逐半径复算完全一致；小数半径存在覆盖口径差异——r=0.9 时旧欧氏剪枝（r+0.5 格容差）排除 (1,1) 型斜邻格（欧氏 ≈1.414 > 1.4）而 1-2-2-2 计费（≤ r+0.1）包含它（审阅复算确认）——故按决策 20"米即格、按格数存储"仅接受整数半径、小数入参显式拒绝**。`tests/aura-shapes.test.mjs` Node 直跑 11 组断言全部通过：r=0/1/2/3 精确格子集合（9/21/37 格及角格排除）、直邻=斜邻=1、二斜(2,2)=三直(3,0)=3 等距、整数半径契约拒绝用例（0.9/1.5/2.5/2.95/-1/NaN/Infinity）、r=20=921 格包围盒独立重算一致、矩形锚格与越界校验、旋转四向/归一化/锚格不动/整数吸附、朝向吸附边界。运行时接入注意（AURA-04）：核心 GridShapeData offsets 的 i=行(y)、j=列(x)，与生成器 i=列、j=行 相反，写入时须轴映射；半径按格存储（决策 20），生成器不读场景 grid 设置。
+- [ ] AURA-03（S3.5 后半）`xjzlAura` 行为类型完整实现：`CONFIG.RegionBehavior.dataModels` 注册 + 本地化；schema 字段：结算模式（enter/round/mark 三选一或组合）、半径（非负整数格）、形状（圆/矩形 + 朝向）、阵营过滤（友方/敌方/全体）、是否含自身、payload 引用（源物品 UUID + 效果名 + 档位）、每回合限一次节流、直接结算动作（伤害/治疗；数值支持固定值或按源角色 rollData 解析的公式，如 `0.4*@neixi`）、显示名、颜色、粒子样式（AURA-07 才启用）。enter/exit 对称结算：进出判定直接采用核心包含语义（第 3.2 节，不做二次判定、不自研状态机）；enter 正常走门面 `addEffect`（叠层/刷新/满层语义照旧）并记录贡献账本（决策 22：叠加前后层数差存 region flags，非叠层记"是否本光环创建"）；**enter 以账本存在性幂等**——同一 Region＋Token 已有账本条目（`active: true`）时不再施加、直接视为已生效；每次成功处理的 enter 均记录条目（含贡献 0 与 created=false 的情况，`active` 是唯一幂等与对账依据，`contributedStacks`/`created` 只决定 exit 摘除方式，exit 后清除账目，防重复 enter 触发门面重复刷新/覆盖，决策 37）；exit 按账本摘除——可叠层按贡献数 `removeEffect`，非叠层被其他同 payload 光环覆盖时账本转移、否则删除，清空型条目按 schema 选项全清；直接伤害/治疗走 `applyDamage/applyHealing` 事务；区域内格间移动经 `tokenMoveWithin` 按**每次移动**结算一次（决策 23，万剑归宗用）；非 GM 客户端收到事件一律经 socketlib 委托活动 GM，本端即 GM 时直接执行，**账本操作按目标 Actor ＋ payload 串行队列执行、在执行回合核对覆盖状态**（入队前重查仅作快速过滤；写入完成后二次核对兜底 region 删除等场景；串行化解决"进→出→再进"交错与并发贡献记重，决策 28/34）；回合事件对区域内单位结算（固定数值动作；复杂规则按统一原则落 payload AE 脚本）；mark 模式零结算；节流不用计数器重置，以 {战斗 ID, 轮次} 为键（区域外整轮的 token 收不到该区域的 roundStart，决策依据第二轮审阅）；所有结算幂等——同一单位同一事件不重复结算（决策 17）。**实机验收项（承接 AURA-01 ⑥b）：socketlib 委托 GM 全链路——玩家移动触发非本端 handler、经 executeAsGM 落活动 GM 端单端结算（无往返当本端即 GM），链路与竞态随本项实机验收（spike 已实测玩家端 handler 在发起者客户端执行）。**
 - [ ] AURA-04 光环管理器：公开 API 挂 `game.xjzl`（与 `api.effects` 并列，最终命名实施时定稿）：`create(source, params)`（AURA-02 生成器算 offsets → 建 region：grid 形状 + `visibility: ALWAYS` + 颜色默认按元素/品质（可在核心配置页改）+ 显示名 + 跟随模式加 `attachment.token` + 挂 xjzlAura 行为；源支持角色 Token 与指定格点）、`dismiss(label|regionId)`、`query(label)`、`refreshAura(label)`（档位/半径变化后重建）、`queryTokens(source, {radius 或 offsets, 阵营过滤等})`（**无实例范围查询**：按 AURA-02 生成器现算 offsets、对候选 token 按包含口径判定（1×1 中心、多格足迹任一点，决策 35）返回 Actor 列表，不创建文档——供五雷等 attack 触发脚本使用，决策 30；实现须显式传入文档**源**位置与尺寸调用 getContainmentTestPoints，无参调用取 prepared 值可能处于动画中，而 Region 判定用 source 值）；单实例标签替换（删旧建新，核心对旧 region 补发 exit 完成清理）。**来源生命周期（销毁时机按效果原文，决策 16）**：架招光环由既有 `stopStance` 路径（关架招/被破/濒死共用）直调 `dismiss`；装备光环卸下即毁、运功光环切换即毁——经系统级 Foundry 钩子 `updateItem`/`deleteItem`/`updateActor` 监听源状态（钩子内查源物品映射，无命中零开销返回；不新增脚本触发器）；时限在战斗回合边界统一递减（GM 端单一入口，与 AE registry 无耦合）；维持消耗在源角色回合末结算且**单一归属管理器**（区域行为不扣钱，决策 17）；combatEnd 清空战斗期光环；ready 孤儿校验与恢复（region flags 持久化源物品 uuid、到期轮次、维持状态、战斗 ID 与**施加账本**（决策 22）；战斗已结束、源物品失效、payload 不可解析的 → 清理或降级仅标记并警告）。
-- [ ] AURA-05 传送对账兜底（**必选项**，决策 18）：裸 update 传送不派发 enter/exit（S0.4 实测）但 `region.tokens` 包含性跟踪仍更新——`updateToken` 钩子去抖对账为主（战斗外传送没有回合事件，仅靠回合对账永远不会补正），回合事件对账为辅：比对覆盖状态与施加账本（决策 22），漏挂补挂、漏摘按贡献数补摘，均走门面；非链接 Token 的合成 Actor 分支在此与 AURA-03 一并实测（第 6 节 13-②）。
+- [ ] AURA-05 传送对账兜底（**必选项**，定位按决策 39 修正）：**14.368 实测 `document.update` 裸传送已派发 enter/exit/moveWithin（决策 39）**——常规传送依赖事件即时补正；本项定位为**兜底校验**：`updateToken` 钩子去抖对账保留（防御未知无事件路径与未来核心行为变化）+ 回合事件对账（战斗回合边界补扫）；比对覆盖状态与施加账本（决策 22），漏挂补挂、漏摘按贡献数补摘，均走门面，对事件已即时补正的常态零操作。**验收方式（2026-09-26 审阅修订）：不以 `updateSource` 作为触发用例**——其为纯内存数据模型更新，不产生数据库更新操作、不触发 updateToken 钩子与区域事件、包含性跟踪也不更新（AURA-01 二次复测），对账钩子对其不可达；改用**强制构造失配**验收（测试钩子临时抑制事件派发，或直接注入"覆盖状态 ↔ 账本"失配后调用对账入口），验证补正逻辑本身；`updateSource` 的漂移仅是单端内存态与数据库的暂时背离，不改变服务端权威状态（账本、已施加 AE、区域成员的数据库记录均不变），由后续真实同步（下一次真实移动/文档刷新/重连）自然收敛，不设专项承接。非链接 Token 的合成 Actor 分支在此与 AURA-03 一并实测（第 6 节 13-②）。
 
 #### C. UI 与工具
 
-- [ ] AURA-06（S3.2/S3.4/S4.3）快建工具：`getSceneControlButtons` 注入按钮（注入机制 S0.3 已验证）；轻量弹窗（半径/持续回合/颜色/跟随或固定/显示名）；画布放置格子吸附，光环中心强制吸附格心（跟随模式改为选源 Token）；默认创建 mark 模式光环，需要结算的经核心配置页在行为里后补；`data/macros/utility.json` 旧"创建跟随光环"宏改写为指向工具的说明宏（**不删除**，口径与 S4.3 一致），宏数据变更后 `game.xjzl.seed.macros()` 重建。
+- [ ] AURA-06（S3.2/S3.4/S4.3）快建工具：`getSceneControlButtons` 注入按钮（注入机制 S0.3 已验证）；轻量弹窗（非负整数半径/持续回合/颜色/跟随或固定/显示名）；画布放置格子吸附，光环中心强制吸附格心（跟随模式改为选源 Token）；默认创建 mark 模式光环，需要结算的经核心配置页在行为里后补；`data/macros/utility.json` 旧"创建跟随光环"宏改写为指向工具的说明宏（**不删除**，口径与 S4.3 一致），宏数据变更后 `game.xjzl.seed.macros()` 重建。
 - [ ] AURA-07（可选，可砍）粒子增强：行为 schema 粒子样式字段 + V14 原生 `ParticleGenerator`（effect 模式、固定数量）+ 系统设置总开关（默认关）；AURA-01 性能结论不达标即取消本项，不影响出口。
 
 #### D. 数据落地（依赖框架齐备；每批均含 automationNote 同步更新、改动 JSON 过 `JSON.parse`、对应 `game.xjzl.seed.<type>()` 重建与导入验证）
@@ -380,13 +398,13 @@
 | 场景 | 必须看到的结果 |
 |---|---|
 | 跟随光环全周期 | 装备/架招/进战触发创建（格心吸附；1-2-2-2 覆盖格与旧模板高亮口径一致）；源移动后区域整格平移，边界变化对 token 补发进/出；卸下/解除/被破/脱战/源 Token 删除后区域与已挂 AE 全部清理，无残留、无报错 |
-| 判定口径 | 半径 N 米 = N 格（1-2-2-2，"米"即格、无换算）；1×1 token 中心点判定、多格 token 足迹判定（核心语义）；光环圆心吸附格心；无网格场景禁用创建并有提示 |
+| 判定口径 | 半径 N 米 = N 格，N 为非负整数（1-2-2-2，"米"即格、无换算）；1×1 token 中心点判定、多格 token 足迹判定（核心语义）；光环圆心吸附格心；无网格场景禁用创建并有提示 |
 | 进出结算 | 友方/敌方/全体/不含自身过滤正确；放置时已在区域内的单位立即获得 enter 结算（行为激活补发）；payload 分档数值正确；直接伤害/治疗走事务（飘字/统计正常）；"每回合限一次"节流以 {战斗 ID, 轮次} 为键（区域外整轮不残留旧计数）；贡献账本正确（决策 22：双光环进退层数 1→2→1→移除、预存 1 层→进→2 层→退→回 1 层、满层钳制独立用例进退均满、清空型退出全清、重复 enter 只处理一次含满层贡献 0 与 created=false 特例（决策 37））；**进→出→再进与双光环同时进入经串行队列不重复施加、不记重贡献（决策 34）**；Region 删除时施加在途不残留（决策 28 二次核对补偿） |
 | 暴击抑制 | 黑烟内角色自然暴击不可达（黑烟 AE 出招脚本负向修正阈值，决策 33；forceCrit 与手动暴击直传绕过为已知边界，决策 36）；"生民立命"范围内友方濒死受击不承受暴击伤害倍率（现有 preDefense 脚本），非濒死正常（反例验收）；战报仍显示暴击为已知边界 |
 | 回合结算 | 区域内单位回合开始/结束结算正确且幂等（同一单位同一回合不重复扣血/扣维持）；维持消耗单一归属管理器、与区域行为不双扣；与核心 AE 到期清理（registry）先后无冲突、不重复；维持不足即散（青海语义不变） |
 | 格内移动 | 万剑归宗等单 region 大区域：token 在区域内格间移动时经 `tokenMoveWithin` 每次移动结算一次（决策 23），不依赖重新 enter |
 | 时限与单实例 | N 回合到期自动消失（战斗回合边界）；同名标签替换旧实例；计数上限条目（腐蛊雾霭 1+up 等）正确 |
-| 传送对账 | 裸 update 传送进出光环后，updateToken 去抖对账在战斗内外均生效、一拍内补正施加状态；合成 Actor（非链接 Token）施加/清理正确 |
+| 传送对账 | `document.update` 裸传送进出光环经事件即时补正（14.368 实测有事件，决策 39）；对账兜底以**强制构造失配**（测试钩子抑制事件派发或注入"覆盖 ↔ 账本"失配）验证：updateToken 去抖对账在战斗内外均生效、一拍内补正施加状态（对已补正的常态零操作）；`updateSource` 纯内存漂移（无钩子无事件、不改变服务端权威状态）由后续真实同步自然收敛；合成 Actor（非链接 Token）施加/清理正确 |
 | 权限与执行端 | 玩家移动触发的结算全部落在活动 GM 端；无权限用户不能绕过门面；多 GM 在线不重复结算 |
 | 监听 AE | 死亡/濒死/出招/受伤反向触发持有者效果；离开范围（AE 被摘）后不再触发；随风潜入夜按濒死口径计数 |
 | 脚本编排 | 暗刻立于其上出招引爆并消耗实例；碧火检定扑灭与火球消耗；万剑湮灭联动返还；破招/格挡触发放置；五雷每次出招经 `queryTokens` 给范围内敌人叠层（与 Region 同口径含多格足迹，决策 35，替换手搓距离） |
