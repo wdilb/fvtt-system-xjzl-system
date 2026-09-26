@@ -20,7 +20,7 @@ const RANGE_FIELDS = ["radius", "shapeKind", "rectWidth", "rectHeight", "anchorX
 
 /**
  * 光环行为数据模型。
- * 字段由核心 RegionBehaviorConfig 渲染编辑；
+ * 字段由自定义 RegionBehaviorConfig 配置页分组编辑；
  * 生命周期元数据（源物品、战斗 ID、账本、节流）在 region flags，不入 schema。
  */
 export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.RegionBehaviorType {
@@ -31,19 +31,46 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
     /** @override 光环行为 schema 全字段。 */
     static defineSchema() {
         const fields = foundry.data.fields;
-        const actionField = () => new fields.SchemaField({
-            // none=不结算；damage=按 XJZL.damageTypes 造成伤害；healing=按资源键
-            // 治疗/流失（负数数值表示资源流失）
+        // 结算动作子字段（enterAction/roundAction 共用同一组 label 键）。
+        // type 的 Schema 包含伤害类型与恢复资源；配置页按 kind 筛选。
+        // 气血流失属于伤害类型，不列入治疗资源。
+        const actionField = (withEffect = false) => new fields.SchemaField({
             kind: new fields.StringField({required: true, initial: "none",
-                choices: {none: "XJZL.AuraBehavior.CHOICES.ActionNone",
-                    damage: "XJZL.AuraBehavior.CHOICES.ActionDamage",
-                    healing: "XJZL.AuraBehavior.CHOICES.ActionHealing"}}),
-            // 固定数值或按源角色 rollData 解析的公式，如 "0.4*@neixi"
-            amount: new fields.StringField({required: true, blank: false, initial: "0"}),
-            // damage: waigong/neigong/bleed/poison/mental/fire/liushi…；healing: hp/mp/tili…
-            type: new fields.StringField({required: true, blank: false, initial: "liushi"}),
-            // 必中且无视格挡/防御/最低伤害（水牢、万剑"必中无暴击"类条目用）
-            pierce: new fields.BooleanField({initial: false})
+                choices: withEffect
+                    ? {none: "XJZL.AuraBehavior.CHOICES.ActionNone",
+                        damage: "XJZL.AuraBehavior.CHOICES.ActionDamage",
+                        healing: "XJZL.AuraBehavior.CHOICES.ActionHealing",
+                        effect: "XJZL.AuraBehavior.CHOICES.ActionEffect"}
+                    : {none: "XJZL.AuraBehavior.CHOICES.ActionNone",
+                        damage: "XJZL.AuraBehavior.CHOICES.ActionDamage",
+                        healing: "XJZL.AuraBehavior.CHOICES.ActionHealing"},
+                label: "XJZL.AuraBehavior.ACTION.kind.label"}),
+            // 固定数值，或按光环主人属性计算的公式（如 "0.4*@neixi"）
+            amount: new fields.StringField({required: true, blank: false, initial: "0",
+                label: "XJZL.AuraBehavior.ACTION.amount.label",
+                hint: "XJZL.AuraBehavior.ACTION.amount.hint"}),
+            // damage: XJZL.damageTypes；healing: 恢复的资源
+            type: new fields.StringField({required: true, blank: false, initial: "liushi",
+                choices: {
+                    waigong: "XJZL.Damage.Waigong",
+                    neigong: "XJZL.Damage.Neigong",
+                    bleed: "XJZL.Damage.Bleed",
+                    poison: "XJZL.Damage.Poison",
+                    mental: "XJZL.Damage.Mental",
+                    fire: "XJZL.Damage.Fire",
+                    liushi: "XJZL.Damage.Liushi",
+                    hp: "XJZL.AuraBehavior.CHOICES.Resource.Hp",
+                    mp: "XJZL.AuraBehavior.CHOICES.Resource.Mp",
+                    tili: "XJZL.AuraBehavior.CHOICES.Resource.Tili",
+                    rage: "XJZL.AuraBehavior.CHOICES.Resource.Rage",
+                    huti: "XJZL.AuraBehavior.CHOICES.Resource.Huti"
+                },
+                label: "XJZL.AuraBehavior.ACTION.type.label",
+                hint: "XJZL.AuraBehavior.ACTION.type.hint"}),
+            // 必中且无视格挡/防御/最低伤害保底（水牢、万剑"必中无暴击"类条目用）
+            pierce: new fields.BooleanField({initial: false,
+                label: "XJZL.AuraBehavior.ACTION.pierce.label",
+                hint: "XJZL.AuraBehavior.ACTION.pierce.hint"})
         });
         return {
             // ---- 结算开关 ----
@@ -64,15 +91,18 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
                     rect: "XJZL.AuraBehavior.CHOICES.Rect"},
                 label: "XJZL.AuraBehavior.FIELDS.shapeKind.label"}),
             rectWidth: new fields.NumberField({required: true, nullable: false, integer: true, min: 1, initial: 3,
-                label: "XJZL.AuraBehavior.FIELDS.rectWidth.label"}),
+                label: "XJZL.AuraBehavior.FIELDS.rectWidth.label",
+                hint: "XJZL.AuraBehavior.FIELDS.rectWidth.hint"}),
             rectHeight: new fields.NumberField({required: true, nullable: false, integer: true, min: 1, initial: 3,
-                label: "XJZL.AuraBehavior.FIELDS.rectHeight.label"}),
+                label: "XJZL.AuraBehavior.FIELDS.rectHeight.label",
+                hint: "XJZL.AuraBehavior.FIELDS.rectHeight.hint"}),
             // 矩形锚格在矩形内的格位（0 起算）；奇数尺寸可取 (边-1)/2 居中
             anchorX: new fields.NumberField({required: true, nullable: false, integer: true, min: 0, initial: 0,
-                label: "XJZL.AuraBehavior.FIELDS.anchorX.label"}),
+                label: "XJZL.AuraBehavior.FIELDS.anchorX.label",
+                hint: "XJZL.AuraBehavior.FIELDS.anchorX.hint"}),
             anchorY: new fields.NumberField({required: true, nullable: false, integer: true, min: 0, initial: 0,
-                label: "XJZL.AuraBehavior.FIELDS.anchorY.label"}),
-            // 管理器可按源 Token 朝向吸附为 90° 转数，行为 schema 保存数值
+                label: "XJZL.AuraBehavior.FIELDS.anchorY.label",
+                hint: "XJZL.AuraBehavior.FIELDS.anchorY.hint"}),            // 管理器可按源 Token 朝向吸附为 90° 转数，行为 schema 保存数值
             quarterTurns: new fields.NumberField({required: true, nullable: false, integer: true, min: 0, max: 3, initial: 0,
                 label: "XJZL.AuraBehavior.FIELDS.quarterTurns.label",
                 hint: "XJZL.AuraBehavior.FIELDS.quarterTurns.hint"}),
@@ -82,7 +112,8 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
                 choices: {all: "XJZL.AuraBehavior.CHOICES.FactionAll",
                     ally: "XJZL.AuraBehavior.CHOICES.FactionAlly",
                     enemy: "XJZL.AuraBehavior.CHOICES.FactionEnemy"},
-                label: "XJZL.AuraBehavior.FIELDS.faction.label"}),
+                label: "XJZL.AuraBehavior.FIELDS.faction.label",
+                hint: "XJZL.AuraBehavior.FIELDS.faction.hint"}),
             includeSelf: new fields.BooleanField({initial: true,
                 label: "XJZL.AuraBehavior.FIELDS.includeSelf.label",
                 hint: "XJZL.AuraBehavior.FIELDS.includeSelf.hint"}),
@@ -108,15 +139,16 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
 
             // ---- 回合结算动作 ----
             // choices 值必须与 CONST.REGION_EVENTS 的事件名一致（handler 按
-            // event.name 匹配），核心带 token 前缀。
+            // event.name 匹配）；显示文案用我们自己的本地化键（核心无
+            // REGION.EVENTS.* 键，实测原样回显）。
             roundTiming: new fields.StringField({required: true, initial: "tokenRoundEnd",
-                choices: {tokenRoundStart: "REGION.EVENTS.TOKEN_ROUND_START.label",
-                    tokenRoundEnd: "REGION.EVENTS.TOKEN_ROUND_END.label",
-                    tokenTurnStart: "REGION.EVENTS.TOKEN_TURN_START.label",
-                    tokenTurnEnd: "REGION.EVENTS.TOKEN_TURN_END.label"},
+                choices: {tokenRoundStart: "XJZL.AuraBehavior.CHOICES.Timing.RoundStart",
+                    tokenRoundEnd: "XJZL.AuraBehavior.CHOICES.Timing.RoundEnd",
+                    tokenTurnStart: "XJZL.AuraBehavior.CHOICES.Timing.TurnStart",
+                    tokenTurnEnd: "XJZL.AuraBehavior.CHOICES.Timing.TurnEnd"},
                 label: "XJZL.AuraBehavior.FIELDS.roundTiming.label",
                 hint: "XJZL.AuraBehavior.FIELDS.roundTiming.hint"}),
-            roundAction: actionField(),
+            roundAction: actionField(true),
 
             // ---- 退出摘除选项 ----
             // 退出时需移除整条 AE 的效果使用清空型
@@ -215,7 +247,163 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
         CONFIG.RegionBehavior.dataModels.xjzlAura = XJZLAuraRegionBehaviorType;
         // 配置页直接读取 typeIcons，必须显式注册。
         CONFIG.RegionBehavior.typeIcons.xjzlAura = "fas fa-hurricane";
+        // 配置页顶部的引导说明
+        CONFIG.RegionBehavior.typeHints.xjzlAura = "XJZL.AuraBehavior.TYPE_HINT";
+        // sheetClasses 按"类型"的条目由核心在数据类型就绪后生成，注册须等
+        // 其存在：setup 兜底 ready 各执行一次（registerSheet 幂等）
+        const registerWhenReady = () => {
+            if (CONFIG.RegionBehavior.sheetClasses?.xjzlAura) XJZLAuraBehaviorConfig.registerSheet();
+        };
+        Hooks.once("setup", registerWhenReady);
+        Hooks.once("ready", registerWhenReady);
         console.log("XJZL | xjzlAura 行为类型已注册");
+    }
+}
+
+/**
+ * 光环行为的配置页：覆盖核心的字段平铺逻辑，按使用动线分组——
+ * 范围 → 对谁生效 → 自动挂载特效 → 进入生效 → 回合生效 → 离开时。
+ * 核心把 SchemaField 递归平铺且不渲染节标题（#addSystemFields），
+ * 嵌套的动作参数与开关混在一起无法阅读，故子类化重排。
+ */
+class XJZLAuraBehaviorConfig extends foundry.applications.sheets.RegionBehaviorConfig {
+
+    /** 注册为 xjzlAura 的默认配置页（保留核心条目可切回）。 */
+    static registerSheet() {
+        const registry = CONFIG.RegionBehavior.sheetClasses.xjzlAura;
+        const core = registry["core.RegionBehaviorConfig"];
+        if (core) core.default = false;
+        registry["xjzl.AuraBehaviorConfig"] = {
+            id: "xjzl.AuraBehaviorConfig",
+            label: "XJZL.AuraBehavior.SECTIONS.title",
+            themes: core?.themes ?? {},
+            canBeDefault: true,
+            canConfigure: false,
+            cls: XJZLAuraBehaviorConfig,
+            default: true
+        };
+    }
+
+    /**
+     * @override 按使用动线把字段分入多个 fieldset。
+     * 动作子字段（enterAction/roundAction）从我们数据模型的 SchemaField
+     * 展开，取值路径与核心 #addSystemFields 一致。
+     */
+    _getFields() {
+        const doc = this.document;
+        const source = doc._source;
+        // 行为自有字段在数据模型（xjzlAura）的 schema 上，不在 RegionBehavior
+        // 文档 schema 上（后者只有 name/disabled/flags 等公共字段）
+        const f = CONFIG.RegionBehavior.dataModels.xjzlAura.schema.fields;
+        const pick = (field, path) => ({field, value: foundry.utils.getProperty(source, path)});
+        const ea = f.enterAction.fields;
+        const ra = f.roundAction.fields;
+
+        return [
+            // 行为本体
+            {fieldset: true, legend: "BEHAVIOR.SECTIONS.identity", fields: [pick(doc.schema.fields.name, "name")]},
+            {fieldset: true, legend: "BEHAVIOR.SECTIONS.status", fields: [pick(doc.schema.fields.disabled, "disabled")]},
+            // 范围
+            {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.range", fields: [
+                pick(f.radius, "system.radius"),
+                pick(f.shapeKind, "system.shapeKind"),
+                pick(f.rectWidth, "system.rectWidth"),
+                pick(f.rectHeight, "system.rectHeight"),
+                pick(f.anchorX, "system.anchorX"),
+                pick(f.anchorY, "system.anchorY"),
+                pick(f.quarterTurns, "system.quarterTurns")
+            ]},
+            // 对谁生效
+            {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.target", fields: [
+                pick(f.faction, "system.faction"),
+                pick(f.includeSelf, "system.includeSelf")
+            ]},
+            // 自动挂载特效（进入生效时挂；回合生效选"挂载特效"时也用它）
+            {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.effect", fields: [
+                pick(f.payloadItemUuid, "system.payloadItemUuid"),
+                pick(f.payloadEffectName, "system.payloadEffectName")
+            ]},
+            // 进入生效
+            {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.enter", fields: [
+                pick(f.enterEnabled, "system.enterEnabled"),
+                pick(ea.kind, "system.enterAction.kind"),
+                pick(ea.amount, "system.enterAction.amount"),
+                pick(ea.type, "system.enterAction.type"),
+                pick(ea.pierce, "system.enterAction.pierce"),
+                pick(f.moveWithin, "system.moveWithin"),
+                pick(f.throttlePerRound, "system.throttlePerRound")
+            ]},
+            // 回合生效
+            {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.round", fields: [
+                pick(f.roundEnabled, "system.roundEnabled"),
+                pick(f.roundTiming, "system.roundTiming"),
+                pick(ra.kind, "system.roundAction.kind"),
+                pick(ra.amount, "system.roundAction.amount"),
+                pick(ra.type, "system.roundAction.type"),
+                pick(ra.pierce, "system.roundAction.pierce")
+            ]},
+            // 离开时
+            {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.exit", fields: [
+                pick(f.exitClear, "system.exitClear")
+            ]}
+        ];
+    }
+
+    /**
+     * 条件显隐：圆形隐藏矩形参数；动作选"无/挂载特效"隐藏数值与类型；
+     * 类型下拉跟随动作切换（伤害类型 / 恢复资源）；"无视防御"仅伤害时有意义。
+     * 纯前端显隐与选项过滤，不改变存储结构。
+     */
+    _onRender(context, options) {
+        super._onRender(context, options);
+        const root = this.element;
+        const groupOf = name => root.querySelector(`[name="${name}"]`)?.closest(".form-group");
+
+        // 形状 → 矩形参数显隐
+        const shapeSel = root.querySelector('select[name="system.shapeKind"]');
+        const rectGroups = ["system.rectWidth", "system.rectHeight", "system.anchorX", "system.anchorY", "system.quarterTurns"]
+            .map(groupOf);
+        const syncShape = () => {
+            const isRect = shapeSel?.value === "rect";
+            for (const g of rectGroups) if (g) g.style.display = isRect ? "" : "none";
+        };
+        shapeSel?.addEventListener("change", syncShape);
+        syncShape();
+
+        // 动作 → 参数显隐 + 类型选项过滤
+        const DAMAGE_TYPES = ["waigong", "neigong", "bleed", "poison", "mental", "fire", "liushi"];
+        const HEAL_RESOURCES = ["hp", "mp", "tili", "rage", "huti"];
+        const syncAction = prefix => {
+            const kindSel = root.querySelector(`select[name="${prefix}.kind"]`);
+            const typeSel = root.querySelector(`select[name="${prefix}.type"]`);
+            const typeG = groupOf(`${prefix}.type`);
+            const amountG = groupOf(`${prefix}.amount`);
+            const pierceG = groupOf(`${prefix}.pierce`);
+            if (!kindSel) return;
+            const sync = () => {
+                const kind = kindSel.value;
+                const showParams = kind === "damage" || kind === "healing";
+                if (typeG) typeG.style.display = showParams ? "" : "none";
+                if (amountG) amountG.style.display = showParams ? "" : "none";
+                // 无视防御只有伤害有语义
+                if (pierceG) pierceG.style.display = kind === "damage" ? "" : "none";
+                if (typeSel && showParams) {
+                    const allow = kind === "healing" ? HEAL_RESOURCES : DAMAGE_TYPES;
+                    let currentValid = false;
+                    for (const opt of typeSel.options) {
+                        const allowed = allow.includes(opt.value);
+                        opt.hidden = !allowed;
+                        if (allowed && opt.selected) currentValid = true;
+                    }
+                    // 当前值不属于所选动作 → 自动切到该组第一项（仅表单层，未提交不写库）
+                    if (!currentValid) typeSel.value = allow[0];
+                }
+            };
+            kindSel.addEventListener("change", sync);
+            sync();
+        };
+        syncAction("system.enterAction");
+        syncAction("system.roundAction");
     }
 }
 

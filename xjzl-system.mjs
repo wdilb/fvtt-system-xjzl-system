@@ -71,6 +71,7 @@ import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 import { xjzlSocket } from "./module/socket.mjs";
 import { registerAuraBehavior } from "./module/region/xjzl-aura-behavior.mjs";
 import { AuraManager } from "./module/region/xjzl-aura-manager.mjs";
+import { registerAuraQuick, openAuraQuick } from "./module/region/xjzl-aura-quick.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
 import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
@@ -94,6 +95,8 @@ Hooks.once("init", async function () {
   registerAuraBehavior();
   // 光环管理器钩子（来源生命周期、时限、维持、对账）在此一并注册。
   AuraManager.init();
+  // 快建工具：Region placeable 子类（自绘显示名标签）与工具栏按钮注册。
+  registerAuraQuick();
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
@@ -758,6 +761,9 @@ Hooks.once("ready", async function () {
 
   // 脚本和宏通过此入口创建、查询、重建或消除 Region 光环。
   game.xjzl.aura = AuraManager;
+
+  // 光环快建入口供区域工具栏按钮与光环宏共用。
+  game.xjzl.auraQuick = {open: openAuraQuick};
 
   // 3. 挂载 GM 专用 API (生成器)
   // 此时 game.user 已经不是 null 了，可以安全检查权限

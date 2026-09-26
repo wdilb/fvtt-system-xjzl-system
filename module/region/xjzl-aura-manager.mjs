@@ -33,8 +33,12 @@ export class AuraManager {
     static #reconcileTimers = new Map();
     /** @type {Set<string>} 维持消耗去重键 {combatId}:{round}:{turn}。 */
     static #consumedMaintenance = new Set();
+    /** @type {Map<string, string|null>} 各战斗最近一次钩子观测的行动者 combatantId（维持扣取依据）。 */
+    static #currentActors = new Map();
     /** @type {boolean} 钩子只注册一次。 */
     static #initialized = false;
+    /** @type {Promise<void>} 并行创建会覆盖 Region 的 Token 包含跟踪，故串行创建。 */
+    static #createChain = Promise.resolve();
 
     /* -------------------------------------------- */
     /*  钩子注册                                     */
@@ -71,19 +75,30 @@ export class AuraManager {
         });
 
         // ---- 时限递减 / 维持消耗 / 战斗期清理 / 回合对账 ----
+        // 滚轮推进至新轮时 combat.previous 可能为 null；保存上次观测的
+        // combatantId，以便在 round 或 turn 变化时扣取推进前行动者的维持。
+        Hooks.on("createCombat", combat => {
+            if (!game.users.activeGM?.isSelf) return;
+            this.#currentActors.set(combat.id, combat.combatant?.id ?? null);
+        });
         Hooks.on("updateCombat", async (combat, updateData) => {
             if (!game.users.activeGM?.isSelf) return;
             const roundChanged = "round" in updateData;
             const turnChanged = "turn" in updateData;
+            const prevActorId = this.#currentActors.get(combat.id) ?? null;
             if (roundChanged) await this.#tickDurations(combat);
-            if (turnChanged) await this.#consumeMaintenance(combat);
+            // 扣取触发用 round 或 turn 任一变化：单人（或连续行动者）回合
+            // 轮转时核心只 update {round}、turn 键缺省，仅看 turn 会漏扣。
+            if (turnChanged || roundChanged) await this.#consumeMaintenance(combat, prevActorId);
             // 轮边界补扫；事件已即时补正时无需写入
             if (roundChanged && (combat.round ?? 0) >= 1) await this.reconcileCombat(combat);
             // round 回 0（战斗面板关闭）也清战斗期光环
             if (roundChanged && (combat.round ?? 0) === 0) await this.#clearCombatAuras(combat.id);
+            this.#currentActors.set(combat.id, combat.combatant?.id ?? null);
         });
         Hooks.on("deleteCombat", async combat => {
             if (!game.users.activeGM?.isSelf) return;
+            this.#currentActors.delete(combat.id);
             await this.#clearCombatAuras(combat.id);
         });
 
@@ -126,7 +141,23 @@ export class AuraManager {
      *   如 20 表达"按人数×20")}
      * @returns {Promise<RegionDocument|null>} 创建的 region；无网格/参数非法返回 null
      */
-    static async create(source, params) {
+    static create(source, params) {
+        // 并发调用串行执行：核心 Region 的 token→region 跟踪在两个创建
+        // 操作并发完成时会互相覆盖（实测先建者 tokens 恒空、不结算、
+        // 对账也不可达），逐个创建消除该窗口。
+        const run = this.#createChain.catch(err => console.error("XJZL | 前序光环创建失败:", err))
+            .then(() => this.#createImpl(source, params));
+        this.#createChain = run.then(() => undefined, () => undefined);
+        return run;
+    }
+
+    /**
+     * create 的实际执行体（经 #createChain 串行调用）。
+     * @param {TokenDocument|Token|Actor|{scene: Scene, x: number, y: number}} source - 光环源
+     * @param {object} params - 光环参数（见 create）
+     * @returns {Promise<RegionDocument|null>}
+     */
+    static async #createImpl(source, params) {
         if (!params?.label || typeof params.label !== "string") {
             console.warn("XJZL | 光环创建被拒绝：label 必填。", params);
             return null;
@@ -193,8 +224,8 @@ export class AuraManager {
 
     /**
      * 消除光环：按 label 或 regionId 删除 region。
-     * 核心在 region 删除时为区域内每个 token 补发 tokenExit，已挂 AE
-     * 经行为退出摘除路径走门面清理。
+     * 删除前预提交区域内 token 的 exit，确保在 region 消失前取得账目快照。
+     * 核心删除事件可能再次提交 exit；账目清除和条目 eid 防止重复摘除。
      * @param {string} labelOrRegionId - 光环标签或 region 文档 id
      * @param {object} [options] - {scene?: Scene}（默认 canvas.scene）
      * @returns {Promise<number>} 删除的 region 数
@@ -211,6 +242,8 @@ export class AuraManager {
             }
         }
         if (!ids.length) return 0;
+        const regions = ids.map(id => scene.regions.get(id)).filter(Boolean);
+        for (const region of regions) this.#preDeleteExits(region);
         if (game.users.activeGM?.isSelf) {
             await scene.deleteEmbeddedDocuments("Region", ids);
         } else {
@@ -358,7 +391,7 @@ export class AuraManager {
             console.warn("XJZL | 光环对账仅由活动 GM 执行。");
             return;
         }
-        if (target instanceof TokenDocument) return AuraLedger.reconcileToken(target);
+        if (target?.documentName === "Token") return AuraLedger.reconcileToken(target);
         const scene = target ?? canvas.scene;
         if (!scene) return;
         for (const token of scene.tokens) await AuraLedger.reconcileToken(token);
@@ -446,7 +479,7 @@ export class AuraManager {
         if (!source) return {scene: null, tokenDoc: null, anchorOffset: {i: 0, j: 0}, anchorPoint: null, follow: false};
         if (source.documentName === "Token") {
             tokenDoc = source;
-        } else if (typeof Token !== "undefined" && source instanceof Token) {
+        } else if (source instanceof foundry.canvas.placeables.Token) {
             tokenDoc = source.document;
         } else if (source.documentName === "Actor" || source instanceof foundry.documents.Actor) {
             // Actor：取当前场景的活动 Token；无 Token 的 Actor 无法定环
@@ -624,12 +657,37 @@ export class AuraManager {
     }
 
     /**
+     * 删除单个光环 region 前预提交区域内所有 token 的 exit（快照在
+     * region 完好时读取；机理见 dismiss 注释）。
+     * @param {RegionDocument} region - 待删除的光环 region
+     */
+    static #preDeleteExits(region) {
+        const behaviorId = region.behaviors.find(b => b.type === "xjzlAura")?.id ?? null;
+        for (const token of [...region.tokens]) {
+            if (!token.actor) continue;
+            const entries = Object.entries(AuraLedger.getEntriesOfToken(region, token.id))
+                .filter(([, entry]) => entry?.active)
+                .map(([key, entry]) => ({key, entry}));
+            if (!entries.length) continue;
+            AuraLedger.submitExit({
+                behaviorId,
+                regionUuid: region.uuid,
+                tokenUuid: token.uuid,
+                actorUuid: token.actor.uuid,
+                // 队列键取首条 key 保证与对应 enter 同组；摘除按快照执行
+                payloadKey: entries[0].key
+            }, entries, xjzlSocket);
+        }
+    }
+
+    /**
      * 删除单个光环 region（本类调用点均已在活动 GM 端）。
      * @param {RegionDocument} region - 光环 region
      */
     static async #deleteRegion(region) {
         const scene = region.parent;
         if (!scene) return;
+        this.#preDeleteExits(region);
         if (game.users.activeGM?.isSelf) {
             await scene.deleteEmbeddedDocuments("Region", [region.id]);
         } else {
@@ -659,15 +717,17 @@ export class AuraManager {
      * 避免重复扣取）。实际扣取不足即散。
      * 消耗构成：`amount`（固定每回合）＋ `perTarget × 覆盖内敌人数`
      * （`perTarget` 为每名敌人的追加消耗）。
+     * 行动者由 updateCombat 钩子传入的**推进前记录**定位，previous 为
+     * null 的滚轮推进同样覆盖。
      * @param {Combat} combat - 战斗文档
+     * @param {string|null} prevActorCombatantId - 推进前行动者的 combatant id
      */
-    static async #consumeMaintenance(combat) {
-        const prevId = combat.previous?.combatantId;
-        if (!prevId) return;
-        const prevActor = combat.combatants.get(prevId)?.actor;
+    static async #consumeMaintenance(combat, prevActorCombatantId) {
+        if (!prevActorCombatantId) return;
+        const prevActor = combat.combatants.get(prevActorCombatantId)?.actor;
         if (!prevActor) return;
         // 幂等键：updateCombat 可能重入（快速切回合），同一 turn 只结算一次
-        const dedupKey = `${combat.id}:${combat.previous.round}:${prevId}`;
+        const dedupKey = `${combat.id}:${combat.round ?? combat.previous?.round}:${prevActorCombatantId}`;
         if (this.#consumedMaintenance.has(dedupKey)) return;
         this.#consumedMaintenance.add(dedupKey);
         if (this.#consumedMaintenance.size > 256) this.#consumedMaintenance.clear();
