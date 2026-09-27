@@ -2129,7 +2129,7 @@
             "sect": "jianghushili",
             "description": "左道功法，长年与尸体为伴，纳阴气，食腐物，饮黄水，将自身修炼得不人不鬼，方为大成。\n圆满运功特效：每当你周围10米有人死亡，你获得一层“死气”，最多叠加十层，持续到你开启一条第一关经脉或切换内功后消失。\n死气：每层使你下一次冲击第一关经脉时难度-1。\n修满特效：修满[永久]：气血+10，内力+10。\n你体表没有温度，且僵硬如同死人。",
             "requirement": "悟性2",
-            "automationNote": "手动：系统无法检测周围单位死亡。",
+            "automationNote": "部分自动化（圆满运功特效）：进战时以自身为中心生成 10 米跟随光环，范围内任何人（不含主人自身）死亡时，主人自动获得一层死气（至多十层）。脱战自动清理；死气层数在冲击经脉或切换内功后手动移除。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -2168,7 +2168,14 @@
                     },
                     "description": "圆满运功特效：每当你周围10米有人死亡，你获得一层“死气”，最多叠加十层，持续到你开启一条第一关经脉或切换内功后消失。\n死气：每层使你下一次冲击第一关经脉时难度-1。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "死气光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 死气光环：周围 10 米有人死亡时，主人获得一层死气（监听 AE 反向驱动）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-siqi\",\n    displayName: \"死气\",\n    follow: true,\n    radius: 10,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"死气监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 }
             },
             "x-xjzl-aura": true,
@@ -2189,7 +2196,49 @@
                 "specific": 0
             }
         },
-        "effects": []
+        "effects": [
+            {
+                "name": "死气",
+                "description": "每层使你下一次冲击第一关经脉时难度-1（至多十层）。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "siqi",
+                        "stackable": true,
+                        "maxStacks": 10
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/ae/目盲.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            },
+            {
+                "name": "死气监听",
+                "description": "光环监听标记（不可见）。离开光环范围后自动移除，效果随之失效。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "listener_死气监听",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "死气监听",
+                                "trigger": "death",
+                                "active": true,
+                                "script": "// 光环主人解析：监听 AE 的 origin 指向源物品内 AE（Item.xxx.ActiveEffect.yyy）。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner || owner.uuid === actor.uuid) return; // 主人自身的死亡不给自己叠层\nconst item = srcAE.parent;\nconst siqi = item?.effects?.getName?.(\"死气\");\nif (!siqi) return;\nawait game.xjzl.api.effects.addEffect(owner, siqi.toObject(), 1);"
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/ae/目盲.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 0
+            }
+        ]
     },
     {
         "name": "《王氏易书》",
@@ -5310,7 +5359,7 @@
             "sect": "jianghushili",
             "description": "江湖哀老人所创绝技，炼化周身骨骼，兼具毒药抗力。修炼之后，运转内力之时，风起云涌，飞沙走石。",
             "requirement": "悟性 5",
-            "automationNote": "被动防御加成需玩家手动添加“狂沙·孤影”状态。",
+            "automationNote": "部分自动化（小成／圆满运功特效·孤影条件防御）：进战时生成监听光环，主人每回合开始自动检查 3 米内是否没有任何其他角色（敌我不限）：无其他角色时按境界自动获得【狂沙·孤影(小)/(圆)】防御增益，有其他角色时自动移除。切换运功或脱战时光环消散；已获得的孤影增益需手动移除。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -5336,7 +5385,14 @@
                     },
                     "description": "小成运功特效：你周围3米内没有其他角色存在时，你的内外功防御+10。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "狂沙监听光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 狂沙·孤影光环（小成）：主人回合开始检查 3 米内是否无其他角色，按境界自动挂/摘孤影增益。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-kuangsha\",\n    displayName: \"狂沙\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"狂沙监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 },
                 "stage3": {
                     "stats": {
@@ -5349,7 +5405,14 @@
                     },
                     "description": "圆满运功特效：你周围3米内没有其他角色存在时，你的内外功防御+20。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "狂沙监听光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 狂沙·孤影光环（圆满）：主人回合开始检查 3 米内是否无其他角色，按境界自动挂/摘孤影增益。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-kuangsha\",\n    displayName: \"狂沙\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"狂沙监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 }
             },
             "masteryEffect": "修满[永久]：气血+40，内力+20。你中毒时的[韧性]检定具有优势。",
@@ -5411,6 +5474,30 @@
                     ]
                 },
                 "showIcon": 2
+            },
+            {
+                "name": "狂沙监听",
+                "description": "光环监听标记（不可见）。离开光环范围后自动移除，效果随之失效。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "listener_狂沙监听",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "狂沙监听",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "// 狂沙监听：仅主人结算；3 米内没有任何其他角色时按境界获得孤影增益，否则移除。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner || owner.uuid !== actor.uuid) return;\nconst stage = srcAE.parent?.system?.stage ?? 1;\nconst itemName = stage >= 3 ? \"狂沙·孤影(圆)\" : \"狂沙·孤影(小)\";\nconst payload = srcAE.parent?.effects?.find?.(e => e.name === itemName);\nif (!payload) return;\nconst slug = payload.getFlag?.(\"xjzl-system\", \"slug\") || payload.name.slugify();\nconst has = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst others = await game.xjzl.aura.queryTokens(actor, {radius: 3, faction: \"all\", includeSelf: false});\nif (!others.length && !has) {\n    await game.xjzl.api.effects.addEffect(actor, payload.toObject());\n    actor.showFloatyText(\"狂沙·孤影\", {fill: \"#c8a415\", fontSize: 28});\n} else if (others.length && has) {\n    await game.xjzl.api.effects.removeEffect(actor, slug);\n}"
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/ae/目盲.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 0
             }
         ]
     },
@@ -5799,7 +5886,7 @@
             "sect": "jianghushili",
             "description": "江湖奇功，以点燃浑身干燥火药熬炼皮骨，练成后水火不侵，刀枪难入。但风险极大，稍有不慎便爆炸身死，熬过此功大成者寥寥。",
             "requirement": "悟性 4",
-            "automationNote": "格挡加成自动化。受击爆炸AOE通过提示手动处理。",
+            "automationNote": "分档自动化（圆满运功特效）：格挡+10 为圆满档 passive 常驻；圆满档进战时生成 2 米跟随监听光环，主人受到外功伤害时自动对 2 米内敌人造成 10 点火焰伤害（必中不暴击）；小成档仅提示，伤害由 GM 手动结算。切换运功或脱战时光环消散。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -5859,10 +5946,10 @@
                             "script": "S.combat.block += 10;"
                         },
                         {
-                            "label": "火浣·爆炸(圆)",
-                            "trigger": "damaged",
+                            "label": "火浣光环",
+                            "trigger": "combatStart",
                             "active": true,
-                            "script": "if (args.type === 'waigong' && args.finalDamage > 0) {\n    ChatMessage.create({content: '火浣功：受到外功伤害，对2米内敌人造成10点火焰伤害。', speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
+                            "script": "// 监听 AE 挂在范围内角色身上，仅主人受外功伤害时执行爆炸。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-huohuan\",\n    displayName: \"火浣\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"火浣监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -5885,7 +5972,33 @@
                 "general": 0,
                 "specific": 0
             }
-        }
+        },
+        "effects": [
+            {
+                "name": "火浣监听",
+                "description": "光环监听标记（不可见）。离开光环范围后自动移除，效果随之失效。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "listener_火浣监听",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "火浣监听",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "// 火浣监听：仅主人受外功伤害时爆炸（2 米内敌人 10 点火焰伤害，必中不暴击）。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner || owner.uuid !== actor.uuid) return;\nif (args.type !== \"waigong\" || !(args.finalDamage > 0)) return;\nconst targets = await game.xjzl.aura.queryTokens(owner, {radius: 2, faction: \"enemy\", includeSelf: false});\nfor (const t of targets) {\n    await t.applyDamage({amount: 10, type: \"fire\", attacker: owner, isHit: true, isCrit: false, source: \"dot\"});\n}\nif (targets.length) owner.showFloatyText(\"火浣功·爆炸!\", {fill: \"#e67e22\", fontSize: 30});"
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/ae/目盲.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 0
+            }
+        ]
     },
     {
         "name": "《毒蛤诀》",

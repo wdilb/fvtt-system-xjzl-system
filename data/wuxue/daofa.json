@@ -690,7 +690,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>雪影弥漫，对所有敌人造成 0.5 内息点内功伤害，并在 5 米范围内产生‘寒霜’一回合。</p><p><strong>寒霜：</strong>区域中所有角色外功防御+5，内功防御-5。</p><p>·寒霜形成在原地，不会跟随你移动，你只能拥有一个寒霜，如果你形成新的寒霜，之前的消失。</p><p><strong>升级：</strong>招式伤害+10，寒霜中角色外防再+5，内防再-5，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "领域效果手动(提示)。",
+                    "automationNote": "完全自动化：施展【了因现雪】时自动在原地（施放位置，不跟随）生成放置光环【寒霜】，全体含己自动获得【寒霜】状态（外防+5/内防-5，2 级起 ±10），持续 1 回合后自动消散并摘除。单实例：再次施展自动替换旧寒霜。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -716,10 +716,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "生成领域",
-                            "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 5 + (lvl - 1) * 5;\nui.notifications.info(`已生成 [寒霜] 领域 (5米)。效果：外防 +${bonus} / 内防 -${bonus}。`);",
-                            "active": true
+                            "label": "寒霜光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 寒霜光环：原地放置（不跟随），全体含己，单实例（同标签自动替换），持续 1 回合。\n// 档位随招式等级：1 级 ±5，2 级及以上 ±10。\nconst lvl = Math.max(1, Math.min(2, move.computedLevel || 1));\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-hanshuang\",\n    displayName: \"寒霜\",\n    follow: false,\n    radius: 5,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: `寒霜 (${lvl}级)`,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -753,7 +753,63 @@
                     "showIcon": 2
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "寒霜 (1级)",
+                "description": "寒霜领域：区域中所有角色外功防御+5，内功防御-5。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "hanshuang_aura",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "5",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "-5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
+            },
+            {
+                "name": "寒霜 (2级)",
+                "description": "寒霜领域：区域中所有角色外功防御+10，内功防御-10。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "hanshuang_aura",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "-10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "柴刀十八砍",

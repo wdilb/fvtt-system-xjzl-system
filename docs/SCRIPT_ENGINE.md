@@ -723,6 +723,8 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 
 删除或重建光环会触发区域退出清理；需要按标签更新半径、动作或效果时使用 `refreshAura`。直接修改 Region 行为配置中的范围字段也会重算形状。已有清理记录期间更换 payload 引用不会立即切换，该目标继续使用旧引用直至退出；需要立即切换时调用 `refreshAura` 重建。`cleanupOnExit: false` 产生的效果没有清理记录，修改引用或重建光环都不会移除既有效果，调用方须自行处理。
 
+监听型光环可将无数值、`showIcon: 0` 的 AE 作为 payload，利用被挂角色的现有触发器响应事件。模板 AE 位于角色持有的物品且未预设 `origin` 时，管理器把复制品的 `origin` 设为模板 AE 的 UUID；脚本可用 `fromUuid(thisEffect.origin)` 找回模板，再从所属物品定位主人。退出清理只管理光环直接挂载且已记账的 payload；监听脚本另行添加的 AE 不会自动纳入光环账本。
+
 区域工具栏的光环快建按钮和 `game.xjzl.auraQuick.open()` 会打开快建窗口。快建光环默认只标记范围；需要自动结算时，可编辑区域行为，或在异步脚本中使用 `game.xjzl.aura.create()` 传入结算参数。
 
 ## Macros API

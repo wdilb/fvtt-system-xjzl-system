@@ -121,7 +121,7 @@
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
                     "description": "<p>持刀倚天，灼灼曜日，自身每有一层“金乌”，对范围内敌人造成 10 点火焰伤害。然后在自身周围 10m 范围内创造‘灼日’，持续到战斗脱离或你解除架招【烈日炎炎】。</p><p><strong>灼日：</strong>区域内敌人在自己的每个回合初，受到 10 点火焰伤害，若处于无架招状态，持续陷入“目盲”。</p><p>·灼日区域以你为中心跟随你移动，你只能拥有一 个灼日，如果你创造新的灼日，之前的消失。</p><p><strong>升级：</strong>每层金乌和灼日区域造成的火焰伤害+10，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "金乌额外伤害自动计算并显示。施展完毕发送卡片提示灼日生成，区域效果需手动结算。",
+                    "automationNote": "完全自动化：施展【骄阳似火】时金乌层数爆发伤害按 calc 自动结算；自动生成跟随光环【灼日】，范围内敌人每回合初（各自的回合开始）受 10×招式等级 的火焰伤害（必中不暴击），无架招状态由导体标记自动陷入目盲。解除架招【烈日炎炎】或脱离战斗时光环消散并按账目摘除状态。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "isFixed": true,
@@ -145,14 +145,20 @@
                         {
                             "label": "金乌爆发伤害",
                             "trigger": "calc",
-                            "script": "const jinwu = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinwu\");\nconst stacks = jinwu ? (jinwu.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerStack = 10 + (lvl - 1) * 10;\nconst totalAdd = stacks * dmgPerStack;\nargs.output.damage += totalAdd;\nif (totalAdd > 0) args.output.bonusDesc.push(`金乌爆发 (${stacks}层): +${totalAdd} 火焰伤害`);",
-                            "active": true
+                            "active": true,
+                            "script": "const jinwu = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinwu\");\nconst stacks = jinwu ? (jinwu.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerStack = 10 + (lvl - 1) * 10;\nconst totalAdd = stacks * dmgPerStack;\nargs.output.damage += totalAdd;\nif (totalAdd > 0) args.output.bonusDesc.push(\"金乌爆发 +\" + totalAdd);"
                         },
                         {
                             "label": "生成灼日提示",
                             "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dotDmg = 10 + (lvl - 1) * 10;\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230,126,34,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-sun\"></i> 灼日领域 生成</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">区域内敌人在回合初，受到 <b style=\"color:#c0392b;\">${dotDmg}</b> 点火焰伤害。<br>若处于无架招状态，持续陷入“目盲”。<br><span style=\"color:#888;\">(以自身为中心 10m 移动，需玩家手动结算伤害与状态)</span></div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dotDmg = 10 + (lvl - 1) * 10;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: `<div class=\"xjzl-chat-card\"><b>灼日</b> 已生成：范围内敌人每回合初受 ${dotDmg} 点火焰伤害；无架招状态持续目盲。解除架招或脱战时消散。</div>`});"
+                        },
+                        {
+                            "label": "灼日光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 灼日光环：跟随敌方，每名敌人自己的回合初受火焰伤害（10×招式等级）。\n// 双重消散：解除架招【烈日炎炎】（stance）或脱战（combatId 绑定当前战斗）。\nconst lvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-zhuori\",\n    displayName: \"灼日\",\n    follow: true,\n    radius: 10,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"灼日\",\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(lvl * 10), type: \"fire\"},\n    lifecycle: \"stance\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -182,7 +188,33 @@
                     "showIcon": 2
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "灼日",
+                "description": "灼日领域标记：自身回合初若处于无架招状态，则持续陷入目盲。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhuori_aura",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "无架招目盲导体",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "// 导体在目标回合初检查架招状态；未架招者持续承受目盲。\nif (actor.system?.martial?.stanceActive) return;\nconst hasBlind = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"blind\");\nif (!hasBlind) {\n    await game.xjzl.api.effects.addEffect(actor, \"blind\");\n    actor.showFloatyText(\"烈日灼目！\", { fill: \"#e67e22\", fontSize: 28 });\n}"
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "五郎八卦棍",

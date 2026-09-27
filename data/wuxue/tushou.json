@@ -8922,7 +8922,7 @@
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
                     "description": "<p>消耗所有“锦鲤”，进入“盛世”状态，持续@{2 + @up|两}回合。</p><p><strong>盛世：</strong>范围内有角色受伤时，你可以消耗反应动作使此次伤害减少，数值为消耗锦鲤层数*30。</p><p><strong>升级：</strong>持续时间+1 回合，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "自动消耗锦鲤生成动态[盛世]BUFF。当范围内有人受伤时，请手动处理。",
+                    "automationNote": "部分自动化：锦鲤消耗与盛世状态由系统自动处理；开启盛世时自动生成跟随监听光环（7 米，与盛世同寿命），范围内任意角色（含主人）承受伤害前自动发送盛世提醒卡片。提醒不会暂停本次伤害结算；如需消耗反应减伤，由 GM 手动处理本次伤害。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -8952,6 +8952,12 @@
                             "trigger": "hit",
                             "active": true,
                             "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinli\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await game.xjzl.api.effects.removeEffect(actor, \"jinli\", stacks);\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 2 + (lvl - 1);\n    const blockAmount = stacks * 30;\n    \n    const sourceAe = thisItem.effects.getName(\"盛世\");\n    if (sourceAe) {\n        const eff = sourceAe.toObject();\n        eff.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        eff.name = `盛世 (减免${blockAmount})`;\n        eff.description = `范围内有角色受伤时，你可以消耗反应动作使此次伤害减少 ${blockAmount} 点。`;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n        \n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.1); padding: 5px;\">\n            <div style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-sun\"></i> 贞观治世 - 盛世降临</div>\n            <div style=\"font-size:0.9em; margin-top:4px;\">\n                消耗了 <b>${stacks}</b> 层 [锦鲤]，进入 <b>[盛世]</b> 状态，持续 <b>${rounds}</b> 回合。<br>\n                <span style=\"color:#555;\">范围内有角色受伤时，可手动消耗反应动作使该次伤害减少 <b style=\"color:#c0392b;\">${blockAmount}</b> 点。(请在对方【应用伤害】前手动从面板扣减)</span>\n            </div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n    }\n} else {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #7f8c8d; background: rgba(127,140,141,0.1); padding: 5px;\">\n        <div style=\"color:#2c3e50; font-weight:bold;\"><i class=\"fas fa-times-circle\"></i> 施放失败</div>\n        <div style=\"font-size:0.9em; margin-top:4px;\">身上没有 [锦鲤] 层数，无法开启盛世。</div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
+                        },
+                        {
+                            "label": "盛世监听光环",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 盛世监听光环：跟随全体（7 米），持续与盛世状态同寿命（2 + 升级 回合）。\nconst lvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-shengshi\",\n    displayName: \"盛世\",\n    follow: true,\n    radius: 7,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"盛世监听\",\n    durationRounds: 2 + (lvl - 1),\n    lifecycle: \"combat\",\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -9005,7 +9011,33 @@
                     "showIcon": 2
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "盛世监听",
+                "description": "光环监听标记（不可见）。离开光环范围后自动移除，效果随之失效。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "listener_盛世监听",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "盛世监听",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "// 光环主人解析：监听 AE 的 origin 指向源物品内 AE（Item.xxx.ActiveEffect.yyy）。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner) return; // 主人自身承伤同样触发盛世提示（规则：范围内任意角色）\n// 盛世状态名包含减免值，仅状态存在时提示主人消耗反应。\nconst shengshi = owner.effects.find(e => e.name?.startsWith(\"盛世\"));\nif (!shengshi) return;\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: owner}),\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:8px 12px;border-left:4px solid #2980b9;\"><b>贞观治世·盛世</b><br>${owner.name} 可消耗反应动作触发【${shengshi.name}】，请手动结算 ${actor.name} 的伤害减免。</div>`\n});"
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/ae/目盲.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 0
+            }
+        ]
     },
     {
         "name": "灭神掌",
