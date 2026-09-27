@@ -24,13 +24,9 @@ const FLAG_SCOPE = "xjzl-system";
 const FLAG_AURA = "aura";
 /** 光环默认颜色（核心 ColorField 初始值是随机色，业务上给可预期的默认）。 */
 const DEFAULT_COLOR = "#40d0c0";
-/** Token 坐标更新后的对账去抖窗口。 */
-const RECONCILE_DEBOUNCE_MS = 500;
 
 export class AuraManager {
 
-    /** @type {Map<string, number>} updateToken 对账去抖计时器（按 token id）。 */
-    static #reconcileTimers = new Map();
     /** @type {Set<string>} 维持消耗去重键 {combatId}:{round}:{turn}。 */
     static #consumedMaintenance = new Set();
     /** @type {Map<string, string|null>} 各战斗最近一次钩子观测的行动者 combatantId（维持扣取依据）。 */
@@ -74,7 +70,7 @@ export class AuraManager {
             }
         });
 
-        // ---- 时限递减 / 维持消耗 / 战斗期清理 / 回合对账 ----
+        // ---- 时限递减 / 维持消耗 / 战斗期清理 ----
         // 滚轮推进至新轮时 combat.previous 可能为 null；保存上次观测的
         // combatantId，以便在 round 或 turn 变化时扣取推进前行动者的维持。
         Hooks.on("createCombat", combat => {
@@ -90,8 +86,6 @@ export class AuraManager {
             // 扣取触发用 round 或 turn 任一变化：单人（或连续行动者）回合
             // 轮转时核心只 update {round}、turn 键缺省，仅看 turn 会漏扣。
             if (turnChanged || roundChanged) await this.#consumeMaintenance(combat, prevActorId);
-            // 轮边界补扫；事件已即时补正时无需写入
-            if (roundChanged && (combat.round ?? 0) >= 1) await this.reconcileCombat(combat);
             // round 回 0（战斗面板关闭）也清战斗期光环
             if (roundChanged && (combat.round ?? 0) === 0) await this.#clearCombatAuras(combat.id);
             this.#currentActors.set(combat.id, combat.combatant?.id ?? null);
@@ -102,23 +96,15 @@ export class AuraManager {
             await this.#clearCombatAuras(combat.id);
         });
 
-        // ---- Token 坐标更新后的对账兜底 ----
-        // 去抖比对覆盖与账本，补正未派发进出事件的更新路径。
-        Hooks.on("updateToken", (tokenDoc, change) => {
-            if (!game.users.activeGM?.isSelf) return;
-            if (!("x" in change) && !("y" in change)) return;
-            const timers = this.#reconcileTimers;
-            clearTimeout(timers.get(tokenDoc.id));
-            timers.set(tokenDoc.id, setTimeout(() => {
-                timers.delete(tokenDoc.id);
-                AuraLedger.reconcileToken(tokenDoc)
-                    .catch(err => console.error("XJZL | 传送对账失败:", err));
-            }, RECONCILE_DEBOUNCE_MS));
-        });
-
         // ---- ready 孤儿校验 ----
         Hooks.once("ready", async () => {
-            if (!game.user.isGM) return;
+            // 多 GM 在线时只允许活动 GM 执行（写 flags 的删除路径）
+            if (!game.users.activeGM?.isSelf) return;
+            // 恢复各进行中战斗的行动者记录：刷新页面后 #currentActors 为空，
+            // 不初始化会导致第一次推进回合漏扣维持消耗
+            for (const combat of game.combats) {
+                this.#currentActors.set(combat.id, combat.combatant?.id ?? null);
+            }
             await this.validateOrphans();
         });
     }
@@ -135,16 +121,15 @@ export class AuraManager {
      *   {label(必填), displayName?, color?, follow?, radius, shapeKind, rectWidth, rectHeight,
      *    anchorX, anchorY, quarterTurns(number|"auto"), faction, includeSelf,
      *    payloadItemUuid?, payloadEffectName?, enterAction?, moveWithin?, throttlePerRound?,
-     *    roundTiming?, roundAction?, exitClear?, enterEnabled?, roundEnabled?,
+     *    roundTiming?, roundAction?, cleanupOnExit?, enterEnabled?, roundEnabled?,
      *    durationRounds?, maintain?, lifecycle?, sourceActorUuid?, sourceItemUuid?, levelIds?}
      *   maintain: {resource("mp"/"hp"/…), amount(每回合固定), perTarget(每名覆盖敌人的追加消耗,
      *   如 20 表达"按人数×20")}
      * @returns {Promise<RegionDocument|null>} 创建的 region；无网格/参数非法返回 null
      */
     static create(source, params) {
-        // 并发调用串行执行：核心 Region 的 token→region 跟踪在两个创建
-        // 操作并发完成时会互相覆盖（实测先建者 tokens 恒空、不结算、
-        // 对账也不可达），逐个创建消除该窗口。
+        // 并发创建会使核心 token→region 跟踪互相覆盖，先完成的 Region
+        // 可能没有 tokens、无法派发行为事件；逐个创建消除该窗口。
         const run = this.#createChain.catch(err => console.error("XJZL | 前序光环创建失败:", err))
             .then(() => this.#createImpl(source, params));
         this.#createChain = run.then(() => undefined, () => undefined);
@@ -224,8 +209,9 @@ export class AuraManager {
 
     /**
      * 消除光环：按 label 或 regionId 删除 region。
-     * 删除前预提交区域内 token 的 exit，确保在 region 消失前取得账目快照。
-     * 核心删除事件可能再次提交 exit；账目清除和条目 eid 防止重复摘除。
+     * 删除前预提交账目清理并 await 完成（每条账目按独立 owner 释放，
+     * 见 #preDeleteCleanup）；核心删除事件可能再次提交 exit，账目已清
+     * 与条目 eid 保证不重复摘除。
      * @param {string} labelOrRegionId - 光环标签或 region 文档 id
      * @param {object} [options] - {scene?: Scene}（默认 canvas.scene）
      * @returns {Promise<number>} 删除的 region 数
@@ -243,7 +229,7 @@ export class AuraManager {
         }
         if (!ids.length) return 0;
         const regions = ids.map(id => scene.regions.get(id)).filter(Boolean);
-        for (const region of regions) this.#preDeleteExits(region);
+        for (const region of regions) await this.#preDeleteCleanup(region);
         if (game.users.activeGM?.isSelf) {
             await scene.deleteEmbeddedDocuments("Region", ids);
         } else {
@@ -381,34 +367,6 @@ export class AuraManager {
     }
 
     /**
-     * 按覆盖状态与账本补正失配。传 TokenDocument 对单个 Token 对账；传 Scene（或缺省当前
-     * 场景）对全场 Token 补扫。
-     * @param {TokenDocument|Scene|null} [target]
-     * @returns {Promise<void>}
-     */
-    static async reconcile(target = null) {
-        if (!game.users.activeGM?.isSelf) {
-            console.warn("XJZL | 光环对账仅由活动 GM 执行。");
-            return;
-        }
-        if (target?.documentName === "Token") return AuraLedger.reconcileToken(target);
-        const scene = target ?? canvas.scene;
-        if (!scene) return;
-        for (const token of scene.tokens) await AuraLedger.reconcileToken(token);
-    }
-
-    /**
-     * 战斗内回合边界对账：对本战斗每个战斗员 Token 补扫。
-     * @param {Combat} combat - 战斗文档
-     */
-    static async reconcileCombat(combat) {
-        for (const combatant of combat.combatants) {
-            if (!combatant.token) continue;
-            await AuraLedger.reconcileToken(combatant.token);
-        }
-    }
-
-    /**
      * 按源映射销毁光环（生命周期兜底与脚本编排共用）。
      * @param {object} criteria - {sourceItemUuid?, sourceActorUuid?, lifecycle?}
      */
@@ -443,12 +401,12 @@ export class AuraManager {
                 await this.#deleteRegion(region);
                 continue;
             }
-            // payload 校验读行为 system 的当前值：配置页改过
-            // payload 后 meta.params 快照过时，按快照校验会误报/漏报
-            const behavior = region.behaviors.find(b => b.type === "xjzlAura");
-            const payloadUuid = behavior?.system?.payloadItemUuid;
-            const payloadName = behavior?.system?.payloadEffectName;
-            if (payloadUuid && payloadName) {
+            // meta.params 只保存创建时快照；payload 校验必须读取每个行为的
+            // 当前 system，避免配置修改或多行为组合造成误报、漏报。
+            for (const behavior of region.behaviors.filter(b => b.type === "xjzlAura")) {
+                const payloadUuid = behavior.system?.payloadItemUuid;
+                const payloadName = behavior.system?.payloadEffectName;
+                if (!payloadUuid || !payloadName) continue;
                 const item = await fromUuid(payloadUuid);
                 if (!item?.effects?.some(e => e.name === payloadName)) {
                     console.warn(`XJZL | 光环「${meta.label}」的 payload 不可解析（${payloadUuid} / "${payloadName}"），已降级：进出挂摘失效，保留直接结算动作与范围显示。`);
@@ -562,7 +520,7 @@ export class AuraManager {
             throttlePerRound: params.throttlePerRound ?? false,
             roundTiming: params.roundTiming ?? "tokenRoundEnd",
             roundAction: {...(params.roundAction ?? {})},
-            exitClear: params.exitClear ?? false
+            cleanupOnExit: params.cleanupOnExit ?? true
         };
     }
 
@@ -657,26 +615,31 @@ export class AuraManager {
     }
 
     /**
-     * 删除单个光环 region 前预提交区域内所有 token 的 exit（快照在
-     * region 完好时读取；机理见 dismiss 注释）。
+     * 删除光环 region 前预提交清理：枚举账本条目（账目自带
+     * actorUuid/tokenUuid，不依赖 region.tokens——Token 可能已删除而账目
+     * 仍在），每条账目按独立 owner 提交一次释放；await 全部完成后再删除，
+     * 核心 delete 补发的 exit 到达时账目已清、空转（eid 幂等兜底重复快照）。
+     * 预清理必须先于删除完成，否则 Region 文档可能在读取快照或清账前消失。
+     * 任一清理失败时抛出 AggregateError 并中止删除：region 存活时账目
+     * 仍在、可重试；此时坚持删除会让清理账目随文档消失，AE 永久残留且
+     * 失去重试凭据。
      * @param {RegionDocument} region - 待删除的光环 region
      */
-    static #preDeleteExits(region) {
-        const behaviorId = region.behaviors.find(b => b.type === "xjzlAura")?.id ?? null;
-        for (const token of [...region.tokens]) {
-            if (!token.actor) continue;
-            const entries = Object.entries(AuraLedger.getEntriesOfToken(region, token.id))
-                .filter(([, entry]) => entry?.active)
-                .map(([key, entry]) => ({key, entry}));
-            if (!entries.length) continue;
-            AuraLedger.submitExit({
-                behaviorId,
+    static async #preDeleteCleanup(region) {
+        const pending = [];
+        for (const {key, tokenId, entry} of AuraLedger.allEntriesOfRegion(region)) {
+            pending.push(AuraLedger.submitExit({
+                behaviorId: key,
                 regionUuid: region.uuid,
-                tokenUuid: token.uuid,
-                actorUuid: token.actor.uuid,
-                // 队列键取首条 key 保证与对应 enter 同组；摘除按快照执行
-                payloadKey: entries[0].key
-            }, entries, xjzlSocket);
+                tokenUuid: entry.tokenUuid,
+                actorUuid: entry.actorUuid
+            }, [{key, tokenId, entry}], xjzlSocket));
+        }
+        const results = await Promise.allSettled(pending);
+        const rejected = results.filter(r => r.status === "rejected");
+        if (rejected.length) {
+            throw new AggregateError(rejected.map(r => r.reason),
+                `XJZL | 光环 region「${region.name}」预清理失败，已中止删除（region 保留可重试）`);
         }
     }
 
@@ -687,7 +650,7 @@ export class AuraManager {
     static async #deleteRegion(region) {
         const scene = region.parent;
         if (!scene) return;
-        this.#preDeleteExits(region);
+        await this.#preDeleteCleanup(region);
         if (game.users.activeGM?.isSelf) {
             await scene.deleteEmbeddedDocuments("Region", [region.id]);
         } else {

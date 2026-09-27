@@ -11,7 +11,7 @@
  * ③ zh-cn `TYPES.RegionBehavior.xjzlAura`（typeLabels 自动挂载）。
  */
 
-import {AuraLedger, payloadKeyOf} from "./xjzl-aura-ledger.mjs";
+import {AuraLedger} from "./xjzl-aura-ledger.mjs";
 import {generateCircleOffsets, generateRectangleOffsets, rotateOffsets90, toCoreOffsets} from "../utils/aura-shapes.mjs";
 import {xjzlSocket} from "../socket.mjs";
 
@@ -139,8 +139,8 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
 
             // ---- 回合结算动作 ----
             // choices 值必须与 CONST.REGION_EVENTS 的事件名一致（handler 按
-            // event.name 匹配）；显示文案用我们自己的本地化键（核心无
-            // REGION.EVENTS.* 键，实测原样回显）。
+            // event.name 匹配）；核心未提供 REGION.EVENTS.* 本地化键，
+            // 因此显示文案使用系统本地化键。
             roundTiming: new fields.StringField({required: true, initial: "tokenRoundEnd",
                 choices: {tokenRoundStart: "XJZL.AuraBehavior.CHOICES.Timing.RoundStart",
                     tokenRoundEnd: "XJZL.AuraBehavior.CHOICES.Timing.RoundEnd",
@@ -150,11 +150,14 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
                 hint: "XJZL.AuraBehavior.FIELDS.roundTiming.hint"}),
             roundAction: actionField(true),
 
-            // ---- 退出摘除选项 ----
-            // 退出时需移除整条 AE 的效果使用清空型
-            exitClear: new fields.BooleanField({initial: false,
-                label: "XJZL.AuraBehavior.FIELDS.exitClear.label",
-                hint: "XJZL.AuraBehavior.FIELDS.exitClear.hint"})
+            // ---- 退出清理 ----
+            // cleanupOnExit 只控制 payload AE 是否建立清理账目：开启时记录
+            // 实际贡献（可叠层）或 owner 身份（不可叠层），退出时释放；
+            // 关闭时正常施加但不记账，效果离开范围仍保留。直接伤害/治疗
+            // 与未成功施加 payload 不建账目，与本开关无关。
+            cleanupOnExit: new fields.BooleanField({initial: true,
+                label: "XJZL.AuraBehavior.FIELDS.cleanupOnExit.label",
+                hint: "XJZL.AuraBehavior.FIELDS.cleanupOnExit.hint"})
         };
     }
 
@@ -286,7 +289,7 @@ class XJZLAuraBehaviorConfig extends foundry.applications.sheets.RegionBehaviorC
 
     /**
      * @override 按使用动线把字段分入多个 fieldset。
-     * 动作子字段（enterAction/roundAction）从我们数据模型的 SchemaField
+     * 动作子字段（enterAction/roundAction）从本行为数据模型的 SchemaField
      * 展开，取值路径与核心 #addSystemFields 一致。
      */
     _getFields() {
@@ -344,7 +347,7 @@ class XJZLAuraBehaviorConfig extends foundry.applications.sheets.RegionBehaviorC
             ]},
             // 离开时
             {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.exit", fields: [
-                pick(f.exitClear, "system.exitClear")
+                pick(f.cleanupOnExit, "system.cleanupOnExit")
             ]}
         ];
     }
@@ -421,13 +424,14 @@ function onTokenEnter(event) {
     if (!event.user.isSelf || !this.enterEnabled) return;
     const token = event.data?.token;
     if (!token?.actor) return;
-    AuraLedger.submitEnter(opBase(this, token), xjzlSocket);
+    AuraLedger.submitEnter(opBase(this, token), xjzlSocket)
+        .catch(err => console.error("XJZL | 光环进入结算提交失败:", err));
 }
 
 /**
  * 退出结算：与 enter 对称；入队时快照账本条目——region 删除补发的 exit
- * 在 region 消失后才会被结算，快照是摘除凭据。退出摘除
- * 与 enterEnabled 无关：进入时挂上的 AE 在任何情况下都必须被摘除。
+ * 在 region 消失后才会被结算，快照是释放凭据。退出释放与 enterEnabled、
+ * cleanupOnExit 的当前配置无关：已有清理收据按施加时的记录释放。
  * @param {RegionTokenExitEvent} event - 核心 Region 事件
  * @this {XJZLAuraRegionBehaviorType}
  */
@@ -435,15 +439,15 @@ function onTokenExit(event) {
     if (!event.user.isSelf) return;
     const token = event.data?.token;
     if (!token?.actor) return;
-    // 快照该目标全部有效条目；条目自足（含 exitClear/slug），
-    // region 删除后行为配置不可达时快照是摘除凭据；配置页更换 payload
-    // 引用后旧键条目也随同一次退出清理。
+    // 快照该目标本行为的清理账目（账本按行为分键，同 region 其他
+    // 行为的账目由它们自己的退出事件负责）；账目自足（slug/贡献/owner
+    // 基线），region 删除后行为配置不可达时快照是释放凭据。
+    const op = opBase(this, token);
     const snapshots = this.region
-        ? Object.entries(AuraLedger.getEntriesOfToken(this.region, token.id))
-            .filter(([, entry]) => entry?.active)
-            .map(([key, entry]) => ({key, entry}))
+        ? AuraLedger.ownEntriesOfToken(this.region, token.id, op.behaviorId)
         : [];
-    AuraLedger.submitExit(opBase(this, token), snapshots, xjzlSocket);
+    AuraLedger.submitExit(op, snapshots, xjzlSocket)
+        .catch(err => console.error("XJZL | 光环退出结算提交失败:", err));
 }
 
 /**
@@ -461,7 +465,7 @@ function onTokenMoveWithin(event) {
         id: movement.id,
         origin: movement.origin ? {x: movement.origin.x, y: movement.origin.y} : null,
         destination: movement.destination ? {x: movement.destination.x, y: movement.destination.y} : null
-    }, xjzlSocket);
+    }, xjzlSocket).catch(err => console.error("XJZL | 光环移动结算提交失败:", err));
 }
 
 /**
@@ -479,26 +483,23 @@ function onTokenRoundTurn(event) {
         timing: event.name,
         combatId: event.data?.combat?.id ?? null,
         round: event.data?.round ?? null
-    }, xjzlSocket);
+    }, xjzlSocket).catch(err => console.error("XJZL | 光环回合结算提交失败:", err));
 }
 
 /**
- * 构造队列入队参数。payloadKey 在本端（配置在手）计算并随操作携带，
- * 保证同一目标＋payload 的 enter/exit 落入同一条串行队列；串行键按目标
- * Actor——链接 Actor 的 uuid 跨 Token 一致，合成 Actor 的
- * uuid 即 Token uuid，因此同一 Actor 的多个 Token 落同一队列。
+ * 构造队列入队参数。串行队列按目标 Actor 分键：链接
+ * Actor 的 uuid 跨 Token 一致，合成 Actor 的 uuid 即 Token uuid——
+ * 同一 Actor 的多个 Token 落同一队列，AE 修改严格串行。
  * @param {XJZLAuraRegionBehaviorType} behavior - 行为实例
  * @param {TokenDocument} token - 事件目标 Token
- * @returns {object} {behaviorId, regionUuid, tokenUuid, actorUuid, payloadKey}
+ * @returns {object} {behaviorId, regionUuid, tokenUuid, actorUuid}
  */
 function opBase(behavior, token) {
-    const behaviorId = behavior.parent?.id ?? null;
     return {
-        behaviorId,
+        behaviorId: behavior.parent?.id ?? null,
         regionUuid: behavior.region?.uuid ?? null,
         tokenUuid: token.uuid,
-        actorUuid: token.actor?.uuid ?? token.uuid,
-        payloadKey: payloadKeyOf(behavior, behaviorId)
+        actorUuid: token.actor?.uuid ?? token.uuid
     };
 }
 

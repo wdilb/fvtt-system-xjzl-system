@@ -93,7 +93,7 @@ Hooks.once("init", async function () {
 
   // 类型声明位于 system.json；客户端模型需在本地化扫描前注册。
   registerAuraBehavior();
-  // 光环管理器钩子（来源生命周期、时限、维持、对账）在此一并注册。
+  // 光环管理器钩子（来源生命周期、时限、维持）在此一并注册。
   AuraManager.init();
   // 快建工具：Region placeable 子类（自绘显示名标签）与工具栏按钮注册。
   registerAuraQuick();

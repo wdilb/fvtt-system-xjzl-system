@@ -1,15 +1,19 @@
 /**
- * xjzlAura 光环的施加账本与结算执行器。
+ * xjzlAura —— 光环施加账本与结算执行器。
  *
- * 职责划分：Region 行为（xjzl-aura-behavior.mjs）只做事件接收与门控，
- * 全部结算落在活动 GM 端，按目标 Actor＋payload 串行执行；
- * 入队后再次核对覆盖状态。
- *
- * 账本存于 region flags `xjzl-system.ledger`，按 tokenId → payloadKey
- * 记录 `{active, stacks, created, stackable, slug, exitClear, eid}`；
- * `active` 是唯一幂等与对账依据——enter 以"已有条目"为已生效，贡献层数为 0
- * 或 created=false 的 enter 同样记 active 条目；exit 按条目摘除后清除账目。
- * 对账以覆盖状态与施加账本为依据。
+ * 业务模型：
+ * - **Region 事件是施加事实源**：每次被接受的真实 tokenEnter 都调用一次
+ *   门面 addEffect；throttlePerRound 是进入事件唯一的业务节流；回合挂载
+ *   每个有效回合事件调用一次 addEffect（叠层累加与非叠层刷新语义全部
+ *   归门面）。不以账本存在性、也不以当前覆盖状态否定已发生的事件。
+ * - **账目是清理收据，不是覆盖状态事实源**：账本按 Region flag
+ *   `xjzl-system.ledger` 保存，身份 tokenId → behaviorId，一行为对一目标
+ *   至多一条；条目自带 actorUuid，Token 删除后仍可按它解析 Actor 清理。
+ * - **清理开关 cleanupOnExit**（行为 schema）：true 时记录清理账目——
+ *   可叠层累计 contributedStacks、不可叠层记录 owner 身份与接管基线
+ *   existedBeforeAura；false 时施加但不记账，退出不处理（效果保留）。
+ * - 全部同 Actor 的施加/释放经按 actorUuid 串行的 GM 队列执行，事件顺序
+ *   即队列顺序，不做基于几何覆盖状态的二次判定。
  */
 
 /** 账本与节流的 flags 根路径。 */
@@ -18,7 +22,7 @@ const FLAG_AURA = "aura";
 const FLAG_LEDGER = "ledger";
 const FLAG_THROTTLE = "throttle";
 
-/** GM 端串行队列：优先按 `${actorUuid}|${payloadKey}` 分键。 */
+/** GM 端串行队列：按 `${actorUuid}` 分键。 */
 const opQueues = new Map();
 /** GM 端 movement.id 去重集合，避免重复结算同次移动。 */
 const processedMovements = new Set();
@@ -26,19 +30,21 @@ const processedMovements = new Set();
 const processedRounds = new Set();
 /** GM 端已处理条目 eid：删除快照和补偿清理据此避免重复摘除。 */
 const processedEids = new Set();
-/** 去重集合容量上限，防止长会话无限增长。 */
-const DEDUP_LIMIT = 256;
-
-/* -------------------------------------------- */
-/*  发起端入口（Region 事件 handler 调用）        */
-/* -------------------------------------------- */
+/** 去重集合容量上限：按插入顺序 FIFO 淘汰最旧记录，不整体清空——
+ *  整体清空会让刚处理过的重复事件在大批量结算后重新执行。 */
+const DEDUP_LIMIT = 1024;
 
 export class AuraLedger {
 
+  /* -------------------------------------------- */
+  /*  提交入口（事件端转发，结算统一落活动 GM）      */
+  /* -------------------------------------------- */
+
   /**
    * 提交一次 enter 结算（移动发起者端调用，活动 GM 时直接入队）。
-   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, payloadKey}
+   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, actorUuid}
    * @param {object} socketlibRef - xjzlSocket 实例（由调用方传入避免循环依赖）
+   * @returns {Promise<void>} 结算完成 promise
    */
   static submitEnter(payload, socketlibRef) {
     return this.#submit({op: "enter", ...payload}, socketlibRef);
@@ -47,11 +53,12 @@ export class AuraLedger {
   /**
    * 提交一次 exit 结算。入队时携带发起端可见的账本快照：
    * region 删除补发 exit 时行为与 flags 可能随 region 消失，快照是摘除
-   * 凭据；快照为该目标全部有效条目（含 exitClear/slug），配置页更换
-   * payload 引用变化或 region 删除都不影响摘除。
-   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, actorUuid, payloadKey}
-   * @param {Array<{key: string, entry: object}>} snapshots - 有效账本条目快照数组
+   * 凭据；快照为该目标**本行为**的有效账目（普通退出每行为独立结算，
+   * region 删除由管理器按账目逐条提交，每条独立 owner 释放）。
+   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, actorUuid}
+   * @param {Array<{key: string, tokenId: string, entry: object}>} snapshots - 账本条目快照数组
    * @param {object} socketlibRef - xjzlSocket 实例
+   * @returns {Promise<void>} 结算完成 promise
    */
   static submitExit(payload, snapshots, socketlibRef) {
     return this.#submit({op: "exit", snapshots: snapshots ?? [], ...payload}, socketlibRef);
@@ -60,9 +67,10 @@ export class AuraLedger {
   /**
    * 提交一次区域内部移动结算。
    * movement 只保留去重与纯区域内判定所需字段，避免整份 movement 过 socket。
-   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, payloadKey}
+   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, actorUuid}
    * @param {object} movement - {id, origin, destination}（origin/destination 为 {x,y} 点）
    * @param {object} socketlibRef - xjzlSocket 实例
+   * @returns {Promise<void>} 结算完成 promise
    */
   static submitMoveWithin(payload, movement, socketlibRef) {
     return this.#submit({op: "moveWithin", movement, ...payload}, socketlibRef);
@@ -71,8 +79,9 @@ export class AuraLedger {
   /**
    * 提交一次回合结算。回合事件由活动 GM 端 Combat 工作流派发，通常本端即
    * 活动 GM；非本端时仍委托，以保证结算统一落在活动 GM 端。
-   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, payloadKey, timing, combatId, round}
+   * @param {object} payload - {behaviorId, regionUuid, tokenUuid, actorUuid, timing, combatId, round}
    * @param {object} socketlibRef - xjzlSocket 实例
+   * @returns {Promise<void>} 结算完成 promise
    */
   static submitRound(payload, socketlibRef) {
     return this.#submit({op: "round", ...payload}, socketlibRef);
@@ -80,33 +89,35 @@ export class AuraLedger {
 
   /**
    * 统一提交口：活动 GM 端直接入队；否则经 socketlib 委托活动 GM。
-   * 发起端只做事件转发，不等待结算结果（fire-and-forget，核心事件本就如此）。
+   * 发起端只做事件转发，不等待结算结果（fire-and-forget，核心事件本就
+   * 如此）；失败会向外抛出，调用方自行决定记录或忽略——**不得把失败
+   * 转成成功**：预清理路径依赖 Promise 状态判定是否允许删除 region。
    * @param {object} op - 完整操作对象
    * @param {object} socketlibRef - xjzlSocket 实例
+   * @returns {Promise<void>} 结算完成 promise（失败时 reject）
    */
   static #submit(op, socketlibRef) {
-    if (game.users.activeGM?.isSelf) {
-      this.enqueue(op).catch(err => console.error("XJZL | 光环结算队列执行失败:", op, err));
-      return;
+    if (game.users.activeGM?.isSelf) return this.enqueue(op);
+    if (!socketlibRef?.executeAsGM) {
+      // socketlib 未就绪时不得把委托失败当成成功：预清理等路径据此中止。
+      return Promise.reject(new Error("XJZL | 光环账目操作失败：socketlib 尚未就绪，无法委托活动 GM"));
     }
-    socketlibRef?.executeAsGM("auraLedger", op)?.catch?.(err => {
+    return socketlibRef.executeAsGM("auraLedger", op).catch(err => {
       console.error("XJZL | 光环结算委托活动 GM 失败:", op, err);
+      throw err;
     });
   }
 
   /**
-   * 将操作加入目标＋payload 串行队列并在活动 GM 端执行（socket 处理端入口）。
-   * 串行键按**目标 Actor**＋payload：同一关联 Actor 的多个 Token
-   * 必须落在同一队列，否则并发修改同一 Actor 的 AE 会记重贡献；合成 Actor
-   * 的 uuid 即 Token uuid，天然按 Token 分队。payloadKey 由行为 handler 在
-   * 入队时计算并随操作携带——串行键必须在入队时刻同步确定：region 删除
-   * 补发的 exit 拿不到行为配置，若此时才异步解析，同一目标＋payload 的
-   * enter/exit 会落入不同队列，串行性失效。
-   * @param {object} op - {op, behaviorId, regionUuid, tokenUuid, actorUuid, payloadKey, ...}
+   * 将操作加入目标 Actor 串行队列并在活动 GM 端执行（socket 处理端入口）。
+   * 串行键按目标 Actor：同一关联 Actor 的多个 Token
+   * 落同一队列，AE 的施加/释放严格按事件顺序执行；合成 Actor 的 uuid 即
+   * Token uuid，天然按 Token 分队。
+   * @param {object} op - {op, behaviorId, regionUuid, tokenUuid, actorUuid, ...}
    * @returns {Promise<void>} 该操作在队列中的完成 promise
    */
   static async enqueue(op) {
-    const key = `${op.actorUuid || op.tokenUuid}|${op.payloadKey || `direct:${op.regionUuid}.${op.behaviorId}`}`;
+    const key = op.actorUuid || op.tokenUuid;
     const previous = opQueues.get(key) || Promise.resolve();
     const current = previous
         .catch(err => console.error(`XJZL | 光环队列前序操作失败 [${key}]:`, err))
@@ -134,47 +145,48 @@ export class AuraLedger {
   }
 
   /**
-   * 读取一个账本条目。
+   * 读取一个清理账目（按行为键）。
    * @param {RegionDocument} region - 光环 region
    * @param {string} tokenId - 目标 Token id
-   * @param {string} payloadKey - payload 串行键
-   * @returns {object|undefined} 条目 {active, stacks, created, stackable, slug, exitClear}
+   * @param {string} behaviorId - 行为 id（账本键）
+   * @returns {object|undefined} 账目 {eid, actorUuid, tokenUuid, behaviorId,
+   *   slug, ref, stackable, contributedStacks, existedBeforeAura}
    */
-  static getEntry(region, tokenId, payloadKey) {
+  static getEntry(region, tokenId, behaviorId) {
     const ledger = region.getFlag(FLAG_SCOPE, FLAG_LEDGER) ?? {};
-    return ledger[tokenId]?.[payloadKey];
+    return ledger[tokenId]?.[behaviorId];
   }
 
   /**
-   * 写入一个账本条目（覆盖式）；region 已从场景移除时跳过。
+   * 写入一个清理账目（覆盖式）；region 已从场景移除时跳过。
    * @param {RegionDocument} region - 光环 region
    * @param {string} tokenId - 目标 Token id
-   * @param {string} payloadKey - payload 串行键
-   * @param {object} entry - {active, stacks, created, stackable, slug, exitClear}
+   * @param {string} behaviorId - 行为 id（账本键）
+   * @param {object} entry - 清理账目
    */
-  static putEntry(region, tokenId, payloadKey, entry) {
+  static putEntry(region, tokenId, behaviorId, entry) {
     if (!this.#regionLive(region)) return Promise.resolve();
-    return region.update({[`flags.${FLAG_SCOPE}.${FLAG_LEDGER}.${tokenId}.${payloadKey}`]: entry});
+    return region.update({[`flags.${FLAG_SCOPE}.${FLAG_LEDGER}.${tokenId}.${behaviorId}`]: entry});
   }
 
   /**
-   * 清除一个账本条目（exit 摘除后调用）；region 已从场景移除时跳过。
+   * 清除一个清理账目（exit 释放后调用）；region 已从场景移除时跳过。
    * 使用 ForcedDeletion 删除嵌套 flag，避免删除键兼容性警告。
    * @param {RegionDocument} region - 光环 region
    * @param {string} tokenId - 目标 Token id
-   * @param {string} payloadKey - payload 串行键
+   * @param {string} behaviorId - 行为 id（账本键）
    */
-  static clearEntry(region, tokenId, payloadKey) {
+  static clearEntry(region, tokenId, behaviorId) {
     if (!this.#regionLive(region)) return Promise.resolve();
     const Deletion = foundry.data.operators.ForcedDeletion;
-    return region.update({[`flags.${FLAG_SCOPE}.${FLAG_LEDGER}.${tokenId}.${payloadKey}`]: new Deletion()});
+    return region.update({[`flags.${FLAG_SCOPE}.${FLAG_LEDGER}.${tokenId}.${behaviorId}`]: new Deletion()});
   }
 
   /**
-   * 读取某 Token 的全部有效账本条目（对账用）。
+   * 读取某 Token 的全部清理账目。
    * @param {RegionDocument} region - 光环 region
    * @param {string} tokenId - 目标 Token id
-   * @returns {Object<string, object>} payloadKey → 条目
+   * @returns {Object<string, object>} behaviorId → 账目
    */
   static getEntriesOfToken(region, tokenId) {
     const ledger = region.getFlag(FLAG_SCOPE, FLAG_LEDGER) ?? {};
@@ -182,69 +194,57 @@ export class AuraLedger {
   }
 
   /**
-   * 读取上次进入结算的节流键。
+   * 读取某行为对目标 Token 的清理账目：普通 tokenExit 只结算本行为的
+   * 账目；同 region 其他行为的账目由各自的退出事件负责。
    * @param {RegionDocument} region - 光环 region
    * @param {string} tokenId - 目标 Token id
+   * @param {string} behaviorId - 行为 id
+   * @returns {Array<{key: string, tokenId: string, entry: object}>} 0 或 1 条
+   */
+  static ownEntriesOfToken(region, tokenId, behaviorId) {
+    const entry = this.getEntriesOfToken(region, tokenId)[behaviorId];
+    return entry ? [{key: behaviorId, tokenId, entry}] : [];
+  }
+
+  /**
+   * 读取 region 账本中的全部清理账目（region 删除预清理用）：
+   * 账目自带 actorUuid/tokenUuid，不依赖 region.tokens 枚举（Token 可能
+   * 已删除而账目仍在）。
+   * @param {RegionDocument} region - 光环 region
+   * @returns {Array<{key: string, tokenId: string, entry: object}>}
+   */
+  static allEntriesOfRegion(region) {
+    const out = [];
+    const ledger = region.getFlag(FLAG_SCOPE, FLAG_LEDGER) ?? {};
+    for (const [tokenId, entries] of Object.entries(ledger)) {
+      for (const [behaviorId, entry] of Object.entries(entries ?? {})) {
+        if (!entry) continue;
+        out.push({key: behaviorId, tokenId, entry});
+      }
+    }
+    return out;
+  }
+
+  /**
+   * 读取上次进入结算的节流键。
+   * @param {RegionDocument} region - 光环 region
+   * @param {string} scopeKey - 节流作用域键 `${behaviorId}|${tokenId}`；
+   *   行为维度使同 region 多行为的节流互不影响
    * @returns {string|undefined} 如 "combatId:round"
    */
-  static getThrottle(region, tokenId) {
-    return region.getFlag(FLAG_SCOPE, `${FLAG_THROTTLE}.${tokenId}`);
+  static getThrottle(region, scopeKey) {
+    return region.getFlag(FLAG_SCOPE, `${FLAG_THROTTLE}.${scopeKey}`);
   }
 
   /**
    * 写入节流记录；region 已从场景移除时跳过。
    * @param {RegionDocument} region - 光环 region
-   * @param {string} tokenId - 目标 Token id
+   * @param {string} scopeKey - 节流作用域键 `${behaviorId}|${tokenId}`
    * @param {string} key - 节流键 `${combatId}:${round}`
    */
-  static setThrottle(region, tokenId, key) {
+  static setThrottle(region, scopeKey, key) {
     if (!this.#regionLive(region)) return Promise.resolve();
-    return region.update({[`flags.${FLAG_SCOPE}.${FLAG_THROTTLE}.${tokenId}`]: key});
-  }
-
-  /* -------------------------------------------- */
-  /*  对账（GM 端）                                */
-  /* -------------------------------------------- */
-
-  /**
-   * 对单个 Token 做覆盖状态与账本比对。
-   * 以核心包含性跟踪 `token._source._regions` 为覆盖基准（服务端在每次含
-   * 移动字段的更新时重算，权威口径）；hidden region 与 disabled 行为不派发
-   * 事件、行为停摆，账本冻结，对账跳过以免误补。
-   * 漏挂补挂、漏摘按账本快照补摘，均复用 enter/exit 队列逻辑（含节流与过滤）。
-   * @param {TokenDocument} tokenDoc - 待对账的 Token
-   * @returns {Promise<void>}
-   */
-  static async reconcileToken(tokenDoc) {
-    if (!tokenDoc?.parent) return;
-    const regionIds = new Set(tokenDoc._source?._regions ?? []);
-    for (const region of tokenDoc.parent.regions) {
-      const behavior = region.behaviors.find(b => b.type === "xjzlAura" && !b.disabled);
-      if (!behavior || region.hidden) continue;
-      const inside = regionIds.has(region.id);
-      const entries = this.getEntriesOfToken(region, tokenDoc.id);
-      const activeKeys = Object.keys(entries).filter(k => entries[k]?.active);
-      if (inside && activeKeys.length === 0) {
-        // 覆盖内但无任何有效账目 → 补挂（复用 enter；节流与过滤在队列内生效）
-        this.submitEnter({
-          behaviorId: behavior.id,
-          regionUuid: region.uuid,
-          tokenUuid: tokenDoc.uuid,
-          actorUuid: tokenDoc.actor?.uuid ?? tokenDoc.uuid,
-          payloadKey: payloadKeyOf(behavior.system, behavior.id)
-        }, null);
-      } else if (!inside && activeKeys.length > 0) {
-        // 覆盖外仍有有效账目：按全部有效条目补摘，避免配置变化后遗漏旧键。
-        const snapshots = activeKeys.map(key => ({key, entry: entries[key]}));
-        this.submitExit({
-          behaviorId: behavior.id,
-          regionUuid: region.uuid,
-          tokenUuid: tokenDoc.uuid,
-          actorUuid: tokenDoc.actor?.uuid ?? tokenDoc.uuid,
-          payloadKey: activeKeys[0]
-        }, snapshots, null);
-      }
-    }
+    return region.update({[`flags.${FLAG_SCOPE}.${FLAG_THROTTLE}.${scopeKey}`]: key});
   }
 
   /* -------------------------------------------- */
@@ -253,33 +253,38 @@ export class AuraLedger {
 
   /**
    * 队列执行体：解析文档 → 分发到具体结算。
+   * Actor 解析以 token.actor 优先；exit 在 Token 已删除时按账目的
+   * actorUuid 兜底解析（账目自带，清理不依赖 Token 存活）。
    * @param {object} op - 队列操作
    */
   static async #execute(op) {
-    const region = await fromUuid(op.regionUuid);
+    const region = await fromUuid(op.regionUuid).catch(() => null);
     const behavior = region?.behaviors.get(op.behaviorId);
-    const token = await fromUuid(op.tokenUuid);
-    const actor = token?.actor;
-    if (!actor) return;
+    const token = await fromUuid(op.tokenUuid).catch(() => null);
+    const actor = token?.actor ?? await fromUuid(op.actorUuid).catch(() => null);
 
     switch (op.op) {
       case "enter":
-        await this.#executeEnter(op, region, behavior, token, actor);
+        if (token && actor) await this.#executeEnter(op, region, behavior, token, actor);
         break;
       case "exit":
-        await this.#executeExit(op, region, behavior, token, actor);
+        if (actor) await this.#executeExit(op, region, behavior, token, actor);
         break;
       case "moveWithin":
-        await this.#executeMoveWithin(op, region, behavior, token, actor);
+        if (token && actor) await this.#executeMoveWithin(op, region, behavior, token, actor);
         break;
       case "round":
-        await this.#executeRound(op, region, behavior, token, actor);
+        if (token && actor) await this.#executeRound(op, region, behavior, token, actor);
         break;
     }
   }
 
   /**
-   * enter 结算：幂等 → 节流 → 过滤 → 挂 AE（记贡献）→ 直接动作 → 二次核对。
+   * enter 结算：过滤 → 节流 → 挂 AE（cleanup 记账）→ 直接动作。
+   * 每次被接受的真实 enter 都施加一次；节流是唯一的业务门，命中时不
+   * 施加、不执行动作、也不建账目。不以账本存在性或当前是否仍在区域内
+   * 否定已发生的事件。Actor 队列保证 enter→exit 顺序，退出事件负责
+   * 后续清理。
    * @param {object} op - 队列操作
    * @param {RegionDocument|null} region - 已解析 region（可能已被删除）
    * @param {RegionBehavior|null} behavior - 行为文档
@@ -287,173 +292,74 @@ export class AuraLedger {
    * @param {Actor} actor - 目标 Actor
    */
   static async #executeEnter(op, region, behavior, token, actor) {
-    // 入队后核对：region 已删或目标已退出则不再施加——
-    // 没有施加就没有账目，后续 exit 自然空操作，状态一致。
+    // region 已删或行为停用：光环已不存在，进入事件失效。
     if (!region || !behavior || behavior.disabled) return;
-    // 对账补挂也会走到这里，须服从 enterEnabled，避免无进入结算的区域被反复施加。
-    if (!region.tokens.has(token)) return;
     const system = behavior.system;
     if (!system.enterEnabled) return;
-    const payloadKey = op.payloadKey || payloadKeyOf(system, behavior.id);
     const meta = region.getFlag(FLAG_SCOPE, FLAG_AURA) ?? {};
 
-    // enter 以账本存在性幂等：已有条目即视为已生效，
-    // 防区域边界重算/行为重激活引起的重复 enter 触发门面重复刷新或覆盖。
-    if (this.getEntry(region, token.id, payloadKey)?.active) return;
-
-    // 阵营过滤先于节流：被过滤的目标不参与本光环结算，不记节流与账目
-    // （覆盖↔账本对账对其余目标才保持"范围内应有条目"的语义）。
+    // 阵营过滤先于节流：被过滤的目标不参与本光环结算，不占节流计数。
     const sourceToken = await resolveSourceToken(meta);
     if (!passesFilter(system, token, sourceToken)) return;
 
-    // 节流以 {战斗 ID, 轮次} 为键：区域外整轮的 token 收不到该区域的
-    // roundStart，只有战斗 ID＋轮次组合能表达"本回合尚未结算过"。
+    // 节流以 {战斗 ID, 轮次} 为键、作用域含行为与 Token：战斗外
+    // currentThrottleKey 为 null、不节流；命中则本回合不再结算。
     const throttleKey = currentThrottleKey();
-    if (system.throttlePerRound && throttleKey && this.getThrottle(region, token.id) === throttleKey) {
-      // 节流命中仍记录 active；否则对账会反复把目标判为漏挂。
-      // exitClear 随条目保存，确保退出清理不依赖行为当前配置。
-      await this.putEntry(region, token.id, payloadKey, {active: true, stacks: 0, created: false, stackable: false, slug: null, exitClear: Boolean(system.exitClear), eid: foundry.utils.randomID()});
-      return;
-    }
+    if (system.throttlePerRound && throttleKey
+      && this.getThrottle(region, `${op.behaviorId}|${token.id}`) === throttleKey) return;
 
-    // 挂载 payload 并记账（enter 与回合挂载共用；调用方已做账本
-    // 存在性幂等检查）。记账先于直接动作：动作抛错时挂载已记录，
-    // 对账不会重复施加。
-    const entry = await this.#applyAndRecord(system, meta, region, token, actor, payloadKey);
-
+    // 每次真实进入施加一次；记账先于直接动作：动作抛错时账目已记录。
+    const entry = await this.#applyPayload(system, meta, region, token, actor, op.behaviorId);
     await applyAction(system.enterAction, actor, sourceToken?.actor ?? null);
-    if (system.throttlePerRound && throttleKey) await this.setThrottle(region, token.id, throttleKey);
+    if (system.throttlePerRound && throttleKey) {
+      await this.setThrottle(region, `${op.behaviorId}|${token.id}`, throttleKey);
+    }
 
-    // 写入完成后二次核对：异步结算期间 region 被删除或目标已
-    // 退出（enter 在途时快速进出），按刚记的账本条目立即补偿清理。
-    if (!region.tokens.has(token) || !(await fromUuid(op.regionUuid))) {
-      await this.#compensateRemove(region, token, actor, payloadKey, entry);
+    // 施加过程中 region 被删除：退出事件不会再来，cleanup 账目就地补偿
+    // 释放；不清理语义按"不清理"保留。region 存活时一切交给退出事件。
+    if (entry && !this.#regionLive(region)) {
+      await this.#releaseContribution(actor, entry);
+      if (entry.eid) rememberDedup(processedEids, entry.eid);
     }
   }
 
   /**
-   * 挂载 payload 并写账本条目（enter 与回合挂载共用；账本存在性幂等
-   * 由调用方检查）。条目记录实际 slug 与施加时的 exitClear，摘除不依赖
-   * 行为当前配置。无 payload 时记空条目（active 仍是对账唯一依据）。
-   * @param {object} system - 行为 system 数据
-   * @param {object} meta - region flags 的 aura 元数据
-   * @param {RegionDocument} region - 光环 region
-   * @param {TokenDocument} token - 目标 Token
-   * @param {Actor} actor - 目标 Actor
-   * @param {string} payloadKey - payload 账本键
-   * @returns {Promise<object>} 写入的账本条目
-   */
-  static async #applyAndRecord(system, meta, region, token, actor, payloadKey) {
-    let stacks = 0;
-    let created = false;
-    let stackable = false;
-    let effectSlug = null;
-    const effect = await resolvePayload(system, meta);
-    if (effect) {
-      // before/after 按实际 slug 查找：显式 slug 的 payload
-      // 与配置级键不同，按配置级键查找永远落空，会误记"非本光环创建"
-      // 导致退出不摘除。
-      effectSlug = effect.slug;
-      const before = findEffectBySlug(actor, effect.slug);
-      // 叠加前层数必须在 addEffect 之前立即求值：叠加走 update 不换
-      // 文档 id，before 与 after 是同一对象，惰性求值会把 before 读成
-      // 更新后的层数，贡献恒记 0、退出摘不掉（层数漂移）。
-      const beforeStacks = stackCount(before);
-      // 可叠层判定：目标已有时以现存 AE 为准（maxStacks 可能被更高来源
-      // 升级过）；首次挂载时取源 AE 定义。
-      stackable = before ? isStackable(before) : isStackable(effect.data);
-      await game.xjzl.api.effects.addEffect(actor, effect.data, 1);
-      const after = findEffectBySlug(actor, effect.slug);
-      if (before) {
-        // 叠层贡献 = 叠加前后层数差（受 maxStacks 钳制时为 0）；
-        // 非叠层走覆盖刷新，贡献恒 0，摘除责任记在 created 上。
-        stacks = stackable ? Math.max(0, stackCount(after) - beforeStacks) : 0;
-        created = false;
-      } else {
-        stacks = stackable ? stackCount(after) : 0;
-        created = after != null;
-      }
-    }
-    // 条目 eid 是快照摘除的幂等凭据：预提交与核心删除补发可能各携带一份
-    // 相同条目快照，凭 eid 只摘一次（见 #executeExit）。
-    const entry = {active: true, stacks, created, stackable, slug: effectSlug, exitClear: Boolean(system.exitClear), eid: foundry.utils.randomID()};
-    await this.putEntry(region, token.id, payloadKey, entry);
-    return entry;
-  }
-
-  /**
-   * exit 结算：按账本条目摘除，再清账目。
-   * exitClear/stackable/slug 都在 enter 记账时写入
-   * 条目，摘除不再依赖行为当前配置——region 删除后行为解析不到、配置页
-   * 更换 payload 引用（旧条目仍以旧键存在）都不会让摘除失效。
-   * 摘除范围是本 region 账本中该 token 的**全部**有效条目：正常场景单配置
-   * 单键；更换 payload 引用后旧键条目随同一次退出清理，不留残留特效。
-   * 幂等（防重复 exit 双摘）：region 仍在时以实时账目为准，账目已清即
-   * 本次摘除已被处理（预提交与核心补发可能对同一事件各提交一次），直接
-   * 结束、**不回退事件快照**；仅 region 已删（实时账目不可得）时才凭快照
-   * 摘除，且快照条目按 eid 去重（见 #applyAndRecord），同一份条目只摘一次。
+   * exit 结算：按本行为账目释放贡献并清账目。
+   * 普通退出只结算当前 behaviorId 的账目；region 删除由管理器按账目
+   * 逐条提交（每条独立 owner 释放），无需范围标记。
+   * 幂等（防重复 exit 双摘）：region 与 token 均在时以实时账目为准，
+   * 账目已清即本次释放已被处理（预清理与核心补发可能对同一事件各提交
+   * 一次），直接结束、不回退快照；region 或 token 已不在时凭快照释放，
+   * 快照条目按 eid 去重。
    * @param {object} op - 队列操作（可携带 snapshots）
    * @param {RegionDocument|null} region - 已解析 region（删除补发场景可能为 null）
-   * @param {RegionBehavior|null} behavior - 行为文档（摘除不依赖它，条目自足）
-   * @param {TokenDocument} token - 目标 Token
-   * @param {Actor} actor - 目标 Actor
+   * @param {RegionBehavior|null} behavior - 行为文档（释放不依赖它，账目自足）
+   * @param {TokenDocument|null} token - 目标 Token（可能已删除）
+   * @param {Actor} actor - 目标 Actor（token.actor 优先，账目 actorUuid 兜底）
    */
   static async #executeExit(op, region, behavior, token, actor) {
-    let entries = null;
-    let fromSnapshot = false;
-    if (region) {
-      const stored = this.getEntriesOfToken(region, token.id);
-      entries = Object.entries(stored)
-        .filter(([, entry]) => entry?.active)
-        .map(([key, entry]) => ({key, entry}));
-      // 实时账目已清：重复 exit（预提交＋核心补发各一次），不再重放快照
+    let entries;
+    if (region && token) {
+      entries = this.ownEntriesOfToken(region, token.id, op.behaviorId);
+      // 实时账目已清：重复 exit（预清理＋核心补发各一次），不再重放快照
       if (!entries.length) return;
     } else {
-      // region 已删，实时账目不可得：凭入队快照摘除
-      fromSnapshot = true;
-      const snapshots = Array.isArray(op.snapshots) ? op.snapshots : [];
-      entries = snapshots
-        .filter(s => s?.entry?.active)
-        .map(s => ({key: s.key, entry: s.entry}));
+      // region 或 token 已不在：凭入队快照释放
+      entries = (Array.isArray(op.snapshots) ? op.snapshots : [])
+        .filter(s => s?.entry)
+        .map(s => ({key: s.key ?? s.entry.behaviorId, tokenId: s.tokenId, entry: s.entry}));
     }
     if (!entries.length) return;
 
-    for (const {key, entry} of entries) {
-      // 条目 eid 是快照重放的幂等凭据：无论实时摘除还是快照摘除，处理过
-      // 的条目不再第二次摘除（预提交与删除补发可能各携带一份相同快照）
-      if (entry.eid) {
-        if (processedEids.has(entry.eid) && fromSnapshot) continue;
-        rememberDedup(processedEids, entry.eid);
-      }
-      // 摘除一律按条目内存的实际 slug；无 payload 的直接动作光环 slug
-      // 为 null，无需也无法摘除 AE，只清账目。
-      if (entry.exitClear && entry.slug) {
-        // 清空型移除整条 AE，由施加时的条目配置决定。
-        await removeEffectBySlug(actor, entry.slug, Number.MAX_SAFE_INTEGER);
-      } else if (entry.stackable && entry.slug && (entry.stacks ?? 0) > 0) {
-        // 可叠层：按贡献层数摘除；贡献等于剩余层数时门面会整条移除。
-        await removeEffectBySlug(actor, entry.slug, entry.stacks);
-      } else if (!entry.stackable && entry.created && entry.slug) {
-        // 非叠层且本光环创建：同 payload（按实际 slug 判定）光环仍覆盖
-        // 目标时账本转移（创建标记移交给存活光环），否则删除。
-        // 覆盖判定按 Actor 全部 Token：链接 Actor 的 Token A、
-        // B 同在光环内时，A 退出不能删掉 B 仍需的共享 AE——AE 挂在
-        // Actor 上，只查退出 Token 会导致 B 的效果被误删且对账不补挂。
-        const covering = await findOtherCoveringAura(region, token, entry.slug);
-        if (covering) {
-          // 创建标记写入**覆盖 Token** 在存活光环账本中的条目：
-          // 写到退出 Token 的键下会成为永久脏条目，覆盖 Token 退出时
-          // created=false 不摘除，共享 AE 残留。
-          await this.putEntry(covering.region, covering.tokenId, covering.payloadKey,
-            {...covering.entry, created: true});
-        } else {
-          await removeEffectBySlug(actor, entry.slug, Number.MAX_SAFE_INTEGER);
-        }
-      }
-      // entry.created=false 且非叠层：AE 由目标预存或来源光环之外的东西
-      // 创建，不摘除目标预存的同名 AE，保留其层数与数值。
-
-      if (region) await this.clearEntry(region, token.id, key);
+    for (const {key, tokenId, entry} of entries) {
+      // 账目 eid 只在实际释放成功后标记：释放抛错时不标记，
+      // 同一快照的重试不会被误判为重复；已成功处理的条目（eid 已标记）重入
+      // 时只补清仍残留的实时账目，不再重复摘效果——最后清账若失败，重试
+      // 走到此处即完成收尾。
+      const done = entry.eid && processedEids.has(entry.eid);
+      if (!done) await this.#releaseContribution(actor, entry);
+      if (entry.eid) rememberDedup(processedEids, entry.eid);
+      if (region && tokenId) await this.clearEntry(region, tokenId, key);
     }
   }
 
@@ -461,6 +367,7 @@ export class AuraLedger {
    * 区域内部移动结算：同一 movement.id 只结算一次，且只对
    * 起点/终点都在区域内的"纯区域内移动"结算——踏入移动已由 tokenEnter
    * 结算，避免踏入移动同时触发 enter 与 moveWithin 而重复施加。
+   * moveWithin 只复用 enterAction，不重复挂载 payload。
    * @param {object} op - 队列操作（携带 movement {id, origin, destination}）
    * @param {RegionDocument|null} region - 已解析 region
    * @param {RegionBehavior|null} behavior - 行为文档
@@ -471,10 +378,11 @@ export class AuraLedger {
     if (!region || !behavior || behavior.disabled) return;
     const movement = op.movement;
     if (!movement?.id) return;
-    // 去重键必须带 region＋token：一次移动穿过多个 moveWithin
+    // 去重键必须带 region＋token＋行为：一次移动穿过多个 moveWithin
     // 光环时核心对每个 region 各派发一次同 id 事件，全局按 id 去重会让
-    // 只有第一个区域结算；按区域+目标分键后各光环独立幂等。
-    const dedupKey = `${op.regionUuid}|${op.tokenUuid}|${movement.id}`;
+    // 只有第一个区域结算；按区域+目标分键后各光环独立幂等。行为维度
+    // 同理，同 region 的多个行为各自独立结算。
+    const dedupKey = `${op.behaviorId}|${op.regionUuid}|${op.tokenUuid}|${movement.id}`;
     if (processedMovements.has(dedupKey)) return;
     rememberDedup(processedMovements, dedupKey);
 
@@ -490,9 +398,12 @@ export class AuraLedger {
 
   /**
    * 回合结算：round>=1 门控（战斗开始 round 0→1 边界会先派发一轮
-   * tokenRoundEnd）→ timing 匹配 → 去重 → 直接动作。
+   * tokenRoundEnd）→ timing 匹配 → 去重 → 挂 AE / 直接动作。
    * 回合事件由活动 GM 派发、每单位每回合各一次，去重集合提供
    * 幂等保障（防核心重放与我方回合队列交错双发）。
+   * 挂载特效：每个有效回合事件都调用一次 addEffect——可叠层逐次累加
+   * 贡献，非叠层重复施加走门面的覆盖/刷新语义；账目冻结边界见
+   * #applyPayload。
    * @param {object} op - 队列操作（携带 timing/combatId/round）
    * @param {RegionDocument|null} region - 已解析 region
    * @param {RegionBehavior|null} behavior - 行为文档
@@ -508,7 +419,7 @@ export class AuraLedger {
     // 未配置动作且未配置挂载特效 → 无回合结算
     if (actionKindOf(system.roundAction) === "none" && kind !== "effect") return;
 
-    const dedupKey = `${op.regionUuid}|${op.tokenUuid}|${op.timing}|${op.combatId}|${op.round}`;
+    const dedupKey = `${op.behaviorId}|${op.regionUuid}|${op.tokenUuid}|${op.timing}|${op.combatId}|${op.round}`;
     if (processedRounds.has(dedupKey)) return;
     rememberDedup(processedRounds, dedupKey);
 
@@ -516,46 +427,239 @@ export class AuraLedger {
     const sourceToken = await resolveSourceToken(meta);
     if (!passesFilter(system, token, sourceToken)) return;
 
-    // 挂载特效（按轮固定）：账本存在性幂等——进入时已挂的不再重复挂，
-    // 只为结算时机点上尚未拥有的单位补挂（如灼日的"回合开始未目盲者目盲"）。
-    // 挂载与 enter 共用同一账本键与摘除路径，离开时照常清理。
     if (kind === "effect") {
-      const payloadKey = op.payloadKey || payloadKeyOf(system, behavior.id);
-      if (this.getEntry(region, token.id, payloadKey)?.active) return;
-      // 与 enter 同款成员核对：回合事件与离开事件并发时，目标可能已不在
-      // 覆盖内，挂载会造成范围外特效。
-      if (!region.tokens.has(token)) return;
-      const entry = await this.#applyAndRecord(system, meta, region, token, actor, payloadKey);
-      // 写入后二次核对：挂载在途期间目标离开或 region 删除 → 按条目补偿
-      if (!region.tokens.has(token) || !(await fromUuid(op.regionUuid))) {
-        await this.#compensateRemove(region, token, actor, payloadKey, entry);
+      const entry = await this.#applyPayload(system, meta, region, token, actor, op.behaviorId);
+      // 施加过程中 region 被删除：退出事件不会再来，cleanup 账目就地
+      // 补偿释放；不清理语义按"不清理"保留。
+      if (entry && !this.#regionLive(region)) {
+        await this.#releaseContribution(actor, entry);
+        if (entry.eid) rememberDedup(processedEids, entry.eid);
       }
       return;
     }
     await applyAction(system.roundAction, actor, sourceToken?.actor ?? null);
   }
 
+  /* -------------------------------------------- */
+  /*  施加与释放的核心实现                          */
+  /* -------------------------------------------- */
+
   /**
-   * 补偿清理：按账本条目摘除已施加的 AE 并清账目，不触发
-   * 覆盖转移（补偿路径只求"不留残留"）；清空型与正常退出同口径整条
-   * 清除，避免满层钳制的清空型在施加过程中遇到 Region 删除时残留。
+   * 施加 payload 并维护清理账目（enter 与回合挂载共用）。
+   *
+   * 施加语义：每次调用都执行一次门面 addEffect，叠层累加/覆盖刷新/时长
+   * 刷新全部由门面裁决；施加后重查实际 AE，未产生同 slug AE（免疫、转化
+   * 等）时不建虚假账目。
+   *
+   * 记账语义（cleanupOnExit=true）：
+   * - 可叠层：本次贡献 = max(0, 施加后层数 − 施加前层数)，累计进既有账目；
+   *   无既有账目且本次差值为 0（如已满层）时不建账目。
+   * - 不可叠层：同一 owner（regionUuid+behaviorId+tokenUuid）保持同一条目，
+   *   每次仍施加；首建时继承同 actorUuid+slug owner 组的接管基线
+   *   existedBeforeAura（无同组 owner 时取"施加前是否已存在同 slug AE"）。
+   *
+   * payload 配置在 owner 存续期间变化时：cleanup 账目已存在且配置
+   * 引用与账目 ref 不一致 → 继续施加账目 ref 指向的旧 payload 直到退出
+   * （即时切换走 refreshAura）；定义漂移（同名效果换显式 slug）会混入账本
+   * 不追踪的新 slug → 冻结本次施加，旧效果保留至退出。cleanupOnExit=false
+   * 无账目，始终使用当前配置，旧效果按"不清理"语义保留。
+   * @param {object} system - 行为 system 数据
+   * @param {object} meta - region flags 的 aura 元数据
    * @param {RegionDocument} region - 光环 region
    * @param {TokenDocument} token - 目标 Token
    * @param {Actor} actor - 目标 Actor
-   * @param {string} payloadKey - payload 串行键
-   * @param {object} entry - 账本条目
+   * @param {string} behaviorId - 行为 id（账本键）
+   * @returns {Promise<object|null>} 生效中的清理账目（新建、既有或无）
    */
-  static async #compensateRemove(region, token, actor, payloadKey, entry) {
-    // 补偿摘除与快照摘除共用 eid 幂等凭据：同一份条目只摘一次
-    if (entry.eid) rememberDedup(processedEids, entry.eid);
-    if (entry.exitClear && entry.slug) {
-      await removeEffectBySlug(actor, entry.slug, Number.MAX_SAFE_INTEGER);
-    } else if (entry.stackable && entry.slug && (entry.stacks ?? 0) > 0) {
-      await removeEffectBySlug(actor, entry.slug, entry.stacks);
-    } else if (!entry.stackable && entry.created && entry.slug) {
-      await removeEffectBySlug(actor, entry.slug, Number.MAX_SAFE_INTEGER);
+  static async #applyPayload(system, meta, region, token, actor, behaviorId) {
+    // 始终读取既有账目：清理账目存续期间，清理开关与 payload 引用冻结到
+    // 退出；中途关闭开关不会让后续施加脱离账目，退出重进后才采用新值。
+    // 无账目时按当前开关行事。
+    const existing = this.getEntry(region, token.id, behaviorId);
+    const cleanup = Boolean(existing || system.cleanupOnExit);
+    const refChanged = Boolean(existing?.ref)
+      && (existing.ref.item !== (system.payloadItemUuid ?? "")
+        || existing.ref.name !== (system.payloadEffectName ?? ""));
+    const ref = refChanged
+      ? {...existing.ref}
+      : (system.payloadItemUuid && system.payloadEffectName
+        ? {item: system.payloadItemUuid, name: system.payloadEffectName}
+        : null);
+    if (!ref) return null;
+    const effect = await resolvePayloadRef(ref);
+    if (!effect) return null;
+    // 定义漂移（同名换显式 slug）：施加会混入账本不追踪的新 slug，冻结
+    // 本次施加；既有账目的旧效果保留至退出。
+    if (existing && existing.slug && existing.slug !== effect.slug) return existing;
+
+    // 叠层差值必须以施加前瞬时读数为基线（无既有 AE 时基线为 0——
+    // stackCount 的"无标记视为 1 层"语义只适用于已存在的 AE）：叠加走
+    // update 不换文档 id，若保留对象惰性读数，before 会读到施加后的层数。
+    const before = findEffectBySlug(actor, effect.slug);
+    const beforeStacks = before ? stackCount(before) : 0;
+    await game.xjzl.api.effects.addEffect(actor, effect.data, 1);
+    // 施加后重查实际 AE：免疫/转化/失败时不建虚假 owner 或虚假贡献。
+    const after = findEffectBySlug(actor, effect.slug);
+    if (!after) return null;
+    if (!cleanup) return null;
+
+    const stackable = isStackable(after);
+    // 账目是唯一清理凭据；putEntry 失败（region.update 拒绝等）时必须
+    // 回滚本次施加，避免留下无法清理的贡献。
+    const putOrRollback = async (entryToWrite, diff) => {
+      try {
+        await this.putEntry(region, token.id, behaviorId, entryToWrite);
+      } catch (err) {
+        console.error("XJZL | 光环清理账目写入失败，回滚本次施加:", err);
+        await this.#rollbackApply(actor, entryToWrite, diff, err);
+        // 回滚只恢复状态；本次结算仍然失败，阻止后续动作和节流继续执行。
+        throw err;
+      }
+    };
+
+    if (stackable) {
+      const diff = Math.max(0, stackCount(after) - beforeStacks);
+      if (existing) {
+        const contributedStacks = (existing.contributedStacks ?? 0) + diff;
+        if (diff > 0) {
+          const updated = {...existing, contributedStacks};
+          // 回滚只撤本次新增的 diff 层：旧账目写入未成功、保持原值，
+          // 不得按总贡献回滚
+          await putOrRollback(updated, diff);
+          return updated;
+        }
+        return {...existing, contributedStacks};
+      }
+      // 无既有账目且本次差值为 0（满层进入等）：退出无可释放贡献，不建账目
+      if (diff <= 0) return null;
+      const entry = this.#buildEntry(system, actor, token, behaviorId, effect,
+        {stackable: true, contributedStacks: diff, existedBeforeAura: false});
+      await putOrRollback(entry, diff);
+      return entry;
     }
-    await this.clearEntry(region, token.id, payloadKey);
+
+    // 不可叠层 owner：同一 owner 多次施加保持同一条目（每次仍已施加）。
+    if (existing) return existing;
+    const siblings = this.#findSiblingOwners(actor, effect.slug, null);
+    const existedBeforeAura = siblings.length
+      ? Boolean(siblings[0].existedBeforeAura)
+      : Boolean(before);
+    const entry = this.#buildEntry(system, actor, token, behaviorId, effect,
+      {stackable: false, contributedStacks: 0, existedBeforeAura});
+    await putOrRollback(entry, 0);
+    return entry;
+  }
+
+  /**
+   * 记账写入失败时回滚刚刚这一次施加（不恢复全局状态，只撤销本次）：
+   * - 可叠层：只撤销本次新增的 diff 层——旧账目未写入成功、保持原值，
+   *   不得按账目总贡献回滚；
+   * - 不可叠层：用准备写入的新账目走 #releaseContribution，正确处理
+   *   existedBeforeAura 与同组其他 owner；
+   * 回滚也失败时抛 AggregateError（原写入错误 + 回滚错误）：状态不一致
+   * 但日志完整可查，交由上层记录。
+   * @param {Actor} actor - 目标 Actor
+   * @param {object} entry - 准备写入的清理账目
+   * @param {number} diff - 本次施加新增的层数（可叠层用）
+   * @param {Error} writeErr - 账目写入失败的原始错误
+   */
+  static async #rollbackApply(actor, entry, diff, writeErr) {
+    try {
+      if (entry.stackable) {
+        if (diff > 0) await removeEffectBySlug(actor, entry.slug, diff);
+      } else {
+        await this.#releaseContribution(actor, entry);
+      }
+    } catch (rollbackErr) {
+      throw new AggregateError([writeErr, rollbackErr],
+        "XJZL | 光环施加成功但清理账目写入失败，且回滚也失败（存在未记账贡献）");
+    }
+  }
+
+  /**
+   * 组装一条新清理账目。
+   * @param {object} system - 行为 system 数据（取当前 payload 引用快照）
+   * @param {Actor} actor - 目标 Actor
+   * @param {TokenDocument} token - 目标 Token
+   * @param {string} behaviorId - 行为 id
+   * @param {{slug: string}} effect - 已施加 payload 的实际 slug
+   * @param {object} extra - {stackable, contributedStacks, existedBeforeAura}
+   * @returns {object} 清理账目
+   */
+  static #buildEntry(system, actor, token, behaviorId, effect, extra) {
+    return {
+      eid: foundry.utils.randomID(),
+      actorUuid: actor.uuid,
+      tokenUuid: token.uuid,
+      behaviorId,
+      slug: effect.slug,
+      ref: {item: system.payloadItemUuid ?? "", name: system.payloadEffectName ?? ""},
+      stackable: false,
+      contributedStacks: 0,
+      existedBeforeAura: false,
+      ...extra
+    };
+  }
+
+  /**
+   * 释放一条清理账目（exit 与补偿共用）。eid 标记由调用方在**成功返回后**
+   * 写入：释放抛错时同快照重试不会被幂等集合误判为已处理。
+   * - 可叠层：仅当 contributedStacks > 0 时按累计贡献减层，预存层数保留。
+   * - 不可叠层 owner：同 actorUuid+slug 仍有其他 owner → 保留；无其他
+   *   owner 但 existedBeforeAura=true（接管前 AE 已存在）→ 保留；否则
+   *   整条移除。清理只依据账目归属，不做几何覆盖判定。
+   * @param {Actor} actor - 目标 Actor
+   * @param {object} entry - 清理账目
+   */
+  static async #releaseContribution(actor, entry) {
+    if (!actor || !entry?.slug) return;
+    if (entry.stackable) {
+      const stacks = entry.contributedStacks ?? 0;
+      if (stacks > 0) await removeEffectBySlug(actor, entry.slug, stacks);
+      return;
+    }
+    const siblings = this.#findSiblingOwners(actor, entry.slug, entry.eid);
+    if (siblings.length || entry.existedBeforeAura) return;
+    await removeEffectBySlug(actor, entry.slug, Number.MAX_SAFE_INTEGER);
+  }
+
+  /**
+   * 查找同 actorUuid、同 slug 的其他有效清理账目（owner 组）。
+   * 账目散布在各 region flags 中，按 Actor 的全部关联 Token 反查其所在
+   * region 的账本（核心 Actor#getDependentTokens 跨场景取依赖 Token；
+   * 合成 Actor 只返回自身）。同一关联 Actor 的多个 Token 是多个 owner，
+   * 共享 Actor 上的同一 AE；这是账本归属查找，不做几何覆盖判定。
+   * @param {Actor} actor - 目标 Actor
+   * @param {string} slug - 实际 slug
+   * @param {string|null} excludeEid - 排除的账目 eid（释放自身时排除自己）
+   * @returns {Array<object>} 同组其他 owner 账目
+   */
+  static #findSiblingOwners(actor, slug, excludeEid) {
+    const actorUuid = actor?.uuid;
+    if (!actorUuid) return [];
+    let tokens = [];
+    try {
+      tokens = actor.getDependentTokens?.() ?? [];
+    } catch (err) {
+      console.warn("XJZL | 解析 Actor 的依赖 Token 失败，owner 组按空处理:", err);
+    }
+    const out = [];
+    const seenRegions = new Set();
+    for (const token of tokens) {
+      for (const region of token.regions ?? []) {
+        if (seenRegions.has(region.uuid)) continue;
+        seenRegions.add(region.uuid);
+        const ledger = region.getFlag(FLAG_SCOPE, FLAG_LEDGER) ?? {};
+        for (const entries of Object.values(ledger)) {
+          for (const entry of Object.values(entries ?? {})) {
+            if (!entry || entry.eid === excludeEid) continue;
+            if (entry.actorUuid !== actorUuid || entry.slug !== slug) continue;
+            out.push(entry);
+          }
+        }
+      }
+    }
+    return out;
   }
 }
 
@@ -579,49 +683,19 @@ async function resolveSourceToken(meta) {
 }
 
 /**
- * 由行为配置计算 payload 的账本键（配置级：分组与定位用）。
- * 注意与实际 slug 的区分：门面优先使用 payload AE 的显式 slug（如中文
- * 名"浩渺气海"的显式 slug 可能是拼音），效果名 slugify 只是配置级身份；
- * 实际 slug 由 resolvePayload 解析后存入账本条目的 slug 字段。
- * 键必须可安全用于点分隔的 flags 更新路径：slugify 产物与 behaviorId
- * 均无点，仍显式剔除以防配置异常。
- * @param {object} system - 行为 system 数据
- * @param {string} [behaviorId] - 行为文档 id（直接动作光环的键成分）
- * @returns {string} payloadKey
- */
-export function payloadKeyOf(system, behaviorId = "") {
-  const slug = slugOfPayload(system);
-  const key = slug || `direct:${behaviorId || ""}`;
-  return key.replace(/\./g, "-");
-}
-
-/**
- * payload 效果名的 slug 化；与门面 XJZLActiveEffect.getSlug 的 name 分支
- * 口径一致（不引入门面文档类，避免文档模块与队列模块循环依赖）。
- * 仅作配置级身份；实际匹配 slug 见 resolvePayload。
- * @param {object} system - 行为 system 数据
- * @returns {string} slug；无 payload 名时返回空串
- */
-function slugOfPayload(system) {
-  const name = system?.payloadEffectName;
-  return name ? String(name).slugify() : "";
-}
-
-/**
  * 解析 payload 引用为可施加的 AE 数据（源物品 UUID＋效果名）。
  * 返回的 slug 是**实际** slug——优先显式 flag，与门面 getSlug 的匹配口径
- * 完全一致；账本查找、摘除、覆盖判定都必须用它，否则显式 slug 的 payload
- * 施加后无法按账本摘除。
- * @param {object} system - 行为 system 数据
- * @param {object} meta - region flags 的 aura 元数据
+ * 完全一致；账本查找、摘除都必须用它，否则显式 slug 的 payload 施加后
+ * 无法按账本摘除。
+ * @param {{item: string, name: string}} ref - payload 引用快照
  * @returns {Promise<{data: object, slug: string}|null>} 解析失败返回 null（已警告）
  */
-async function resolvePayload(system, meta) {
-  if (!system.payloadItemUuid || !system.payloadEffectName) return null;
-  const item = await fromUuid(system.payloadItemUuid);
-  const found = item?.effects?.find(e => e.name === system.payloadEffectName);
+async function resolvePayloadRef(ref) {
+  if (!ref?.item || !ref?.name) return null;
+  const item = await fromUuid(ref.item);
+  const found = item?.effects?.find(e => e.name === ref.name);
   if (!found) {
-    console.warn(`XJZL | 光环 payload 不可解析: ${system.payloadItemUuid} / "${system.payloadEffectName}"（源物品被删或效果名不匹配）`);
+    console.warn(`XJZL | 光环 payload 不可解析: ${ref.item} / "${ref.name}"（源物品被删或效果名不匹配）`);
     return null;
   }
   const data = found.toObject();
@@ -668,7 +742,7 @@ function findEffectBySlug(actor, slug) {
 }
 
 /**
- * 按账本键摘除 AE：走门面 removeEffect 保留叠层/飘字语义。
+ * 按实际 slug 摘除 AE：走门面 removeEffect 保留叠层/飘字语义。
  * @param {Actor} actor - 目标 Actor
  * @param {string} slug - 已施加 AE 的实际 slug
  * @param {number} amount - 摘除层数；极大值表示整条移除
@@ -682,13 +756,17 @@ async function removeEffectBySlug(actor, slug, amount) {
  * 阵营过滤（执行时权威判定）。
  * 口径：与源 Token 同 disposition 为友方；敌方 = 与源对置且非中立——
  * 中立单位不视作任何一方的敌人，与战局 HUD 的三色口径一致。
+ * includeSelf=false 按 **Actor UUID** 判定：源 Actor 的其他关联 Token
+ * 同样视为自身，与 queryTokens 的过滤口径一致；非链接 Token 的合成
+ * Actor uuid 各自独立，行为等同按 Token 判定。
  * @param {object} system - 行为 system 数据
  * @param {TokenDocument} token - 目标 Token
  * @param {TokenDocument|null} sourceToken - 源 Token
  * @returns {boolean} 是否通过过滤
  */
 export function passesFilter(system, token, sourceToken) {
-  if (system.includeSelf === false && sourceToken && token.id === sourceToken.id) return false;
+  if (system.includeSelf === false && sourceToken
+    && token.actor?.uuid && token.actor.uuid === sourceToken.actor?.uuid) return false;
   const faction = system.faction ?? "all";
   if (faction === "all") return true;
   if (!sourceToken) return false;
@@ -735,23 +813,11 @@ async function applyAction(action, actor, sourceActor) {
   }
 }
 
-/**
- * 读取动作类型；缺省/非法值归 "none"。
- * @param {object} action - 动作配置
- * @returns {string} "none"|"damage"|"healing"
- */
 function actionKindOf(action) {
   const kind = action?.kind;
   return (kind === "damage" || kind === "healing") ? kind : "none";
 }
 
-/**
- * 解析动作数值：固定数值直接使用；公式按源角色 rollData 解析
- * （如 "0.4*@neixi"，由 actor.getRollData 提供属性引用）。
- * @param {string|number} raw - 数值或公式
- * @param {Actor|null} sourceActor - 源 Actor
- * @returns {Promise<number>} 解析结果；解析失败警告并返回 0（不结算）
- */
 async function resolveAmount(raw, sourceActor) {
   if (raw === undefined || raw === null || raw === "") return 0;
   const numeric = Number(raw);
@@ -767,24 +833,12 @@ async function resolveAmount(raw, sourceActor) {
   }
 }
 
-/**
- * 当前节流键 `${combatId}:${round}`；战斗外返回 null（进出挂摘不节流）。
- * @returns {string|null}
- */
 function currentThrottleKey() {
   const combat = game.combat;
   if (!combat?.round) return null;
   return `${combat.id}:${combat.round}`;
 }
 
-/**
- * 判定移动是否为"纯区域内移动"（起点与终点格都在 grid offsets 内）。
- * 核心 GridShapeData 的 offsets 是场景绝对格坐标，成员 {i: 行, j: 列}
- * （grid.getOffset 返回 i=floor(y/size) 行、j=floor(x/size) 列）。
- * @param {RegionDocument} region - 光环 region
- * @param {object} movement - {origin, destination}
- * @returns {boolean}
- */
 function isMovementFullyInside(region, movement) {
   const shape = region.shapes?.find(s => (s.type === "grid") || Array.isArray(s.offsets));
   if (!shape?.offsets?.length) return false;
@@ -800,59 +854,12 @@ function isMovementFullyInside(region, movement) {
 }
 
 /**
- * 查找与退出 payload 相同（按实际 slug 判定）且仍覆盖该 Actor 的其他
- * 光环。覆盖判定遍历 Actor 的**全部实际 Token 文档**：
- * 用核心 getDependentTokens({concreteOnly:true}) 跨场景取依赖注册表中的
- * Token；同一关联 Actor 的其他场景 Token 仍被同 payload 光环覆盖时，
- * 共享 AE 必须保留；合成 Actor 只
- * 返回自身。任一 Token 仍被覆盖即视为"仍被覆盖"，转移目标写该覆盖
- * Token 在存活光环账本中的条目。只认 enter 开启、行为激活、账本有效的
- * 覆盖。触发频率为"非叠层 created 退出"分支（低频事件），注册表查找
- * 成本可忽略。
- * @param {RegionDocument|null} originRegion - 退出的光环 region（可已删除）
- * @param {TokenDocument} originToken - 退出的 Token（兜底与行为解析）
- * @param {string} slug - 退出条目的实际 slug
- * @returns {Promise<{region: RegionDocument, tokenId: string, payloadKey: string, entry: object}|null>}
- *   tokenId 是覆盖 Token 的 id（创建标记要写到它的条目上）
- */
-async function findOtherCoveringAura(originRegion, originToken, slug) {
-  let candidates;
-  try {
-    candidates = originToken.actor?.getDependentTokens?.({concreteOnly: true}) ?? [];
-  } catch (err) {
-    console.warn("XJZL | 解析 Actor 的依赖 Token 失败，覆盖转移退回单 Token 判定:", err);
-    candidates = [];
-  }
-  if (!candidates.length) candidates = [originToken];
-
-  for (const token of candidates) {
-    for (const region of token.regions ?? []) {
-      if (region.hidden) continue;
-      // 仅排除正在退出的 Token 条目；同 Actor 的其他 Token 仍可持有共享 AE。
-      if (originRegion && region.id === originRegion.id && token.id === originToken.id) continue;
-      const behavior = region.behaviors.find(b => b.type === "xjzlAura" && !b.disabled);
-      if (!behavior) continue;
-      // 回合挂载的光环即使关闭进入结算，也可能持有有效账目。
-      const sys = behavior.system;
-      const canHoldEntry = sys.enterEnabled || (sys.roundEnabled && sys.roundAction?.kind === "effect");
-      if (!canHoldEntry) continue;
-      const stored = AuraLedger.getEntriesOfToken(region, token.id);
-      for (const [key, entry] of Object.entries(stored)) {
-        if (entry?.active && entry.slug && entry.slug === slug) {
-          return {region, tokenId: token.id, payloadKey: key, entry};
-        }
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * 记录去重键；超容量时清空重来（宁可极小概率重算，也不无限占用内存）。
+ * 记录去重键；超容量时按插入顺序淘汰最旧的一条（Set 迭代即插入序），
+ * 近期记录始终保留，避免大批量结算后刚处理的重复事件重新执行。
  * @param {Set<string>} set - 去重集合
  * @param {string} key - 去重键
  */
 function rememberDedup(set, key) {
-  if (set.size >= DEDUP_LIMIT) set.clear();
+  while (set.size >= DEDUP_LIMIT) set.delete(set.values().next().value);
   set.add(key);
 }

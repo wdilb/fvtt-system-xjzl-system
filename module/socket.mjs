@@ -365,9 +365,9 @@ async function _socketStopStance(targetUuid) {
 }
 
 /**
- * 光环结算队列入口：操作对象由行为 handler 组装（含 payloadKey 串行键），
+ * 光环结算队列入口：操作对象由行为 handler 组装（队列按 actorUuid 串行），
  * 只允许活动 GM 入队执行，多 GM 在线时其余端忽略。
- * @param {object} op - {op, behaviorId, regionUuid, tokenUuid, payloadKey, ...}
+ * @param {object} op - {op, behaviorId, regionUuid, tokenUuid, actorUuid, ...}
  */
 async function _socketAuraLedger(op) {
     if (isNotActiveGM()) return null;
