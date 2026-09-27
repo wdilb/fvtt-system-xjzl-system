@@ -3258,7 +3258,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，摇头晃脑，口念歌谣，不论通顺，只尊声势，你获得“太岁当值”，持续到战斗脱离。</p><p><strong>太岁当值:</strong>你周围三米范围内的所有人（包括友方和自己）进行的命中检定、属性检定、技能检定、虚招对抗都具有劣势。</p><p><strong>升级:</strong>怒气-1，内力消耗+4。</p>",
-                    "automationNote": "自身获状态自动。自身劣势自动。光环效果手动。",
+                    "automationNote": "施展后自身获得【太岁当值】（命中/虚招/各类检定劣势，神打状态可豁免），并自动生成 3 米跟随光环：范围内所有其他人（含友方）自动获得同样的劣势，进出即时生效，脱战消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -3279,9 +3279,15 @@
                     "scripts": [
                         {
                             "label": "获得太岁",
-                            "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"太岁当值\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"周围3米内所有人劣势需手动处理\");",
+                            "trigger": "attack",
+                            "script": "const eff = thisItem.effects.getName(\"太岁当值\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
+                        },
+                        {
+                            "label": "太岁当值光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 太岁当值光环：自身周围 3 米内所有其他人（含友方）陷入劣势；\n// 自身由【太岁当值】自体版覆盖，光环排除自己以免重复施加。\nawait game.xjzl.aura.create(actor, {\n    label: \"gunfa-taisui-\" + actor.id,\n    displayName: \"太岁当值\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"太岁当值(光环)\",\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -3328,6 +3334,36 @@
                         }
                     },
                     "img": "icons/magic/light/explosion-star-glow-yellow.webp",
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
+                },
+                {
+                    "name": "太岁当值(光环)",
+                    "description": "太岁当值笼罩：命中检定、属性/技能检定与虚招对抗均具劣势。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "taisui_aura",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "自身劣势",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "const hasShenda = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenda\");\nif (!hasShenda) {\n    args.flags.level -= 1;\n    args.flags.feintLevel -= 1;\n}"
+                                },
+                                {
+                                    "label": "检定劣势施加",
+                                    "trigger": "passive",
+                                    "active": true,
+                                    "script": "// [神打]：无视太岁当值的效果——有神打时不施加属性/技能检定劣势\nconst hasShenda = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenda\");\nif (!hasShenda) {\n    actor.xjzlStatuses.globalCheckLevel -= 1;\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "img": "icons/magic/control/debuff-energy-hold-yellow.webp",
                     "system": {
                         "changes": []
                     },
@@ -3506,7 +3542,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，将矛奋力投向空中，消耗范围内所有目标身上的所有“五雷”，在自身周围 5 米范围产生‘雷云’，持续三回合。</p><p><strong>雷云：</strong>区域内同时视作‘雷暴’天气，雷云中的敌人开始回合时，受到此招消耗“五雷”总层数*10 点的气血流失。</p><p><strong>升级：</strong>雷云的流失系数+10，怒气-1，内力消耗+8。</p><p>·雷云形成在原地，不会跟随你移动，你只能拥有一个雷云，如果你产生新的雷云，之前的消失。</p>",
-                    "automationNote": "改为气招以确保流畅释放。命中时自动消耗目标五雷，并发送卡片提示该目标贡献了多少层数。请GM根据所有目标的总贡献层数计算雷云伤害并手动应用流失。",
+                    "automationNote": "施展时自动消耗各目标身上的【五雷】并逐个发卡提示贡献层数；整招结束后自动在原地生成 5 米雷云范围显示，持续 3 回合后自动消散（每名施展者独立），区域内敌人各自回合开始时自动流失（本次目标五雷总层数 × (10+升级×10)）点气血。雷云内视作雷暴天气需 GM 手动标记。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -3530,6 +3566,18 @@
                             "trigger": "hit",
                             "script": "const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\nif (wulei) {\n    const stacks = wulei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await game.xjzl.api.effects.removeEffect(args.target, \"wulei\", 99);\n    // 升级：雷云的流失系数+10，按招式等级计算后提示 GM\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const coef = 10 + (lvl - 1) * 10;\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding: 5px 10px;\"><b>${args.target.name}</b> 身上的 [五雷] 被引爆！<br>贡献层数: <b>${stacks}</b> (流失系数 ${coef}，该目标贡献 ${stacks * coef} 点雷云流失)</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}",
                             "active": true
+                        },
+                        {
+                            "label": "雷云光环",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "// 雷云：原地（不跟随）放置 5 米范围显示，持续 3 回合（每名施展者独立）；\n// 区域内敌人各自回合开始时流失（本次目标五雷总层数 × 系数(10+升级×10)）点气血。\n// 总层数取自[雷云层数统计]写入的攻击卡快照；雷暴天气需 GM 手动标记。\nconst ljTotal = Number(args.scriptFlags?.xjzlLeiyunTotal ?? 0);\nconst ljLvl = Math.max(1, args.move.computedLevel || 1);\nconst ljCoef = 10 + (ljLvl - 1) * 10;\nawait game.xjzl.aura.create(actor, {\n    label: \"gunfa-leiyun-\" + actor.id,\n    displayName: \"雷云\",\n    follow: false,\n    radius: 5,\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(ljTotal * ljCoef), type: \"liushi\"},\n    durationRounds: 3,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nif (ljTotal > 0) {\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>雷云</b>已生成：共消耗 \" + ljTotal + \" 层五雷，区域内敌人回合开始时流失 \" + (ljTotal * ljCoef) + \" 点气血。</div>\"});\n}"
+                        },
+                        {
+                            "label": "雷云层数统计",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 雷云层数统计：出招时统计本次目标身上的五雷总层数，写入攻击卡快照，\n// 由结算阶段经 args.scriptFlags 读取（跨客户端、跨待结算卡安全）。\nconst lyTotal = Array.from(game.user.targets ?? []).reduce((sum, lyT) => {\n    const lyWulei = (lyT.actor || lyT)?.effects?.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\n    return sum + (lyWulei ? (lyWulei.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0);\n}, 0);\nargs.flags.xjzlLeiyunTotal = lyTotal;"
                         }
                     ]
                 }

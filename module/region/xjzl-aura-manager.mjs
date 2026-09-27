@@ -120,7 +120,7 @@ export class AuraManager {
      * @param {object} params - 光环参数（形状同行为 schema 平铺字段，另有管理器字段）：
      *   {label(必填), displayName?, color?, follow?, radius, shapeKind, rectWidth, rectHeight,
      *    anchorX, anchorY, quarterTurns(number|"auto"), faction, includeSelf,
-     *    payloadItemUuid?, payloadEffectName?, enterAction?, moveWithin?, throttlePerRound?,
+     *    payloadItemUuid?, payloadEffectName?, payloadStatusId?, enterAction?, moveWithin?, throttlePerRound?, oncePerRound?,
      *    roundTiming?, roundAction?, cleanupOnExit?, enterEnabled?, roundEnabled?,
      *    durationRounds?, maintain?, lifecycle?, sourceActorUuid?, sourceItemUuid?, levelIds?}
      *   maintain: {resource("mp"/"hp"/…), amount(每回合固定), perTarget(每名覆盖敌人的追加消耗,
@@ -406,6 +406,13 @@ export class AuraManager {
             for (const behavior of region.behaviors.filter(b => b.type === "xjzlAura")) {
                 const payloadUuid = behavior.system?.payloadItemUuid;
                 const payloadName = behavior.system?.payloadEffectName;
+                const payloadStatusId = behavior.system?.payloadStatusId;
+                if (payloadStatusId) {
+                    if (!CONFIG.statusEffects?.[payloadStatusId]) {
+                        console.warn(`XJZL | 光环「${meta.label}」的系统状态 payload 不可解析（${payloadStatusId}）。`);
+                    }
+                    continue;
+                }
                 if (!payloadUuid || !payloadName) continue;
                 const item = await fromUuid(payloadUuid);
                 if (!item?.effects?.some(e => e.name === payloadName)) {
@@ -515,9 +522,11 @@ export class AuraManager {
             includeSelf: params.includeSelf ?? true,
             payloadItemUuid: params.payloadItemUuid ?? "",
             payloadEffectName: params.payloadEffectName ?? "",
+            payloadStatusId: params.payloadStatusId ?? "",
             enterAction: {...(params.enterAction ?? {})},
             moveWithin: params.moveWithin ?? false,
             throttlePerRound: params.throttlePerRound ?? false,
+            oncePerRound: params.oncePerRound ?? false,
             roundTiming: params.roundTiming ?? "tokenRoundEnd",
             roundAction: {...(params.roundAction ?? {})},
             cleanupOnExit: params.cleanupOnExit ?? true

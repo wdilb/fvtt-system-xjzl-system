@@ -719,7 +719,7 @@
                             "label": "寒霜光环",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 寒霜光环：原地放置（不跟随），全体含己，单实例（同标签自动替换），持续 1 回合。\n// 档位随招式等级：1 级 ±5，2 级及以上 ±10。\nconst lvl = Math.max(1, Math.min(2, move.computedLevel || 1));\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-hanshuang\",\n    displayName: \"寒霜\",\n    follow: false,\n    radius: 5,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: `寒霜 (${lvl}级)`,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    cleanupOnExit: true\n});"
+                            "script": "// 寒霜光环：原地放置（不跟随），全体含己，单实例（同标签自动替换），持续 1 回合。\n// 档位随招式等级：1 级 ±5，2 级及以上 ±10。\nconst lvl = Math.max(1, Math.min(2, move.computedLevel || 1));\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-hanshuang-\" + actor.id,\n    displayName: \"寒霜\",\n    follow: false,\n    radius: 5,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: `寒霜 (${lvl}级)`,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -4307,7 +4307,7 @@
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
                     "description": "<p>寒意冻结，自身获得“冷心”状态，持续一回合，冷心持续期间，在自身周围 @{1 + @up|1} 米范围释放‘透骨寒意’。</p><p><strong>透骨寒意：</strong>处于区域内的敌人也陷入“冷心”。</p><p>·你的每个回合初需要消耗自身周围【具有“冷心”人数*20】的内力，然后你再获得一回合“冷心”，否则移除你的冷心和透骨寒意，处于区域中的敌人的“冷心”也被移除。</p><p><strong>冷心：</strong>你被寒意冻结，失去所有动作也无法被选中，在你的回合末，你获得一层“冰心”，如果你没有修炼过《雪饮六诀》，改为获得 1 点怒气。</p><p><strong>升级：</strong>透骨寒意范围+1，每回合初维持冷心需要的内力系数-5。</p>",
-                    "automationNote": "获得冷心BUFF自动。光环效果、回合并判断内力消耗及续杯均为手动。冷心回合末获益自动。",
+                    "automationNote": "施展时自动获得 1 回合【冷心】，并生成 1+升级 米跟随光环：范围内敌人进入即自动陷入【冷心】（其回合末冰心/怒气由冷心状态自带结算），离开即解除。主人每个回合开始时自动按 光环内其他角色数×20 扣内力维持（维持成功则自动续获一回合冷心；内力不足时寒意消散、敌人冷心一并解除）。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -4324,9 +4324,27 @@
                     "scripts": [
                         {
                             "label": "获得冷心",
-                            "trigger": "hit",
+                            "trigger": "attack",
                             "active": true,
                             "script": "const eff = thisItem.effects.getName(\"冷心\").toObject();\neff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                        },
+                        {
+                            "label": "透骨寒意光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 透骨寒意：跟随敌方传染光环，范围 1+升级 米，持续到脱战；范围内敌人进入即陷入【冷心】。\n// 维持在主人回合初由[透骨寒意维持]按规则时点扣取（不足即散，敌人冷心随账目摘除）。\nconst tgLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"daofa-tougu-\" + actor.id,\n    displayName: \"透骨寒意\",\n    follow: true,\n    radius: tgLvl,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"冷心\",\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        },
+                        {
+                            "label": "透骨寒意维持",
+                            "trigger": "turnStart",
+                            "active": true,
+                            "script": "// 透骨寒意维持：主人回合初按 光环内其他带【冷心】角色数×20 扣内力；不足则寒意消散\n//（光环内敌人冷心随清理移除，自身冷心自然到期——与规则\"否则移除\"一致）。\nconst tgRegion2 = game.xjzl.aura.query(\"daofa-tougu-\" + actor.id)[0];\nif (!tgRegion2) return;\nlet tgCount = 0;\nfor (const tgT of tgRegion2.tokens) {\n    if (!tgT.actor || tgT.actor.uuid === actor.uuid) continue;\n    if (tgT.actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lengxin\")) tgCount++;\n}\nconst tgCost = tgCount * 20;\nif (tgCost <= 0) return;\nif ((S.resources.mp.value || 0) >= tgCost) {\n    await actor.changeResources({\"system.resources.mp.value\": {delta: -tgCost}}, {cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : null});\n} else {\n    await game.xjzl.aura.dismiss(\"daofa-tougu-\" + actor.id);\n    ui.notifications.info(\"内力不足以维持透骨寒意，寒意消散。\");\n}"
+                        },
+                        {
+                            "label": "透骨寒意续期",
+                            "trigger": "turnStart",
+                            "active": true,
+                            "script": "// 维持成功（光环仍在）时回合初重新获得一回合冷心；维持不足时光环已散，冷心自然消退。\nconst tgAura = game.xjzl.aura.query(\"daofa-tougu-\" + actor.id);\nif (!tgAura.length) return;\nconst tgCold = thisItem.effects.getName(\"冷心\").toObject();\ntgCold.duration = {value: 1, units: \"rounds\", expiry: \"turnStart\"};\ntgCold.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, tgCold);"
                         }
                     ],
                     "actionType": "buff"
@@ -4797,8 +4815,8 @@
                     "range": "10米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>刀如雷龙，毁天灭地，对范围内所有敌方造成伤害，并在范围内产生‘雷电真龙’，持续 1 回合，每消耗 1 层“雷霆”可以使雷龙的存在时间增加 1 回合。</p><p><strong>雷电真龙：</strong>区域内开始回合的敌方角色，投掷 2 枚 D6 骰，根据投掷结果产生效果：</p><p>1/2/3：受到 100 点气血流失；</p><p>4/5/6：陷入禁足、封招状态，持续一回合。</p><p>在雷龙范围内开始回合的友方角色，投掷 2 枚 D6 骰，根据投掷结果产生效果：</p><p>1/2：回复 20 点内力值；</p><p>3/4：移除 1 个状态；</p><p>5/6：攻击有雷霆引导，必然命中，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，怒气-1，内力消耗+16。</p>",
-                    "automationNote": "雷霆增伤自动。消耗雷霆延时手动。区域效果及随机判定手动。",
+                    "description": "<p>刀如雷龙，毁天灭地，对范围内所有敌方造成伤害，并在范围内产生‘雷电真龙’，持续 1 回合，每消耗 1 层“雷霆”可以使雷龙的存在时间增加 1 回合。</p><p><strong>雷电真龙：</strong>区域内开始回合的敌方角色，投掷 1 枚 D6 骰，根据投掷结果产生效果：</p><p>1/2/3：受到 100 点气血流失；</p><p>4/5/6：陷入禁足、封招状态，持续一回合。</p><p>在雷龙范围内开始回合的友方角色，投掷 1 枚 D6 骰，根据投掷结果产生效果：</p><p>1/2：回复 20 点内力值；</p><p>3/4：移除 1 个状态；</p><p>5/6：攻击有雷霆引导，必然命中，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，怒气-1，内力消耗+16。</p>",
+                    "automationNote": "部分自动化：施展后自动在自身所在格建立 10 米雷电真龙范围，持续时间可在弹窗中选择是否消耗【雷霆】延长。范围内单位回合开始时自动投 1D6 并按敌方/友方结果表结算；友方移除状态、必中效果和雷暴天气由 GM 手动处理。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -4832,10 +4850,10 @@
                             "script": "const thunder = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"leiting\");\nif (thunder) {\n    const stacks = thunder.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 10;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`雷霆增伤 +${bonus}`);\n}"
                         },
                         {
-                            "label": "区域效果提示",
-                            "trigger": "hit_once",
+                            "label": "雷电真龙光环",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"font-weight:bold;\">雷电真龙 (区域效果)</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p><strong>敌方回合开始 (2D6):</strong></p>\n            <ul><li>1-3: 气血流失 100</li><li>4-6: 禁足、封招 (1回合)</li></ul>\n            <p><strong>友方回合开始 (2D6):</strong></p>\n            <ul><li>1-2: 回复 20 内力</li><li>3-4: 移除 1 个状态</li><li>5-6: 攻击必中 (1回合)</li></ul>\n            <hr>\n            <p><i>每消耗1层雷霆，持续时间+1回合。</i></p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                            "script": "// 雷电真龙：在施展者所在格放置 10 米光环，基础持续 1 回合；可消耗全部【雷霆】逐层 +1 回合。\n// 区域内单位回合开始的 1D6 随机表由 payload AE 的 turnStart 监听脚本结算；\n// 雷暴天气（G4）与\"必中 1 回合\"无系统旗标，由监听脚本发卡提醒 GM 手动处理。\nconst ltStacks = (() => {\n    const ltEff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"leiting\");\n    return ltEff ? (ltEff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n})();\nlet ltExtra = 0;\nif (ltStacks > 0) {\n    const ltOk = await foundry.applications.api.DialogV2.confirm({\n        window: {title: \"天谴雷罚·雷霆延时\"},\n        content: \"<p>消耗全部 \" + ltStacks + \" 层 [雷霆]，每层使雷电真龙持续 +1 回合（共 \" + (1 + ltStacks) + \" 回合）？</p>\",\n        yes: {label: \"消耗\", icon: \"fas fa-bolt\"},\n        no: {label: \"保留（持续 1 回合）\", icon: \"fas fa-times\"}\n    });\n    if (ltOk) {\n        await game.xjzl.api.effects.removeEffect(actor, \"leiting\", ltStacks);\n        ltExtra = ltStacks;\n    }\n}\nawait game.xjzl.aura.create(actor, {\n    label: \"daofa-leidianzhenlong-\" + actor.id,\n    displayName: \"雷电真龙\",\n    radius: 10,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"雷电真龙监听\",\n    durationRounds: 1 + ltExtra,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -4878,6 +4896,30 @@
                         ]
                     },
                     "showIcon": 2
+                },
+                {
+                    "name": "雷电真龙监听",
+                    "transfer": false,
+                    "img": "icons/magic/lightning/bolt-strike-blue.webp",
+                    "description": "雷电真龙随机表监听（不可见）。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "listener_leidian",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "雷电真龙·随机表",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "// 雷电真龙：携带者开始回合时投 1D6；与雷龙主人阵营对置走敌表，否则走友表。\n// 敌表 1-3 流失 100 气血、4-6 禁足+封招 1 回合（自动）；\n// 友表 1-2 回 20 内力（自动）、3-4 移除 1 个状态与 5-6 必中 1 回合无系统旗标（发卡手动）。\nconst ldSrc = await fromUuid(thisEffect.origin);\nconst ldOwner = ldSrc?.parent?.parent;\nif (!ldOwner) return;\nconst ldRoll = await new Roll(\"1d6\").roll();\nconst ldTotal = ldRoll.total ?? 0;\nconst ldOwnerToken = ldOwner.getActiveTokens?.()[0];\nconst ldSelfToken = actor.getActiveTokens?.()[0];\nconst ldOwnerDisp = ldOwnerToken?.document?.disposition;\nconst hostileDisp = ldOwnerDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE ? CONST.TOKEN_DISPOSITIONS.FRIENDLY : CONST.TOKEN_DISPOSITIONS.HOSTILE;\nconst ldIsEnemy = ldSelfToken?.document?.disposition === hostileDisp;\nif (ldIsEnemy) {\n    if (ldTotal <= 3) {\n        await actor.applyHealing({amount: -100, type: \"hp\", healer: ldOwner});\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>雷电真龙</b>：\" + actor.name + \" 掷出 \" + ldTotal + \"，遭雷击流失 100 点气血！</div>\"});\n    } else {\n        await game.xjzl.api.effects.addEffect(actor, {id: \"root\", duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}});\n        await game.xjzl.api.effects.addEffect(actor, {id: \"fengzhao\", duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}});\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>雷电真龙</b>：\" + actor.name + \" 掷出 \" + ldTotal + \"，陷入禁足与封招 1 回合！</div>\"});\n    }\n} else {\n    if (ldTotal <= 2) {\n        await actor.applyHealing({amount: 20, type: \"mp\", healer: ldOwner});\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>雷电真龙</b>：\" + actor.name + \" 掷出 \" + ldTotal + \"，雷霆引导回复 20 点内力。</div>\"});\n    } else if (ldTotal <= 4) {\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>雷电真龙</b>：\" + actor.name + \" 掷出 \" + ldTotal + \"，可移除自身 1 个状态，请手动选择移除。</div>\"});\n    } else {\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>雷电真龙</b>：\" + actor.name + \" 掷出 \" + ldTotal + \"，本回合攻击必有雷霆引导（必中）。系统无必中旗标，请 GM 在结算时手动处理。</div>\"});\n    }\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 0
                 }
             ]
         }

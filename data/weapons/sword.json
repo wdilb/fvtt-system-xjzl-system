@@ -1358,9 +1358,16 @@
             "damage": 25,
             "block": 15,
             "description": "“提三尺剑，立不世之功”，此乃刘邦所得名剑，饰有七彩珠，九华玉，象征着帝道的权威和威严。<br><b>效果：</b>装备后，所有友方（包括自己）命中、招式伤害+5。",
-            "automationNote": "部分自动化 (自身自动，队友需手动添加 Buff)",
+            "automationNote": "部分自动化：装备者自动获得【赤霄剑-帝道光环】（命中、招式伤害+5）；进战时向当前场景其他友方分发同一效果。队友身上的效果不会自动清理，更换持剑者或不再需要时请手动移除。",
             "x-xjzl-aura": true,
-            "scripts": []
+            "scripts": [
+                {
+                    "label": "赤霄剑·帝道分发",
+                    "trigger": "combatStart",
+                    "active": true,
+                    "script": "// 赤霄剑·帝道光环：装备者由 transfer 被动获得；进战时只向其他友方分发副本。\nconst cxToken = actor.token?.object || actor.getActiveTokens()[0];\nif (!cxToken) return;\nconst cxAura = thisItem.effects.getName(\"赤霄剑-帝道光环\")?.toObject();\nif (!cxAura) return;\ndelete cxAura._id;\ncxAura.transfer = false;\ncxAura.origin = thisItem.uuid;\nconst cxAllies = canvas.tokens.placeables.filter(t => t.actor && t.actor.uuid !== actor.uuid\n    && t.document.disposition === cxToken.document.disposition);\nfor (const cxT of cxAllies) {\n    await game.xjzl.api.effects.addEffect(cxT.actor, cxAura);\n}"
+                }
+            ]
         },
         "effects": [
             {

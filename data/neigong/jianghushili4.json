@@ -82,7 +82,7 @@
             "sect": "jianghushili",
             "description": "<p>瑶池宫顶级内功，具体从何而来不得而知。如情义缠柔，似绵绵相思，令人难以呼吸，无法自拔。</p>",
             "requirement": "悟性11",
-            "automationNote": "‘湘水’状态已预设在特效列表中，请玩家手动添加给范围内的敌人。攻击命中带‘湘水’敌人的回蓝与扣蓝效果已自动化。免疫水负面影响需手动。",
+            "automationNote": "完全自动化：进战后以自身为中心生成跟随光环（领悟 1 米/小成 3 米/圆满 5 米），范围内敌人自动陷入【湘水】（内防-10、受创+30）；暴击命中带【湘水】的敌人时自动吸取其 20 点内力并回复自身。切换运功或脱战时光环消散。修满的\"免疫水负面影响\"需手动。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -101,6 +101,12 @@
                             "trigger": "hit",
                             "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.isCrit) {\n    const hasXiangshui = args.target.effects.some(e => e.name === \"湘水\");\n    if (hasXiangshui) {\n        await actor.applyHealing({ healer: actor,  amount: 20, type: \"mp\", showScrolling: true });\n        const targetMp = args.target.system.resources.mp.value;\n        if (targetMp > 0) {\n            const newMp = Math.max(0, targetMp - 20);\n            await args.target.changeResources({ \"system.resources.mp.value\": newMp }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n             if (args.target.token?.object) {\n                 args.target.showFloatyText(\"内力 -20\", { fill: \"#0000FF\", stroke: \"#000000\", strokeThickness: 4 });\n            }\n        }\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`${actor.name} 触发神女赋，吸取了 ${args.target.name} 的内力！`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}",
                             "active": true
+                        },
+                        {
+                            "label": "湘水光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 湘水光环：跟随敌方减益（内防-10、受击+30 由 payload AE 自带），半径 1 米，持续到脱战。\n// 暴击命中带【湘水】者的吸蓝由本境界 hit 脚本承担；切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-xiangshui-\" + actor.id,\n    displayName: \"湘水\",\n    follow: true,\n    radius: 1,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"湘水\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },
@@ -121,6 +127,12 @@
                             "trigger": "hit",
                             "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.isCrit) {\n    const hasXiangshui = args.target.effects.some(e => e.name === \"湘水\");\n    if (hasXiangshui) {\n        await actor.applyHealing({ healer: actor,  amount: 20, type: \"mp\", showScrolling: true });\n        const targetMp = args.target.system.resources.mp.value;\n        if (targetMp > 0) {\n            const newMp = Math.max(0, targetMp - 20);\n            await args.target.changeResources({ \"system.resources.mp.value\": newMp }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n             if (args.target.token?.object) {\n                 args.target.showFloatyText(\"内力 -20\", { fill: \"#0000FF\", stroke: \"#000000\", strokeThickness: 4 });\n            }\n        }\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`${actor.name} 触发神女赋，吸取了 ${args.target.name} 的内力！`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}",
                             "active": true
+                        },
+                        {
+                            "label": "湘水光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 湘水光环：跟随敌方减益（内防-10、受击+30 由 payload AE 自带），半径 3 米，持续到脱战。\n// 暴击命中带【湘水】者的吸蓝由本境界 hit 脚本承担；切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-xiangshui-\" + actor.id,\n    displayName: \"湘水\",\n    follow: true,\n    radius: 3,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"湘水\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },
@@ -141,6 +153,12 @@
                             "trigger": "hit",
                             "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.isCrit) {\n    const hasXiangshui = args.target.effects.some(e => e.name === \"湘水\");\n    if (hasXiangshui) {\n        await actor.applyHealing({ healer: actor,  amount: 20, type: \"mp\", showScrolling: true });\n        const targetMp = args.target.system.resources.mp.value;\n        if (targetMp > 0) {\n            const newMp = Math.max(0, targetMp - 20);\n            await args.target.changeResources({ \"system.resources.mp.value\": newMp }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n             if (args.target.token?.object) {\n                 args.target.showFloatyText(\"内力 -20\", { fill: \"#0000FF\", stroke: \"#000000\", strokeThickness: 4 });\n            }\n        }\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`${actor.name} 触发神女赋，吸取了 ${args.target.name} 的内力！`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}",
                             "active": true
+                        },
+                        {
+                            "label": "湘水光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 湘水光环：跟随敌方减益（内防-10、受击+30 由 payload AE 自带），半径 5 米，持续到脱战。\n// 暴击命中带【湘水】者的吸蓝由本境界 hit 脚本承担；切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-xiangshui-\" + actor.id,\n    displayName: \"湘水\",\n    follow: true,\n    radius: 5,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"湘水\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }

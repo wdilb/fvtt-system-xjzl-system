@@ -2581,7 +2581,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招后，可消耗反应动作释放此招，压制虚招，左掌右拳，回环推出，对其造成伤害。然后在自身周围 3 米范围形成‘炁化太虚’，持续@{1 + @up|一}回合。</p><p><strong>炁化太虚：</strong>范围外敌方无法选中范围内友方。</p><p><strong>升级：</strong>招式伤害+10，炁化太虚持续回合+1，内力消耗+4。</p>",
-                    "automationNote": "领域效果手动。",
+                    "automationNote": "施展后自动生成 3 米跟随炁化太虚范围显示，持续 1+升级 回合后自动消散（每名施展者独立）并发一次说明卡。\"范围外敌方无法选中范围内友方\"需 GM 在敌方选取目标时手动裁定。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -2607,10 +2607,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "生成领域",
+                            "label": "炁化太虚领域",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst duration = 1 + (lvl - 1);\nui.notifications.info(`已生成 [炁化太虚] 领域 (3米)，持续 ${duration} 回合。`);",
-                            "active": true
+                            "active": true,
+                            "script": "// 炁化太虚（仅标记）：周身 3 米标记光环，持续 1+升级 回合（单实例）。\n// \"范围外敌方无法选中范围内友方\"（G2 目标选取）超出光环框架，创建时发说明卡由 GM 手动裁定。\nconst qhLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-qihua-\" + actor.id,\n    displayName: \"炁化太虚\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1 + (qhLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>炁化太虚</b>已展开（3 米，持续 \" + (1 + (qhLvl - 1)) + \" 回合）：范围外敌方无法选中范围内友方（G2 目标选取请 GM 在敌方选目标时手动裁定）。</div>\"});"
                         }
                     ]
                 },

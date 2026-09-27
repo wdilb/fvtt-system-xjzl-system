@@ -86,7 +86,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>抚剑轻吟，开启架招。架招开启期间，在自身回合初为 3 米范围内未陷入濒死的友方单位回复 5 点气血。</p><p><strong>升级：</strong>格挡值+5，恢复气血+5，内力消耗+1。</p>",
-                    "automationNote": "格挡能力自动。回合初自动弹卡片提示玩家对周围友方手动施加治疗。",
+                    "automationNote": "开启架招后自动生成 3 米跟随范围显示；主人每个回合开始时，范围内未濒死的友方（含己）自动恢复 5×招式等级 点气血。解除架招或脱战时光环消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -101,10 +101,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "回合初治疗提示",
+                            "label": "春雨绵绵光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 春雨绵绵：架招开启时生成 3 米跟随范围显示（解除架招或脱战时消散）；\n// 治疗在主人回合初由[春雨结算]按规则时点执行（未濒死友方）。\nconst cyLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-chunyu-\" + actor.id,\n    displayName: \"春雨绵绵\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"stance\",\n    sourceItemUuid: item.uuid,\n    combatId: game.combat?.id ?? null\n});"
+                        },
+                        {
+                            "label": "春雨结算",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "if (actor.system.martial.stanceActive && actor.system.martial.stanceItemId === thisItem.id) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const healVal = 5 + (lvl - 1) * 5;\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #27ae60; background: rgba(39,174,96,0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-heart\"></i> 春雨绵绵</div>\n        <div style=\"font-size:0.9em; color:#555;\">你正维持架招，请手动为 3 米范围内未濒死的友方回复 <b>${healVal}</b> 点气血。</div>\n    </div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                            "script": "// 春雨结算：主人回合初为范围内未濒死的友方（含己）恢复 5×招式等级 气血。\nconst cyStanceId = S.martial.stance;\nif (!S.martial.stanceActive || cyStanceId !== (thisItem.system.moves.find(m => m.name === \"春雨绵绵\")?.id)) return;\nconst cyRegion = game.xjzl.aura.query(\"wuxue-chunyu-\" + actor.id)[0];\nif (!cyRegion) return;\nconst cyOwnerTok = actor.getActiveTokens?.()[0];\nif (!cyOwnerTok) return;\nconst cyOwnerDisp = cyOwnerTok.document?.disposition ?? cyOwnerTok.disposition;\nconst cyLvl2 = Math.max(1, thisItem.system.moves.find(m => m.name === \"春雨绵绵\")?.computedLevel || 1);\nfor (const cyT of cyRegion.tokens) {\n    if (!cyT.actor) continue;\n    if (cyT.disposition !== cyOwnerDisp) continue;\n    if ((cyT.actor.system.resources.hp.value || 0) <= 0) continue;\n    await cyT.actor.applyHealing({ amount: 5 * cyLvl2, type: \"hp\", healer: actor });\n}"
                         }
                     ]
                 },
@@ -1486,7 +1492,7 @@
                     "targetInfo": "自身周围",
                     "actionCost": "蓄力动作",
                     "description": "<p>【神机预贯，变幻天机】</p><p>蓄力动作，尽变之义，极变之致，消耗“弈理”，在自身周围内布下‘渊微’，持续@{1 + @up|一}回合。</p><p><strong>渊微：</strong>区域内的敌人无法离开此范围，只能在区域范围内移动。</p><p>·你处于区域内时每回合初额外获得一个主要动作。</p><p>·渊微形成在原地，不会跟随你移动，你只能拥有一个渊微，如果你布下新的渊微，之前的消失。</p><p><strong>升级：</strong>持续回合数+1，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "检测并消耗弈理，如果不足将阻断出招。区域效果需手动处理。",
+                    "automationNote": "部分自动化（仅标记）：施展时检测并消耗【弈理】，自动原地生成 5 米【渊微】标记光环（不跟随，单实例，持续 1+升级 回合后自动消散）并发一次说明卡。区域内敌人无法离开（G3 位移限制）与自身回合初额外主要动作为规则面，超出光环框架，由 GM 手动结算。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -1512,10 +1518,10 @@
                             "script": "const yili = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yili');\nif (!yili) {\n    args.abort = true;\n    args.abortReason = \"缺少必要的 [弈理] 状态，无法施展此绝招。\";\n}"
                         },
                         {
-                            "label": "消耗弈理与渊微提示",
+                            "label": "渊微区域",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const yili = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yili');\nif (!yili) return;\nawait yili.delete();\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #8e44ad; background: rgba(142,68,173,0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#8e44ad;\"><i class=\"fas fa-chess-board\"></i> 渊微降临</div>\n        <div style=\"font-size:0.9em; color:#555;\">已消耗 [弈理]。请在周围布下【渊微】区域，持续 <b>${rounds}</b> 回合。</div>\n        <hr>\n        <ul style=\"font-size: 0.85em; color: #666; padding-left: 15px; margin-bottom: 0;\">\n            <li>敌人无法离开此区域</li>\n            <li>施法者处于区域内时：每回合初额外获得一个主要动作</li>\n        </ul>\n    </div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });"
+                            "script": "// 渊微（仅标记）：消耗【弈理】，原地生成 5 米标记光环，持续 1+升级 回合（单实例）。\n// 区域规则超出光环框架，创建时发一次说明卡：敌人无法离开（G3）、自身回合初额外主要动作由 GM 手动结算。\nconst ywYili = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yili\");\nif (!ywYili) return;\nawait ywYili.delete();\nconst ywLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-yuanwei-\" + actor.id,\n    displayName: \"渊微\",\n    follow: false,\n    radius: 5,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1 + (ywLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>渊微</b>已布下（5 米，持续 \" + (1 + (ywLvl - 1)) + \" 回合）：区域内敌人无法离开（移动限制请 GM 手动裁定）；自身处于区域内时每回合初额外获得一个主要动作（请自行记录）。区域到期自动消散。</div>\"});"
                         }
                     ]
                 }
@@ -1746,7 +1752,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，一缕书墨香回忆，获得“江南”状态，持续到战斗脱离。</p><p><strong>江南：</strong>你与周围 5 米内友方招式伤害+5。</p><p>·你每个回合初必须再次消耗 1 点内力维持“江南”，否则移除江南。</p><p><strong>升级：</strong>江南提升的伤害+5，施展和维持的消耗+1。</p>",
-                    "automationNote": "完全自动化。会给自己和选中的目标上BUFF。",
+                    "automationNote": "施展后自动生成 5 米跟随范围显示，自身与范围内友方自动获得【江南】（招式伤害+5×施展者书香江南等级，进出即时生效）；主人每个回合开始时自动消耗 1×招式等级 点内力维持，内力不足时光环消散并移除江南，脱战清理。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -1763,10 +1769,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "分发光环",
-                            "trigger": "hit",
+                            "label": "书香江南光环",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst maintainCost = 1 + (lvl - 1);\n\n// 1. 给所有人 (包括自己) 添加增伤加护\nconst buffTpl = thisItem.effects.getName(\"江南-加护\");\nif (buffTpl) {\n    const buffData = buffTpl.toObject();\n    delete buffData._id;\n    buffData.origin = thisItem.uuid;\n    buffData.system.changes[0].value = String(dmgBonus);\n    await game.xjzl.api.effects.addEffect(args.target, buffData);\n}\n\n// 2. 只对自己添加维持核心\nif (args.target.uuid === actor.uuid) {\n    const mainTpl = thisItem.effects.getName(\"江南-维持\");\n    if (mainTpl) {\n        const maintainData = mainTpl.toObject();\n        delete maintainData._id;\n        maintainData.origin = thisItem.uuid;\n        foundry.utils.setProperty(maintainData, \"flags.xjzl-system.maintainCost\", maintainCost);\n        await game.xjzl.api.effects.addEffect(actor, maintainData);\n    }\n}"
+                            "script": "// 书香江南：以自身为中心 5 米友方（含己）挂【江南-加护】（招式伤害+5×等级），\n// 维持在主人回合初由[江南维持]按规则时点扣取（不足即散并移除江南）。\nconst jnLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-shuxiang-\" + actor.id,\n    displayName: \"书香江南\",\n    follow: true,\n    radius: 5,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"江南-加护\",\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        },
+                        {
+                            "label": "江南维持",
+                            "trigger": "turnStart",
+                            "active": true,
+                            "script": "// 江南维持：主人回合初消耗 1×招式等级 内力；不足则光环消散并移除江南（按清理记录）。\nconst jnRegion2 = game.xjzl.aura.query(\"wuxue-shuxiang-\" + actor.id)[0];\nif (!jnRegion2) return;\nconst jnMove2 = thisItem.system?.moves?.[0];\nconst jnLvl2 = Math.max(1, jnMove2?.computedLevel || 1);\nconst jnCost = 1 + (jnLvl2 - 1);\nif ((S.resources.mp.value || 0) >= jnCost) {\n    await actor.changeResources({\"system.resources.mp.value\": {delta: -jnCost}}, {cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : null});\n} else {\n    await game.xjzl.aura.dismiss(\"wuxue-shuxiang-\" + actor.id);\n    ui.notifications.info(\"内力不足以维持书香江南，江南消散。\");\n}"
                         }
                     ]
                 }
@@ -1774,23 +1786,25 @@
             "effects": [
                 {
                     "name": "江南-加护",
-                    "description": "置身书香江南，招式伤害提升。",
+                    "description": "置身书香江南，招式伤害提升（数值随施展者书香江南等级）",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "wuxue_jiangnan_buff",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "江南·动态加伤",
+                                    "trigger": "passive",
+                                    "active": true,
+                                    "script": "// 江南：招式伤害+5×施展者书香江南等级（动态，仅招式面板，不含普攻）。\nconst jnSrc = foundry.utils.fromUuidSync(thisEffect.origin);\nconst jnOwner = jnSrc?.parent?.parent;\nif (!jnOwner) return;\nconst jnWuxue = jnOwner.items?.find(i => i.name === \"书香江南\");\nconst jnLvl = Math.max(1, jnWuxue?.system?.moves?.[0]?.computedLevel || 1);\nS.combat.damages.skill.mod += 5 * jnLvl;"
+                                }
+                            ]
                         }
                     },
                     "img": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                     "system": {
-                        "changes": [
-                            {
-                                "key": "system.combat.damages.skill.mod",
-                                "value": "5",
-                                "type": "add"
-                            }
-                        ]
+                        "changes": []
                     },
                     "showIcon": 2
                 },

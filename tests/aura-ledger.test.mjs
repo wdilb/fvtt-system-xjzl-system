@@ -354,10 +354,66 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  4. 回合挂载：可叠层逐轮 +1；非叠层每轮仍施加    */
+/*  4. oncePerRound：进入与回合事件共用一次节流   */
 /* -------------------------------------------- */
 {
-  console.log("4. 回合挂载");
+  console.log("4. 进入/回合二选一节流");
+  const actor = makeActor("actor4-once");
+  let damageCalls = 0;
+  actor.applyDamage = async () => { damageCalls++; };
+  const token = makeToken("t4-once", actor);
+  const item = makeItem("Item.once", [makeEffect({name: "Once", slug: "once", stackable: true, maxStacks: 9})]);
+  const behavior = makeBehavior("b1", {
+    cleanupOnExit: true,
+    enterEnabled: true,
+    oncePerRound: true,
+    roundEnabled: true,
+    roundTiming: "tokenTurnStart",
+    enterAction: {kind: "damage", amount: "5", type: "liushi"},
+    roundAction: {kind: "damage", amount: "5", type: "liushi"},
+    ...payloadOf(item)
+  });
+  const region = makeRegion("r4-once", [behavior]);
+  token.regions.push(region);
+  game.combat = {id: "c-once", round: 1};
+
+  await enter(region, behavior, token);
+  await round(region, behavior, token, 1, "tokenTurnStart");
+  ok(findEffectBySlug(actor, "once").stacks === 1, "进入先发生时同回合只挂一次 payload");
+  ok(damageCalls === 1, "进入先发生时同回合只执行一次进入动作");
+
+  game.combat = {id: "c-once", round: 2};
+  await round(region, behavior, token, 2, "tokenTurnStart");
+  ok(findEffectBySlug(actor, "once").stacks === 2, "下一回合回合事件可再次挂载 payload");
+  ok(damageCalls === 2, "下一回合回合动作执行一次");
+  await enter(region, behavior, token);
+  ok(findEffectBySlug(actor, "once").stacks === 2, "回合先发生时同回合进入不重复挂载");
+  ok(damageCalls === 2, "回合先发生时同回合进入不重复执行动作");
+
+  const actionOnlyActor = makeActor("actor4-action");
+  let actionOnlyCalls = 0;
+  actionOnlyActor.applyDamage = async () => { actionOnlyCalls++; };
+  const actionOnlyToken = makeToken("t4-action", actionOnlyActor);
+  const actionOnlyBehavior = makeBehavior("b2", {
+    enterEnabled: true, roundEnabled: true, oncePerRound: true,
+    roundTiming: "tokenTurnStart",
+    enterAction: {kind: "damage", amount: "5", type: "liushi"},
+    roundAction: {kind: "none"}
+  });
+  const actionOnlyRegion = makeRegion("r4-action", [actionOnlyBehavior]);
+  actionOnlyToken.regions.push(actionOnlyRegion);
+  game.combat = {id: "c-once", round: 3};
+  await round(actionOnlyRegion, actionOnlyBehavior, actionOnlyToken, 3, "tokenTurnStart");
+  await enter(actionOnlyRegion, actionOnlyBehavior, actionOnlyToken);
+  ok(actionOnlyCalls === 1, "无回合效果时不占用进入事件的节流");
+  game.combat = null;
+}
+
+/* -------------------------------------------- */
+/*  5. 回合挂载：可叠层逐轮 +1；非叠层每轮仍施加    */
+/* -------------------------------------------- */
+{
+  console.log("5. 回合挂载");
   const actor = makeActor("actor4");
   const token = makeToken("t4", actor);
   const stackItem = makeItem("Item.d", [makeEffect({name: "Stacky", slug: "stacky", stackable: true, maxStacks: 9})]);
@@ -387,10 +443,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  5. 同回合重复 round 事件只执行一次              */
+/*  6. 同回合重复 round 事件只执行一次              */
 /* -------------------------------------------- */
 {
-  console.log("5. 回合事件去重");
+  console.log("6. 回合事件去重");
   const actor = makeActor("actor5");
   const token = makeToken("t5", actor);
   const item = makeItem("Item.f", [makeEffect({name: "Stacky", slug: "stacky5", stackable: true, maxStacks: 9})]);
@@ -406,10 +462,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  6. 预存 1 层：光环 +1，退出恢复预存             */
+/*  7. 预存 1 层：光环 +1，退出恢复预存             */
 /* -------------------------------------------- */
 {
-  console.log("6. 预存层数保留");
+  console.log("7. 预存层数保留");
   const actor = makeActor("actor6");
   const token = makeToken("t6", actor);
   actor.effects.push(makeEffect({name: "Stacky", slug: "stacky6", stackable: true, maxStacks: 9, stacks: 1}));
@@ -424,10 +480,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  7. 满层进入：贡献 0 不建账目，退出不减           */
+/*  8. 满层进入：贡献 0 不建账目，退出不减           */
 /* -------------------------------------------- */
 {
-  console.log("7. 满层钳制");
+  console.log("8. 满层钳制");
   const actor = makeActor("actor7");
   const token = makeToken("t7", actor);
   actor.effects.push(makeEffect({name: "Stacky", slug: "stacky7", stackable: true, maxStacks: 3, stacks: 3}));
@@ -443,10 +499,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  8. 预存不可叠层 AE：进出后仍存在                */
+/*  9. 预存不可叠层 AE：进出后仍存在                */
 /* -------------------------------------------- */
 {
-  console.log("8. 预存非叠层 AE 保留");
+  console.log("9. 预存非叠层 AE 保留");
   const actor = makeActor("actor8");
   const token = makeToken("t8", actor);
   actor.effects.push(makeEffect({name: "Flat", slug: "flat8"}));
@@ -462,10 +518,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  9. 首建不可叠层：最后 owner 退出后删除           */
+/*  10. 首建不可叠层：最后 owner 退出后删除           */
 /* -------------------------------------------- */
 {
-  console.log("9. 光环首建非叠层，owner 全退后删除");
+  console.log("10. 光环首建非叠层，owner 全退后删除");
   const actor = makeActor("actor9");
   const token = makeToken("t9", actor);
   const item = makeItem("Item.j", [makeEffect({name: "Flat", slug: "flat9"})]);
@@ -479,10 +535,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  10. 两个 cleanup owner 共享非叠层 AE            */
+/*  11. 两个 cleanup owner 共享非叠层 AE            */
 /* -------------------------------------------- */
 {
-  console.log("10. 双 owner 共享非叠层 AE");
+  console.log("11. 双 owner 共享非叠层 AE");
   const actor = makeActor("actor10");
   const tokenA = makeToken("t10a", actor);
   const tokenB = makeToken("t10b", actor);
@@ -503,10 +559,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  11. existedBeforeAura=true 的多 owner 组          */
+/*  12. existedBeforeAura=true 的多 owner 组          */
 /* -------------------------------------------- */
 {
-  console.log("11. 预存 AE 的多 owner 组全退仍保留");
+  console.log("12. 预存 AE 的多 owner 组全退仍保留");
   const actor = makeActor("actor11");
   const tokenA = makeToken("t11a", actor);
   const tokenB = makeToken("t11b", actor);
@@ -525,10 +581,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  12. 关联 Actor 多 Token owner 独立、AE 共享       */
+/*  13. 关联 Actor 多 Token owner 独立、AE 共享       */
 /* -------------------------------------------- */
 {
-  console.log("12. 关联 Actor 多 Token / 非关联互不影响");
+  console.log("13. 关联 Actor 多 Token / 非关联互不影响");
   const actor = makeActor("actor12");
   const linkedA = makeToken("t12a", actor);
   const linkedB = makeToken("t12b", actor);
@@ -553,10 +609,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  13. includeSelf=false 按 Actor 排除              */
+/*  14. includeSelf=false 按 Actor 排除              */
 /* -------------------------------------------- */
 {
-  console.log("13. includeSelf 按 Actor UUID");
+  console.log("14. includeSelf 按 Actor UUID");
   const actor = makeActor("actor13");
   const sourceToken = makeToken("t13src", actor, 1);
   const twinToken = makeToken("t13twin", actor, 1);
@@ -570,10 +626,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  14. 同名异 slug 不碰撞                          */
+/*  15. 同名异 slug 不碰撞                          */
 /* -------------------------------------------- */
 {
-  console.log("14. 同名异 slug 不碰撞");
+  console.log("15. 同名异 slug 不碰撞");
   const actor = makeActor("actor14");
   const token = makeToken("t14", actor);
   const itemA = makeItem("Item.o", [makeEffect({name: "IronWall", slug: "ironwall-a"})]);
@@ -594,10 +650,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  15. 删区/删 Token/停用/在途删除 无残留            */
+/*  16. 删区/删 Token/停用/在途删除 无残留            */
 /* -------------------------------------------- */
 {
-  console.log("15. 各类删除路径无残留");
+  console.log("16. 各类删除路径无残留");
   // 15a：region 删除预清理
   const actorA = makeActor("actor15a");
   const tokenA = makeToken("t15a", actorA);
@@ -649,10 +705,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  16. 预清理与核心重复 exit 不重复减层              */
+/*  17. 预清理与核心重复 exit 不重复减层              */
 /* -------------------------------------------- */
 {
-  console.log("16. 预清理与核心补发 exit 的 eid 幂等（region 不可解析 → 快照重放路径）");
+  console.log("17. 预清理与核心补发 exit 的 eid 幂等（region 不可解析 → 快照重放路径）");
   const actor = makeActor("actor16");
   const token = makeToken("t16", actor);
   const item = makeItem("Item.u", [makeEffect({name: "Stacky", slug: "stacky16", stackable: true, maxStacks: 9})]);
@@ -674,10 +730,10 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  17. payload 配置变更：已有 cleanup 账目冻结旧 ref  */
+/*  18. payload 配置变更：已有 cleanup 账目冻结旧 ref  */
 /* -------------------------------------------- */
 {
-  console.log("17. payload 引用变更冻结至退出");
+  console.log("18. payload 引用变更冻结至退出");
   const actor = makeActor("actor17");
   const token = makeToken("t17", actor);
   const itemA = makeItem("Item.v", [makeEffect({name: "Old", slug: "old-17"})]);
@@ -696,20 +752,20 @@ function ok(cond, label) {
 }
 
 /* -------------------------------------------- */
-/*  18. 无自动对账：Region 事件即事实源               */
+/*  19. 无自动对账：Region 事件即事实源               */
 /* -------------------------------------------- */
 {
-  console.log("18. 不存在自动对账");
+  console.log("19. 不存在自动对账");
   ok(typeof AuraLedger.reconcileToken === "undefined", "reconcileToken 已删除");
   ok(typeof AuraLedger.reconcile === "undefined", "reconcile 已删除");
   ok(typeof AuraLedger.reconcileCombat === "undefined", "reconcileCombat 已删除");
 }
 
 
-/*  19. 预清理失败中止删除，重试后完成               */
+/*  20. 预清理失败中止删除，重试后完成               */
 /* -------------------------------------------- */
 {
-  console.log("19. 预清理失败中止删除，重试后完成");
+  console.log("20. 预清理失败中止删除，重试后完成");
   const actor = makeActor("actor19");
   const token = makeToken("t19", actor);
   const item = makeItem("Item.x19", [makeEffect({name: "Flat", slug: "flat19"})]);
@@ -728,10 +784,10 @@ function ok(cond, label) {
   ok(!findEffectBySlug(actor, "flat19"), "重试后清理完成无残留");
 }
 
-/*  20. cleanupOnExit 开关随 owner 周期冻结           */
+/*  21. cleanupOnExit 开关随 owner 周期冻结           */
 /* -------------------------------------------- */
 {
-  console.log("20. 环内 true→false 冻结至退出");
+  console.log("21. 环内 true→false 冻结至退出");
   const actor = makeActor("actor20");
   const token = makeToken("t20", actor);
   const item = makeItem("Item.x20", [makeEffect({name: "Flat", slug: "flat20"})]);
@@ -750,10 +806,10 @@ function ok(cond, label) {
   game.combat = null;
 }
 
-/*  21. 施加写入中途删区：补偿释放                     */
+/*  22. 施加写入中途删区：补偿释放                     */
 /* -------------------------------------------- */
 {
-  console.log("21. 施加写入中途删区经补偿释放");
+  console.log("22. 施加写入中途删区经补偿释放");
   const actor = makeActor("actor21");
   const token = makeToken("t21", actor);
   const item = makeItem("Item.x21", [makeEffect({name: "Flat", slug: "flat21"})]);
@@ -772,10 +828,10 @@ function ok(cond, label) {
 }
 
 
-/*  22. 记账写入失败回滚本次施加                      */
+/*  23. 记账写入失败回滚本次施加                      */
 /* -------------------------------------------- */
 {
-  console.log("22. 记账写入失败回滚本次施加");
+  console.log("23. 记账写入失败回滚本次施加");
   const actor = makeActor("actor22");
   const token = makeToken("t22", actor);
   const item = makeItem("Item.x22", [makeEffect({name: "Stacky", slug: "stacky22", stackable: true, maxStacks: 9})]);
@@ -840,10 +896,10 @@ function ok(cond, label) {
   ok(threw instanceof AggregateError, "回滚也失败时抛 AggregateError");
 }
 
-/*  23. 非活动 GM 且无 socket：必须拒绝而非假成功        */
+/*  24. 非活动 GM 且无 socket：必须拒绝而非假成功        */
 /* -------------------------------------------- */
 {
-  console.log("23. 非活动 GM 无 socket 必须拒绝");
+  console.log("24. 非活动 GM 无 socket 必须拒绝");
   const prevGM = game.users.activeGM;
   game.users.activeGM = {isSelf: false};
   let rejected = null;

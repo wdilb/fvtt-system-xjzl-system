@@ -1401,9 +1401,22 @@
             "damage": 5,
             "block": 13,
             "description": "伞柄长七尺，伞盖宽两尺，绘明月藤花，碧浪飞鸟，是达官贵人的象征。<br><b>效果:</b> 战斗时，你每回合初给周围1米范围内的友方添加5护体真气，持续到战斗脱离。<br>·该武器需要双手持握。",
-            "automationNote": "请手动处理 (AOE 回复)",
+            "automationNote": "完全自动化：进战后自动生成 1 米跟随范围显示；主人每个回合开始时，范围内友方（含己）自动恢复 5 点护体真气。卸下武器或脱战时光环消散。该武器需双手持握由规则自行把握。",
             "x-xjzl-aura": true,
-            "scripts": []
+            "scripts": [
+                {
+                    "label": "清辉华盖光环",
+                    "trigger": "combatStart",
+                    "active": true,
+                    "script": "// 清辉华盖：进战后生成 1 米跟随范围显示（卸下武器或脱战时消散）；\n// 恢复结算在主人回合初由[清辉回护]脚本按规则时点执行。\nawait game.xjzl.aura.create(actor, {\n    label: \"weapon-qinghui-\" + actor.id,\n    displayName: \"清辉华盖\",\n    follow: true,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"equip\",\n    sourceItemUuid: thisItem.uuid,\n    combatId: game.combat?.id ?? null\n});"
+                },
+                {
+                    "label": "清辉回护",
+                    "trigger": "turnStart",
+                    "active": true,
+                    "script": "// 清辉回护：主人回合初为范围内友方（含己）恢复 5 点护体真气。\nconst qhRegion = game.xjzl.aura.query(\"weapon-qinghui-\" + actor.id)[0];\nif (!qhRegion) return;\nconst qhOwnerTok = actor.getActiveTokens?.()[0];\nif (!qhOwnerTok) return;\nconst qhOwnerDisp = qhOwnerTok.document?.disposition ?? qhOwnerTok.disposition;\nfor (const qhT of qhRegion.tokens) {\n    if (!qhT.actor) continue;\n    if (qhT.disposition !== qhOwnerDisp) continue;\n    await qhT.actor.applyHealing({ amount: 5, type: \"huti\", healer: actor });\n}"
+                }
+            ]
         }
     },
     {

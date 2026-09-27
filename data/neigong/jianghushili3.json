@@ -337,7 +337,7 @@
             "subSect": "qianmen",
             "description": "“古之大化者，乃与无形俱生。”\n千门八将在翻看门主批注的时候，根据此篇演化感应变化之道。内功大成后可敏锐感知周遭变化，也可更加自如掌控身体。",
             "requirement": "悟性 4",
-            "automationNote": "区域判定需手动。请GM手动为进入区域的角色添加系统状态“蓄劲”或“犹豫”。",
+            "automationNote": "部分自动化（提示卡片）：进战时发送布置卡片，提醒 GM 布置【气感等级+5/+10】个单格感应区。感应区散布多格、单格一次性触发且友敌效果不同，超出光环框架，区域布置与【蓄劲】/【犹豫】状态由 GM 手动结算。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -363,7 +363,14 @@
                     },
                     "description": "小成运功特效：战斗开始时，在场上【你气感等级+5】个格子中布下只有你可见的‘感应’区域，持续到战斗脱离。\n感应：当友方进入此范围时，获得一层“蓄劲”，同时下一次出招具有优势，持续到脱战；当敌方进入此范围时，获得一层“犹豫”，同时下一次出招具有劣势，持续到脱战。\n·一个格子上的‘感应’在被任意一个角色踩中并触发效果后，便移除感应。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "感应区布置提示",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 感应区超出光环框架（散布单格、单格一次性触发、友敌分支效果），发送卡片提醒 GM 手动布置与结算。\nconst hwxLvl = Math.floor((S.stats.qigan.total || 0) / 10);\nconst hwxCells = hwxLvl + 5;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>化无形书·感应</b>：请在场上布置 <b>\" + hwxCells + \"</b> 个只有你可见的单格'感应'区（散布任意格子，持续到脱战）。友方踩中获得一层【蓄劲】且下一次出招具有优势；敌方踩中获得一层【犹豫】且下一次出招具有劣势；单格触发一次后失效。区域布置与状态由 GM 手动结算。</div>\"});"
+                        }
+                    ]
                 },
                 "stage3": {
                     "stats": {
@@ -376,7 +383,14 @@
                     },
                     "description": "圆满运功特效：战斗开始时，在场上【你气感等级+10】个格子中布下只有你可见的‘感应’区域，持续到战斗脱离。\n感应：当友方进入此范围时，获得一层“蓄劲”，同时下一次出招具有优势，持续到脱战；当敌方进入此范围时，获得一层“犹豫”，同时下一次出招具有劣势，持续到脱战。\n·一个格子上的‘感应’在被任意一个角色踩中并触发效果后，便移除感应。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "感应区布置提示",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 感应区超出光环框架（散布单格、单格一次性触发、友敌分支效果），发送卡片提醒 GM 手动布置与结算。\nconst hwxLvl = Math.floor((S.stats.qigan.total || 0) / 10);\nconst hwxCells = hwxLvl + 10;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>化无形书·感应</b>：请在场上布置 <b>\" + hwxCells + \"</b> 个只有你可见的单格'感应'区（散布任意格子，持续到脱战）。友方踩中获得一层【蓄劲】且下一次出招具有优势；敌方踩中获得一层【犹豫】且下一次出招具有劣势；单格触发一次后失效。区域布置与状态由 GM 手动结算。</div>\"});"
+                        }
+                    ]
                 }
             },
             "masteryEffect": "修满[永久]：气血+30，内力+30。",
@@ -2223,7 +2237,7 @@
             "sect": "jianghushili",
             "description": "世间万物皆有理，有理便可依理所寻，寻至上乘便等于掌握天地万物。",
             "requirement": "悟性 11",
-            "automationNote": "手动。光环无法自动生效，请手动将物品内的‘易理’状态拖拽给范围内的队友。",
+            "automationNote": "完全自动化：进战后以自身为中心生成跟随光环（领悟 3 米/小成 10 米/圆满 20 米），自身与范围内队友自动获得对应档位【易理】（内外防与招式伤害+5，圆满+10）；切换运功或脱战时光环消散。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -2236,7 +2250,14 @@
                     },
                     "description": "领悟特效：你与周围3米范围的队友获得“易理”：内外防+5，招式伤害+5。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "易理光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 易理光环：跟随友方增益（内外防与招式伤害+5），半径 3 米。\n// 切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-yili-\" + actor.id,\n    displayName: \"易理\",\n    follow: true,\n    radius: 3,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"易理 (小成以下)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 },
                 "stage2": {
                     "stats": {
@@ -2249,7 +2270,14 @@
                     },
                     "description": "小成特效：你与周围10米范围的队友获得“易理”：内外防+5，招式伤害+5。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "易理光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 易理光环：跟随友方增益（内外防与招式伤害+5），半径 10 米。\n// 切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-yili-\" + actor.id,\n    displayName: \"易理\",\n    follow: true,\n    radius: 10,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"易理 (小成以下)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 },
                 "stage3": {
                     "stats": {
@@ -2262,7 +2290,14 @@
                     },
                     "description": "圆满特效：你与周围20米范围的队友获得“易理”：内外防+10，招式伤害+10。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "易理光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 易理光环：跟随友方增益（内外防与招式伤害+10），半径 20 米。\n// 切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-yili-\" + actor.id,\n    displayName: \"易理\",\n    follow: true,\n    radius: 20,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"易理 (圆满)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 }
             },
             "masteryEffect": "修满特效：修满[永久]：气血+80，内力+40，悟性+1。",
@@ -4063,7 +4098,7 @@
             "subSect": "modaomen",
             "description": "由魔教帝圣所创，后经血魔老祖改易增删，终成大恶之功法，于江湖间恶名远播。其精要为“随心所欲，邪影移心，魔念纵横，血灵弑生”此十六字，尽显恶念横生。修习者一旦以之侵敌，仿若引动邪祟，令敌身血流如注，难以自止，血枯气竭而亡。\n注意：修炼此内功时，每次都须杀一人，以鲜血活祭，方可灌注修为。",
             "requirement": "悟性 11",
-            "automationNote": "部分自动化。自动施加败血状态。败血的回血效果（圆满时周围判定）需手动。",
+            "automationNote": "命中后自动施加【败血】（领悟 1 回合/小成 2 回合/圆满 3 回合）。圆满后自动生成 3 米跟随领域：范围内带【败血】的角色开始回合时，主人自动回复 10 气血；切换运功或脱战时光环消散。\"败血期间气血回复效果降低 50%\"需 GM 手动执行。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -4122,6 +4157,12 @@
                             "trigger": "hit",
                             "active": true,
                             "script": "if (['attack', 'basic-attack'].includes(args.actionType) && args.isHit && args.target) { const eff = thisItem.effects.getName(\"败血\").toObject(); delete eff._id; eff.origin = thisItem.uuid; eff.duration = {value: 3, units: \"rounds\", expiry: \"turnStart\"}; await game.xjzl.api.effects.addEffect(args.target, eff); }"
+                        },
+                        {
+                            "label": "败血监听光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 败血监听光环（圆满）：跟随 3 米监听领域，范围内单位回合开始时若带【败血】，主人回复 10 气血。\n// 败血的施加仍由各境界 hit 脚本承担；切换运功或脱战时光环消散、监听随之移除。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-baixue-\" + actor.id,\n    displayName: \"血刀经·败血\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"败血监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -4171,6 +4212,29 @@
                     ]
                 },
                 "showIcon": 2
+            },
+            {
+                "name": "败血监听",
+                "transfer": false,
+                "img": "icons/svg/blood.svg",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "listener_baixue",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "败血监听·回合回血",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "// 败血监听：携带者带【败血】并在血刀经主人 3 米内开始回合时，主人回复 10 气血。\nconst bxSrc = await fromUuid(thisEffect.origin);\nconst bxOwner = bxSrc?.parent?.parent;\nif (!bxOwner || bxOwner.uuid === actor.uuid) return;\nconst hasBaixue = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"baixue\");\nif (!hasBaixue) return;\nawait bxOwner.applyHealing({ amount: 10, type: \"hp\", healer: actor, showScrolling: true });"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 0
             }
         ]
     },
@@ -4711,7 +4775,7 @@
             "subSect": "badaotang",
             "description": "<p>原名不详，据说流传自海外，在霸刀堂中发扬光大，临敌之时，攻其不备，趁其不意，多击腰、股之处，越是人多势众，威力更强。</p>",
             "requirement": "属性：阴柔<br>悟性：4",
-            "automationNote": "生成黑幕无法完全自动，请手动绘制区域，并给区域内的角色手动赋予【黑幕】状态。修满增加的 80 点恶行值请在人物面板手动添加。",
+            "automationNote": "部分自动化（提示卡片）：进战时发送说明卡提醒 GM；黑幕需\"每次施展虚招前\"逐次放置多实例单格区域、且\"范围内虚招检定优势\"属视线/检定类（G2），超出光环框架，黑幕的放置、累积与虚招优势均由 GM 手动结算。修满恶行值手动添加。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -4737,7 +4801,14 @@
                     },
                     "description": "<p>小成运功特效：每次施展虚招前，在你所处空格产生一团“黑幕”，持续到战斗结束。</p><p><strong>黑幕：</strong>在该范围内进行虚招检定具有优势。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "黑幕说明卡",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 黑幕：逐次虚招放置多实例单格区域且\"范围内虚招检定优势\"属 G2 视线/检定类，\n// 超出光环框架；进战发一次说明卡，由 GM 手动放置与结算。\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>恶临破空功·黑幕</b>：每次施展虚招前，请在你所处空格放置一团【黑幕】标记（持续到战斗结束，逐次累积）；处于黑幕中的角色进行虚招检定时具有优势（请 GM 手动给予）。修满的 80 点恶行值请在人物面板手动添加。</div>\"});"
+                        }
+                    ]
                 },
                 "stage3": {
                     "stats": {
@@ -4750,7 +4821,14 @@
                     },
                     "description": "<p>圆满运功特效：每次施展虚招前，在你及周围 1 米范围空格处产生一团“黑幕”，持续到战斗结束。</p><p><strong>黑幕：</strong>在该范围内进行虚招检定具有优势。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "黑幕说明卡",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 黑幕：逐次虚招放置多实例单格区域且\"范围内虚招检定优势\"属 G2 视线/检定类，\n// 超出光环框架；进战发一次说明卡，由 GM 手动放置与结算。\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>恶临破空功·黑幕</b>：每次施展虚招前，请在你及周围 1 米的空格处各放置一团【黑幕】标记（持续到战斗结束，逐次累积）；处于黑幕中的角色进行虚招检定时具有优势（请 GM 手动给予）。修满的 80 点恶行值请在人物面板手动添加。</div>\"});"
+                        }
+                    ]
                 }
             },
             "masteryEffect": "<p>修满[永久]：气血+40，内力+20。恶行值+80。</p>",

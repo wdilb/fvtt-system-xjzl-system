@@ -905,10 +905,43 @@
             "damage": 14,
             "block": 5,
             "description": "刀刃微旋，轻盈无比。<br>施展招式时，可以选择消耗5内力在自身周围1米卷起‘旋风’，持续一回合。<br>旋风：在该区域内，风云双刀格挡值+5。<br>·旋风形成在原地，不会跟随你移动，你只能拥有一个旋风，如果你卷出新的旋风，之前的消失。",
-            "automationNote": "请手动。",
+            "automationNote": "施展招式时弹窗询问是否消耗 5 内力卷起旋风：确认后自动在原地生成 1 米范围显示，持续 1 回合后自动消散，再次施展自动替换（每名施展者各自独立）。处于旋风中的持械者（仅限持握风云双刀者）格挡自动+5，他人无感。战斗外出招时光环不自动到期，可手动清除。",
             "x-xjzl-aura": true,
-            "scripts": []
-        }
+            "scripts": [
+                {
+                    "label": "旋风光环",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// 旋风：施展招式时可选消耗 5 内力，在原地卷起 1 米旋风 1 回合（单实例，新旋风替换旧的）。\n// 区域内持握风云双刀者格挡+5（payload AE 的 passive 按持械判定，他人无感）；原地放置不跟随。\nconst xfOk = await foundry.applications.api.DialogV2.confirm({\n    window: {title: \"风云双刀·旋风\"},\n    content: \"<p>消耗 5 内力在原地卷起旋风（1 米，1 回合，区域内持握风云双刀者格挡+5）？</p>\",\n    yes: {label: \"卷起旋风\", icon: \"fas fa-wind\"},\n    no: {label: \"不消耗\", icon: \"fas fa-times\"}\n});\nif (!xfOk) return;\nconst xfMp = S.resources.mp.value || 0;\nif (xfMp < 5) {\n    ui.notifications.warn(\"内力不足，无法卷起旋风。\");\n    return;\n}\nawait actor.changeResources({\"system.resources.mp.value\": {delta: -5}}, {cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : null});\nawait game.xjzl.aura.create(actor, {\n    label: \"weapon-xuanfeng-\" + actor.id,\n    displayName: \"旋风\",\n    follow: false,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"旋风\",\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "旋风",
+                "transfer": false,
+                "img": "icons/svg/windmill.svg",
+                "description": "置身旋风中，风云双刀格挡值+5（仅持握风云双刀者生效）。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xuanfeng_fengyun",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "旋风·持械判定",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "// 旋风仅对持握风云双刀者提供格挡+5，其他处于区域内的单位无感。\nconst xfHeld = (actor.itemTypes.weapon || []).some(w => w.name === \"风云双刀\" && w.system?.equipped);\nif (!xfHeld) return;\nS.combat.block += 5;"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 0
+            }
+        ]
     },
     {
         "name": "鸿鸣刀",

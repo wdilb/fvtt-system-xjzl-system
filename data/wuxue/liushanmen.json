@@ -712,9 +712,16 @@
                         ]
                     },
                     "description": "<p>蓄力动作，剑尖绕身画圆，对周围敌人造成 0.4 力量点外功伤害。然后在自身周围 3 米范围斩出半球形的‘月影’，持续到战斗脱离。<br>月影：你处于月影范围时，格挡值+5，看破值+1。<br>·月影形成在原地，不会跟随你移动，你只能拥有一个月影，如果你斩出新的月影，之前的消失。<br>升级：招式伤害+10，格挡值+5，看破值+1，内力消耗+4。</p>",
-                    "automationNote": "自动化: 伤害。手动: 月影范围判定和Buff添加（已提供'月影'AE供手动添加）。",
+                    "automationNote": "施展后自动在原地（不跟随）生成 3 米月影范围显示，持续到脱战（每名施展者独立，再次施展替换自己的旧月影）；施展者本人身处月影中时格挡自动+5×招式等级、看破自动+1×招式等级，他人无感。",
                     "x-xjzl-aura": true,
-                    "scripts": [],
+                    "scripts": [
+                        {
+                            "label": "月影光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 月影：原地（不跟随）生成 3 米光环，持续到脱战（单实例）；\n// 施展者本人在区域内自动获得格挡/看破加成（payload AE 按持有者判定）。\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-yueying-\" + actor.id,\n    displayName: \"月影\",\n    follow: false,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"月影\",\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ],
                     "actionCost": "蓄力动作"
                 },
                 {
@@ -802,30 +809,27 @@
                 },
                 {
                     "name": "月影",
-                    "description": "处于月影范围内：格挡值+5，看破值+1。",
+                    "description": "处于月影范围内的施展者本人：格挡+5×等级，看破+1×等级（他人无感）。",
                     "flags": {
                         "xjzl-system": {
                             "slug": "yueying",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "月影·持有者判定",
+                                    "trigger": "passive",
+                                    "active": true,
+                                    "script": "// 月影：仅施展者本人在月影中获益（格挡/看破按其月影碎空等级），他人进入无感。\nconst mySrc = foundry.utils.fromUuidSync(thisEffect.origin);\nconst myOwner = mySrc?.parent?.parent;\nif (!myOwner || myOwner.uuid !== actor.uuid) return;\nconst myWuxue = myOwner.items?.find(i => i.name === \"冷血剑法\");\nconst myMove = myWuxue?.system?.moves?.find(m => m.name === \"月影碎空\");\nconst myLvl = Math.max(1, myMove?.computedLevel || 1);\nS.combat.block += 5 * myLvl;\nS.combat.kanpo += 1 * myLvl;"
+                                }
+                            ]
                         }
                     },
                     "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
                     "system": {
-                        "changes": [
-                            {
-                                "key": "system.combat.block",
-                                "value": "5",
-                                "type": "add"
-                            },
-                            {
-                                "key": "system.combat.kanpo",
-                                "value": "1",
-                                "type": "add"
-                            }
-                        ]
+                        "changes": []
                     },
                     "transfer": false,
-                    "showIcon": 2
+                    "showIcon": 0
                 }
             ]
         }

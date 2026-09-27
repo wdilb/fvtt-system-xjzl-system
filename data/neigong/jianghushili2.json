@@ -376,7 +376,7 @@
             "sect": "jianghushili",
             "description": "<p>江湖奇功，修炼之后，炙热真气随体外放，周遭数十米温度上升。对敌之时，真气犹如实质，令范围内敌人如同身处沙漠，大汗淋漓。</p>",
             "requirement": "悟性12",
-            "automationNote": "1. 炙阳真气：内功内置了光环特效AE，请玩家手动将AE施加给周围的敌人。\n2. 招式距离增加：暂不支持动态修改距离，需手动计算。",
+            "automationNote": "完全自动化：进战后以自身为中心生成跟随光环（领悟/小成 5 米、圆满 20 米），范围内敌人出招内力消耗自动+5（小成起+10）；切换运功或脱战时光环消散。困难地形需 GM 手动裁定；修满的\"阳刚武学招式距离+1米\"需手动计算。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -389,7 +389,14 @@
                     },
                     "description": "<p>领悟特效：周围5米视为困难地形，所有敌人出招消耗额外5点内力。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "炙阳真气光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 炙阳真气光环：跟随敌方减益（出招内力消耗+5），半径 5 米。\n// 困难地形（G1）超出光环框架，由 GM 手动结算；切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-zhiyang-\" + actor.id,\n    displayName: \"炙阳真气\",\n    follow: true,\n    radius: 5,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"炙阳真气(敌方)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 },
                 "stage2": {
                     "stats": {
@@ -402,7 +409,14 @@
                     },
                     "description": "<p>小成特效：周围5米视为困难地形，所有敌人出招消耗额外10点内力。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "炙阳真气光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 炙阳真气光环：跟随敌方减益（出招内力消耗+10），半径 5 米。\n// 困难地形（G1）超出光环框架，由 GM 手动结算；切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-zhiyang-\" + actor.id,\n    displayName: \"炙阳真气\",\n    follow: true,\n    radius: 5,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"炙阳真气II(敌方)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 },
                 "stage3": {
                     "stats": {
@@ -415,7 +429,14 @@
                     },
                     "description": "<p>圆满特效：周围20米视为困难地形，所有敌人出招消耗额外10点内力。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "炙阳真气光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 炙阳真气光环：跟随敌方减益（出招内力消耗+10），半径 20 米。\n// 困难地形（G1）超出光环框架，由 GM 手动结算；切换运功或脱战时消散。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-zhiyang-\" + actor.id,\n    displayName: \"炙阳真气\",\n    follow: true,\n    radius: 20,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"炙阳真气II(敌方)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 }
             },
             "masteryEffect": "<p>修满[永久]：气血+60，内力+60。<br>你施展阳、刚武学时招式距离+1米。</p>",
@@ -920,7 +941,7 @@
             "sect": "jianghushili",
             "description": "<p>唐代道门真君赵惠宗所作，“生我于虚，置我于无，至精为神，元气为躯”，修炼真道养神之法，大成后气度不凡，如一方尊王。</p>",
             "requirement": "悟性15",
-            "automationNote": "自身加成：完全自动化。\n2. 友方光环：已提供模板 AE，需玩家手动将 AE 拖给队友并修改数值。",
+            "automationNote": "自身加成完全自动化（各境界按神采等级加成）。圆满后进战自动生成 20 米跟随光环，范围内其他友方自动获得【天帝威仪】，加值自动等于运行者当前的神采等级；切换运功或脱战时光环消散。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -979,6 +1000,12 @@
                             "trigger": "passive",
                             "active": true,
                             "script": "const shencaiLvl = Math.floor(S.stats.shencai.total / 10);\nS.combat.damages.global.mod += shencaiLvl;\nS.combat.hit_waigong += shencaiLvl;\nS.combat.hit_neigong += shencaiLvl;"
+                        },
+                        {
+                            "label": "天帝威仪光环",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "// 天帝威仪光环：跟随友方（不含自身，自身加成由本境 passive 提供），半径 20 米。\n// 数值随运行者神采等级动态：payload AE 的 passive 脚本经 origin 回溯运行者计算。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-tiandi-\" + actor.id,\n    displayName: \"天帝威仪\",\n    follow: true,\n    radius: 20,\n    faction: \"ally\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"天帝威仪(友方)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -1009,33 +1036,25 @@
         "effects": [
             {
                 "name": "天帝威仪(友方)",
-                "description": "受到天帝遗简光环加持，获得伤害和命中加值（请手动修改数值等于内功运行者的神采等级）。",
+                "description": "受到天帝遗简光环加持，获得伤害和命中加值，数值等于运行者的神采等级（自动计算，无需手动修改）。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "tiandi_aura",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "天帝威仪·动态加值",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "// 天帝威仪：加值 = 运行者神采等级。经 origin 回溯到运行者（内功持有者），\n// 每次 derive 重算动态跟随其神采变化；自身不在光环覆盖内（其加成由内功 passive 提供），跳过防双算。\nconst tdSrc = foundry.utils.fromUuidSync(thisEffect.origin);\nconst tdOwner = tdSrc?.parent?.parent;\nif (!tdOwner || tdOwner.uuid === actor.uuid) return;\nconst tdLvl = Math.floor((tdOwner.system?.stats?.shencai?.total || 0) / 10);\nif (!tdLvl) return;\nS.combat.damages.global.mod += tdLvl;\nS.combat.hit_waigong += tdLvl;\nS.combat.hit_neigong += tdLvl;"
+                            }
+                        ]
                     }
                 },
                 "img": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
                 "system": {
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.global.mod",
-                            "value": "0",
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.hit_waigong",
-                            "value": "0",
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.hit_neigong",
-                            "value": "0",
-                            "type": "add"
-                        }
-                    ]
+                    "changes": []
                 },
                 "showIcon": 2
             }
@@ -3042,7 +3061,7 @@
             "subSect": "wudujiao",
             "description": "<p>传闻乃是神农时代留下的盖世毒功，聚天下奇草毒虫，练就万毒神功，从此以毒代血，化为异人。没有任何人见过或练成过。</p>",
             "requirement": "悟性11",
-            "automationNote": "完全手动。请手动应用“毒血”。毒素储存功能需玩家手动记录。",
+            "automationNote": "完全手动：周围 3 米内开始回合的角色获得你的“毒血”效果时，请按毒血对应的毒药规则结算。小成和圆满的检定难度加值分别为 +3、+6；圆满可同时储存两种毒素。毒血内容、持续和移除由玩家与 GM 手动记录和处理。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -5202,7 +5221,7 @@
                             "label": "青海光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 青海光环：全体含己视作处于水中（领悟 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai\",\n    displayName: \"青海\",\n    follow: true,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(领悟)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                            "script": "// 青海光环：全体含己视作处于水中（领悟 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(领悟)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },
@@ -5221,7 +5240,7 @@
                             "label": "青海光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 青海光环：全体含己视作处于水中（小成 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai\",\n    displayName: \"青海\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(小成)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                            "script": "// 青海光环：全体含己视作处于水中（小成 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(小成)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },
@@ -5240,7 +5259,7 @@
                             "label": "青海光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 青海光环：全体含己视作处于水中（圆满 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai\",\n    displayName: \"青海\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(圆满)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                            "script": "// 青海光环：全体含己视作处于水中（圆满 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(圆满)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }

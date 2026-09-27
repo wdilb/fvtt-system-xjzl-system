@@ -3,9 +3,10 @@
  *
  * 业务模型：
  * - **Region 事件是施加事实源**：每次被接受的真实 tokenEnter 都调用一次
- *   门面 addEffect；throttlePerRound 是进入事件唯一的业务节流；回合挂载
- *   每个有效回合事件调用一次 addEffect（叠层累加与非叠层刷新语义全部
- *   归门面）。不以账本存在性、也不以当前覆盖状态否定已发生的事件。
+ *   门面 addEffect；throttlePerRound 是进入事件的业务节流；oncePerRound
+ *   可把进入与指定回合事件合并为同一轮次节流。回合挂载每个被接受的事件
+ *   调用一次 addEffect（叠层累加与非叠层刷新语义全部归门面）。不以账本
+ *   存在性、也不以当前覆盖状态否定已发生的事件。
  * - **账目是清理收据，不是覆盖状态事实源**：账本按 Region flag
  *   `xjzl-system.ledger` 保存，身份 tokenId → behaviorId，一行为对一目标
  *   至多一条；条目自带 actorUuid，Token 删除后仍可按它解析 Actor 清理。
@@ -226,7 +227,7 @@ export class AuraLedger {
   }
 
   /**
-   * 读取上次进入结算的节流键。
+   * 读取上次按轮次节流的结算键（进入与 oncePerRound 回合事件共用）。
    * @param {RegionDocument} region - 光环 region
    * @param {string} scopeKey - 节流作用域键 `${behaviorId}|${tokenId}`；
    *   行为维度使同 region 多行为的节流互不影响
@@ -302,17 +303,19 @@ export class AuraLedger {
     const sourceToken = await resolveSourceToken(meta);
     if (!passesFilter(system, token, sourceToken)) return;
 
-    // 节流以 {战斗 ID, 轮次} 为键、作用域含行为与 Token：战斗外
-    // currentThrottleKey 为 null、不节流；命中则本回合不再结算。
+    // 两种轮次节流共用同一存储键；oncePerRound 还用于回合事件，
+    // 使进入与回合开始按先后只触发一次。战斗外不节流。
     const throttleKey = currentThrottleKey();
-    if (system.throttlePerRound && throttleKey
-      && this.getThrottle(region, `${op.behaviorId}|${token.id}`) === throttleKey) return;
+    const throttleEnabled = system.throttlePerRound || system.oncePerRound;
+    const throttleScope = `${op.behaviorId}|${token.id}`;
+    if (throttleEnabled && throttleKey
+      && this.getThrottle(region, throttleScope) === throttleKey) return;
 
     // 每次真实进入施加一次；记账先于直接动作：动作抛错时账目已记录。
     const entry = await this.#applyPayload(system, meta, region, token, actor, op.behaviorId);
     await applyAction(system.enterAction, actor, sourceToken?.actor ?? null);
-    if (system.throttlePerRound && throttleKey) {
-      await this.setThrottle(region, `${op.behaviorId}|${token.id}`, throttleKey);
+    if (throttleEnabled && throttleKey) {
+      await this.setThrottle(region, throttleScope, throttleKey);
     }
 
     // 施加过程中 region 被删除：退出事件不会再来，cleanup 账目就地补偿
@@ -401,7 +404,7 @@ export class AuraLedger {
    * tokenRoundEnd）→ timing 匹配 → 去重 → 挂 AE / 直接动作。
    * 回合事件由活动 GM 派发、每单位每回合各一次，去重集合提供
    * 幂等保障（防核心重放与我方回合队列交错双发）。
-   * 挂载特效：每个有效回合事件都调用一次 addEffect——可叠层逐次累加
+   * 挂载特效：每个被接受的回合事件都调用一次 addEffect——可叠层逐次累加
    * 贡献，非叠层重复施加走门面的覆盖/刷新语义；账目冻结边界见
    * #applyPayload。
    * @param {object} op - 队列操作（携带 timing/combatId/round）
@@ -416,8 +419,13 @@ export class AuraLedger {
     const system = behavior.system;
     if (system.roundTiming !== op.timing) return;
     const kind = system.roundAction?.kind;
-    // 未配置动作且未配置挂载特效 → 无回合结算
-    if (actionKindOf(system.roundAction) === "none" && kind !== "effect") return;
+    const hasPayload = payloadConfigured(system);
+    // oncePerRound 可在回合事件中挂载 payload；普通回合挂载仍由
+    // roundAction.kind=effect 显式启用。
+    const roundHasWork = actionKindOf(system.roundAction) !== "none"
+      || kind === "effect"
+      || (system.oncePerRound && hasPayload);
+    if (!roundHasWork) return;
 
     const dedupKey = `${op.behaviorId}|${op.regionUuid}|${op.tokenUuid}|${op.timing}|${op.combatId}|${op.round}`;
     if (processedRounds.has(dedupKey)) return;
@@ -427,7 +435,17 @@ export class AuraLedger {
     const sourceToken = await resolveSourceToken(meta);
     if (!passesFilter(system, token, sourceToken)) return;
 
-    if (kind === "effect") {
+    // oncePerRound 与 enter 共用同一轮次键。processedRounds 负责同一事件
+    // 去重，flags.throttle 负责跨事件（进入/回合）二选一。
+    // 回合事件携带的战斗/轮次是事件事实源，避免队列稍有延迟时误用当前轮次。
+    const throttleKey = op.combatId && Number.isFinite(op.round)
+      ? `${op.combatId}:${op.round}`
+      : currentThrottleKey();
+    const throttleScope = `${op.behaviorId}|${token.id}`;
+    if (system.oncePerRound && throttleKey
+      && this.getThrottle(region, throttleScope) === throttleKey) return;
+
+    if (kind === "effect" || (system.oncePerRound && hasPayload)) {
       const entry = await this.#applyPayload(system, meta, region, token, actor, op.behaviorId);
       // 施加过程中 region 被删除：退出事件不会再来，cleanup 账目就地
       // 补偿释放；不清理语义按"不清理"保留。
@@ -435,9 +453,13 @@ export class AuraLedger {
         await this.#releaseContribution(actor, entry);
         if (entry.eid) rememberDedup(processedEids, entry.eid);
       }
-      return;
     }
-    await applyAction(system.roundAction, actor, sourceToken?.actor ?? null);
+    if (actionKindOf(system.roundAction) !== "none") {
+      await applyAction(system.roundAction, actor, sourceToken?.actor ?? null);
+    }
+    if (system.oncePerRound && throttleKey) {
+      await this.setThrottle(region, throttleScope, throttleKey);
+    }
   }
 
   /* -------------------------------------------- */
@@ -479,12 +501,15 @@ export class AuraLedger {
     const cleanup = Boolean(existing || system.cleanupOnExit);
     const refChanged = Boolean(existing?.ref)
       && (existing.ref.item !== (system.payloadItemUuid ?? "")
-        || existing.ref.name !== (system.payloadEffectName ?? ""));
+        || existing.ref.name !== (system.payloadEffectName ?? "")
+        || existing.ref.statusId !== (system.payloadStatusId ?? ""));
     const ref = refChanged
       ? {...existing.ref}
-      : (system.payloadItemUuid && system.payloadEffectName
-        ? {item: system.payloadItemUuid, name: system.payloadEffectName}
-        : null);
+      : (system.payloadStatusId
+        ? {statusId: system.payloadStatusId}
+        : (system.payloadItemUuid && system.payloadEffectName
+          ? {item: system.payloadItemUuid, name: system.payloadEffectName}
+          : null));
     if (!ref) return null;
     const effect = await resolvePayloadRef(ref);
     if (!effect) return null;
@@ -593,7 +618,11 @@ export class AuraLedger {
       tokenUuid: token.uuid,
       behaviorId,
       slug: effect.slug,
-      ref: {item: system.payloadItemUuid ?? "", name: system.payloadEffectName ?? ""},
+      ref: {
+        item: system.payloadItemUuid ?? "",
+        name: system.payloadEffectName ?? "",
+        statusId: system.payloadStatusId ?? ""
+      },
       stackable: false,
       contributedStacks: 0,
       existedBeforeAura: false,
@@ -683,14 +712,26 @@ async function resolveSourceToken(meta) {
 }
 
 /**
- * 解析 payload 引用为可施加的 AE 数据（源物品 UUID＋效果名）。
+ * 解析 payload 引用为可施加的 AE 数据（源物品 UUID＋效果名，或系统状态 ID）。
  * 返回的 slug 是**实际** slug——优先显式 flag，与门面 getSlug 的匹配口径
  * 完全一致；账本查找、摘除都必须用它，否则显式 slug 的 payload 施加后
  * 无法按账本摘除。
- * @param {{item: string, name: string}} ref - payload 引用快照
+ * @param {{item?: string, name?: string, statusId?: string}} ref - payload 引用快照
  * @returns {Promise<{data: object, slug: string}|null>} 解析失败返回 null（已警告）
  */
 async function resolvePayloadRef(ref) {
+  if (ref?.statusId) {
+    const statusData = CONFIG.statusEffects?.[ref.statusId];
+    if (!statusData) {
+      console.warn(`XJZL | 光环系统状态 payload 不可解析: "${ref.statusId}"`);
+      return null;
+    }
+    const data = foundry.utils.deepClone(statusData);
+    if (!data.statuses) data.statuses = [statusData.id || ref.statusId];
+    if (!data.origin) data.origin = `status:${ref.statusId}`;
+    const slug = foundry.utils.getProperty(data, "flags.xjzl-system.slug") || ref.statusId;
+    return {data, slug};
+  }
   if (!ref?.item || !ref?.name) return null;
   const item = await fromUuid(ref.item);
   const found = item?.effects?.find(e => e.name === ref.name);
@@ -816,6 +857,16 @@ async function applyAction(action, actor, sourceActor) {
 function actionKindOf(action) {
   const kind = action?.kind;
   return (kind === "damage" || kind === "healing") ? kind : "none";
+}
+
+/**
+ * 判断行为是否配置了可挂载 payload；系统状态与物品特效引用均支持。
+ * @param {object} system - 光环行为 system 数据
+ * @returns {boolean}
+ */
+function payloadConfigured(system) {
+  return Boolean(system?.payloadStatusId
+    || (system?.payloadItemUuid && system?.payloadEffectName));
 }
 
 async function resolveAmount(raw, sourceActor) {

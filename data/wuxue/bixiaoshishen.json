@@ -58,7 +58,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>以声为剑，开启架招。格挡成功时，在周身 @{1 + @up|1} 米范围内制造一个‘箫音障’持续两回合。</p><p><strong>箫音障：</strong>区域内敌人在他的回合初受到 10 点精神伤害。</p><p>·箫音障形成在原地，不会跟随你移动，你只能拥有一个箫音障，如果你形成新的，之前的消失。</p><p><strong>升级：</strong>格挡值+10，箫音障范围+1 米，消耗+2。</p>",
-                    "automationNote": "格挡后获得箫音障提示AE。区域伤害手动处理。",
+                    "automationNote": "格挡成功后自动在原地（不跟随）生成箫音障范围显示，半径 1+升级 米、持续 2 回合后自动消散（每名施展者独立，再次格挡替换自己的旧箫音障）；区域内敌人各自回合开始时自动受到 10 点精神伤害。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -73,10 +73,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡-箫音障",
+                            "label": "箫音障光环",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取升级后的范围\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst range = 1 + (lvl - 1);\n\n// 查找旧的并删除\nconst oldEff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xiaoyinzhang\");\nif (oldEff) await game.xjzl.api.effects.removeEffect(actor, \"xiaoyinzhang\", 1);\n\n// 添加新AE作为标记\nconst effData = thisItem.effects.getName(\"箫音障\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.name = `箫音障 (${range}米)`;\nawait game.xjzl.api.effects.addEffect(actor, effData);\n\nui.notifications.info(`已生成箫音障 (半径${range}米)，请手动处理回合初伤害。`);",
-                            "active": true
+                            "active": true,
+                            "script": "// 箫音障：格挡成功后在原地（不跟随）生成放置光环，半径 1+升级 米，持续 2 回合（单实例）；\n// 区域内敌人各自回合初受 10 点精神伤害（必中不暴击）。\nif (!Macros.checkStance(actor, args)) return;\nconst xyStanceId = actor.system.martial.stance;\nconst xyMoveData = thisItem.system.moves.find(m => m.id === xyStanceId);\nconst xyLvl = Math.max(1, xyMoveData?.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-xiaoyinzhang-\" + actor.id,\n    displayName: \"箫音障\",\n    follow: false,\n    radius: xyLvl,\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: \"10\", type: \"mental\"},\n    durationRounds: 2,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },

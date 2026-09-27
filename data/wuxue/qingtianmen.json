@@ -1892,7 +1892,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>矗剑于地，山峙渊渟，在自身周围 @{2 + @up|2} 米范围内形成‘剑嶽’，持续到战斗脱离。</p><p><strong>剑嶽：</strong>区域内的敌人感受到磅礴沉重的压力，视作处于困难地形之中。‘剑嶽’范围外的敌人在你的每个回合末，向中心被拉扯 @{1 + @up|1} 米。</p><p>·你可以消耗次要动作拔起重剑，挥舞剑气，对‘剑嶽’范围内的每一个敌人分别进行一次普通攻击，且这次攻击无视目标架招（视作目标无架招）。</p><p><strong>升级：</strong>‘剑嶽’的范围扩大 1 米，‘剑嶽’范围外的敌人被拉扯的距离增加 1 米，内力消耗+10。</p>",
-                    "automationNote": "部分自动化：点击应用获得[剑嶽]状态。普通攻击时弹窗询问是否消耗次要动作发动【挥舞剑气】，确认后本次攻击自动无视架招并发送提示卡片（次要动作消耗请自行记录）。困难地形、回合末拉扯需手动处理。",
+                    "automationNote": "施展时自动获得【剑嶽】状态（挥舞剑气询问与穿透自动结算），并自动生成 1+升级 米跟随剑嶽范围显示（每名施展者独立，持续到脱战）与一次说明卡。区域内敌人移动视作困难地形、范围外敌人回合末被拉向中心，均需 GM 手动结算。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -1912,9 +1912,15 @@
                     "scripts": [
                         {
                             "label": "开启剑嶽",
-                            "trigger": "hit",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"剑嶽\");\nif (!eff) return ui.notifications.warn(\"未找到特效数据\");\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst range = 1 + lvl;\nconst pull = lvl;\n\nconst effectData = eff.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.description = `周围 ${range} 米视为困难地形。回合末范围外敌人向中心拉扯 ${pull} 米。`;\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                            "script": "const eff = thisItem.effects.getName(\"剑嶽\");\nif (!eff) return ui.notifications.warn(\"未找到特效数据\");\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst range = 1 + lvl;\nconst pull = lvl;\n\nconst effectData = eff.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.description = `周围 ${range} 米视为困难地形。回合末范围外敌人向中心拉扯 ${pull} 米。`;\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                        },
+                        {
+                            "label": "剑嶽区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 剑嶽（仅标记）：跟随 1+升级 米标记光环，持续到脱战（单实例）；\n// 区域规则发一次说明卡：困难地形与回合末拉扯由 GM 手动结算，挥舞剑气由【剑嶽】AE 自带脚本承担。\nconst jyqLvl = Math.max(1, args.move.computedLevel || 1);\nif (game.xjzl.aura.query(\"wuxue-jianyue-\" + actor.id).length) return;\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-jianyue-\" + actor.id,\n    displayName: \"剑嶽\",\n    follow: true,\n    radius: 1 + jyqLvl,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>剑嶽</b>已立（\" + (1 + jyqLvl) + \" 米，持续到脱战）：区域内敌人视作困难地形（请 GM 手动裁定移动）；范围外敌人每个你的回合末向中心拉扯 \" + jyqLvl + \" 米（G3 位移请手动结算）；消耗次要动作可挥舞剑气对区域内每个敌人各进行一次无视架招的普通攻击（由【剑嶽】状态自动询问）。</div>\"});"
                         }
                     ]
                 }

@@ -847,10 +847,41 @@
             "damage": 20,
             "block": 10,
             "description": "<p>春秋赵鞅铸，散发幽幽青光，透出阵阵寒意。</p><p><strong>效果：</strong>以该武器开启架招时，处于自身周围1米范围内的友方格挡值+10。</p>",
-            "automationNote": "需手动：请手动检测范围并调整友方属性。",
+            "automationNote": "以长枪类武器开启的架招生效后，自动生成 1 米跟随范围显示，范围内友方（含己）自动获得格挡+10，进出即时生效；解除架招或脱战时光环消散并移除效果。开启架招的那个动作本身不生成（架招状态在其后置位），自动在首次出招或防御时补上。",
             "x-xjzl-aura": true,
-            "scripts": []
-        }
+            "scripts": [
+                {
+                    "label": "保晋戈·枪阵光环",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// 保晋戈·枪阵：以本武器（长枪）开启的架招存续期间，1 米友方（含己）格挡+10。\n// 架招开启动作先于架招状态置位，光环在实际状态生效后的首次出招时生成（单实例，已存在则跳过）；\n// 解除架招（stance）或脱战时消散。需求文本匹配武器子类，确认架招确以长枪类武器开启。\nif (!S.martial.stanceActive || !S.martial.stance) return;\nif (game.xjzl.aura.query(\"weapon-baojin-\" + actor.id).length) return;\nlet bjMove = null;\nfor (const bjWu of actor.items) {\n    const found = (bjWu.system?.moves || []).find(mv => mv.id === S.martial.stance);\n    if (found) { bjMove = found; break; }\n}\nif (!bjMove || !(bjMove.requirements || \"\").includes(thisItem.system.subtype)) return;\nawait game.xjzl.aura.create(actor, {\n    label: \"weapon-baojin-\" + actor.id,\n    displayName: \"保晋戈·枪阵\",\n    follow: true,\n    radius: 1,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"保晋戈·枪阵\",\n    lifecycle: \"stance\",\n    sourceItemUuid: thisItem.uuid,\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "保晋戈·枪阵",
+                "transfer": false,
+                "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+                "description": "保晋戈架招枪阵庇护，格挡值+10。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "baojin_gunzhen",
+                        "stackable": false
+                    }
+                },
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "断魂枪",

@@ -118,13 +118,16 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
                 label: "XJZL.AuraBehavior.FIELDS.includeSelf.label",
                 hint: "XJZL.AuraBehavior.FIELDS.includeSelf.hint"}),
 
-            // ---- payload 引用（源物品 UUID＋效果名）----
+            // ---- payload 引用（源物品效果或系统通用状态）----
             payloadItemUuid: new fields.StringField({required: true, blank: true, initial: "",
                 label: "XJZL.AuraBehavior.FIELDS.payloadItemUuid.label",
                 hint: "XJZL.AuraBehavior.FIELDS.payloadItemUuid.hint"}),
             payloadEffectName: new fields.StringField({required: true, blank: true, initial: "",
                 label: "XJZL.AuraBehavior.FIELDS.payloadEffectName.label",
                 hint: "XJZL.AuraBehavior.FIELDS.payloadEffectName.hint"}),
+            payloadStatusId: new fields.StringField({required: true, blank: true, initial: "",
+                label: "XJZL.AuraBehavior.FIELDS.payloadStatusId.label",
+                hint: "XJZL.AuraBehavior.FIELDS.payloadStatusId.hint"}),
 
             // ---- 进入结算动作 ----
             enterAction: actionField(),
@@ -136,6 +139,11 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
             throttlePerRound: new fields.BooleanField({initial: false,
                 label: "XJZL.AuraBehavior.FIELDS.throttlePerRound.label",
                 hint: "XJZL.AuraBehavior.FIELDS.throttlePerRound.hint"}),
+            // 进入与选定回合时机共用同一轮次节流；用于“首次进入或在范围内开始回合”
+            // 这类二选一触发，避免同一单位在同一回合重复结算。
+            oncePerRound: new fields.BooleanField({initial: false,
+                label: "XJZL.AuraBehavior.FIELDS.oncePerRound.label",
+                hint: "XJZL.AuraBehavior.FIELDS.oncePerRound.hint"}),
 
             // ---- 回合结算动作 ----
             // choices 值必须与 CONST.REGION_EVENTS 的事件名一致（handler 按
@@ -324,7 +332,8 @@ class XJZLAuraBehaviorConfig extends foundry.applications.sheets.RegionBehaviorC
             // 自动挂载特效（进入生效时挂；回合生效选"挂载特效"时也用它）
             {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.effect", fields: [
                 pick(f.payloadItemUuid, "system.payloadItemUuid"),
-                pick(f.payloadEffectName, "system.payloadEffectName")
+                pick(f.payloadEffectName, "system.payloadEffectName"),
+                pick(f.payloadStatusId, "system.payloadStatusId")
             ]},
             // 进入生效
             {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.enter", fields: [
@@ -334,7 +343,8 @@ class XJZLAuraBehaviorConfig extends foundry.applications.sheets.RegionBehaviorC
                 pick(ea.type, "system.enterAction.type"),
                 pick(ea.pierce, "system.enterAction.pierce"),
                 pick(f.moveWithin, "system.moveWithin"),
-                pick(f.throttlePerRound, "system.throttlePerRound")
+                pick(f.throttlePerRound, "system.throttlePerRound"),
+                pick(f.oncePerRound, "system.oncePerRound")
             ]},
             // 回合生效
             {fieldset: true, legend: "XJZL.AuraBehavior.SECTIONS.round", fields: [

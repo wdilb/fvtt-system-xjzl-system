@@ -1581,8 +1581,8 @@
                     "range": "15米",
                     "targetInfo": "环境区域",
                     "actionCost": "蓄力动作",
-                    "description": "<p>挽弓指天，急速抛射箭矢，在目标空格及其周围 3 米范围形成‘箭雨’，持续三回合。</p><p><strong>箭雨：</strong>每回合第一次进入此范围或在此范围开始回合的敌人和其他友方受到 10 点气血流失，且获得一层“流血”，持续到战斗脱离。</p><p>·招式将根据消耗箭矢的品级，提升箭雨的气血流失数值：<br>凡品+0，铜品+5，银品+10，金品+30，玉品+100。</p><p><strong>升级：</strong>箭雨气血流失伤害+5，内力消耗+2。</p>",
-                    "automationNote": "此招式阻断了直接指向目标的伤害，而是发送环境布置卡片。请依靠卡片提示，手动消耗相应品阶的箭矢，并利用系统的[流血]效果施加给踏入此区域的人。",
+                    "description": "<p>挽弓指天，急速抛射箭矢，在目标空格及其周围 3 米范围形成‘箭雨’，持续三回合。</p><p><strong>箭雨：</strong>每回合第一次进入此范围或在此范围开始回合的所有角色（包括施展者）受到 10 点气血流失，且获得一层“流血”，持续到战斗脱离。</p><p>·招式将根据消耗箭矢的品级，提升箭雨的气血流失数值：<br>凡品+0，铜品+5，银品+10，金品+30，玉品+100。</p><p><strong>升级：</strong>箭雨气血流失伤害+5，内力消耗+2。</p>",
+                    "automationNote": "施展时先选择本次使用的箭矢品级（不自动处理真实消耗），再选择目标空格，建立 3 米箭雨范围，持续 3 回合；取消任一选择则不创建区域。范围内所有角色（包括施展者）每回合首次进入或在范围内开始回合时自动结算气血流失并获得系统通用【流血】。流血层保留，脱战后的移除由玩家手动处理。",
                     "x-xjzl-aura": true,
                     "costs": {
                         "mp": [
@@ -1609,10 +1609,10 @@
                             "active": true
                         },
                         {
-                            "label": "发送地形指引卡",
-                            "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst baseDmg = 10 + (lvl - 1) * 5;\nconst msg = `\n<div class=\"xjzl-chat-card\">\n    <div class=\"card-content-wrapper\" style=\"border-left:4px solid #8e44ad; padding-left: 8px;\">\n        <div style=\"font-weight:bold; color:#8b0000; font-size:1.1em;\"><i class=\"fas fa-cloud-meatball\"></i> 箭雨已形成！</div>\n        <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n            请在地面放置一个 <b>3米范围</b> 的标记（持续三回合）。<br><hr>\n            进入该区域者需手动执行：<br>\n            1. 造成 <b>外功真实流失 (基础${baseDmg} + 箭矢品质修正)</b>。<br>\n            2. 添加系统通用效果<b>[流血]</b>一层。\n        </div>\n    </div>\n</div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });",
-                            "active": true
+                            "label": "箭雨区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 出招阶段只创建一次区域，与目标数量无关；先选择箭矢品级，再由玩家在画布上选择落点。\n// oncePerRound 让“首次进入/范围内开始回合”共用一次触发；两种入口都结算流失并挂一层系统通用【流血】。\nconst jyLvl = Math.max(1, move.computedLevel || 1);\nconst quality = await foundry.applications.api.DialogV2.wait({\n    window: {title: \"漫天箭雨·箭矢品级\"},\n    content: \"<p>请选择本次消耗的箭矢品级（系统不自动处理真实消耗）：</p>\",\n    buttons: [\n        {action: \"凡品\", label: \"凡品（+0）\"},\n        {action: \"铜品\", label: \"铜品（+5）\"},\n        {action: \"银品\", label: \"银品（+10）\"},\n        {action: \"金品\", label: \"金品（+30）\"},\n        {action: \"玉品\", label: \"玉品（+100）\"}\n    ]\n});\nif (!quality) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消箭矢品级选择，本次出招中止。\";\n    return;\n}\nconst qualityBonus = {凡品: 0, 铜品: 5, 银品: 10, 金品: 30, 玉品: 100}[quality] ?? 0;\nconst jyDmg = 10 + 5 * (jyLvl - 1) + qualityBonus;\nconst jyRegion = await game.xjzl.auraQuick.place({\n    label: \"wuxue-jianyu-\" + actor.id,\n    displayName: \"箭雨\",\n    sourceActorUuid: actor.uuid,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadStatusId: \"bleed_stack\",\n    enterAction: {kind: \"damage\", amount: String(jyDmg), type: \"liushi\"},\n    oncePerRound: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(jyDmg), type: \"liushi\"},\n    durationRounds: 3,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: false\n});\nif (!jyRegion) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消箭雨落点选择，本次出招中止。\";\n}"
                         }
                     ]
                 }

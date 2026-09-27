@@ -3113,7 +3113,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>尺暗藏袖，开启架招。格挡成功后，在周围 5 米范围创造‘乾坤气场’，持续两回合。</p><p><strong>乾坤气场：</strong>区域内敌人在他的回合初流失 5 气血。</p><p><strong>升级：</strong>格挡值+10，气血流失+5，内力消耗+2。</p>",
-                    "automationNote": "获得气场AE自动。气场对敌效果手动（提供AE说明）。",
+                    "automationNote": "格挡成功后自动以自身为中心生成 5 米跟随气场，持续 2 回合后自动消散（每名施展者独立，再次格挡替换自己的旧气场）；区域内敌人各自回合开始时自动流失 5×招式等级 点气血。【得寸进尺】【百尺竿头】对气场内目标的联动由各自招式结算。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -3128,10 +3128,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "激活气场",
+                            "label": "乾坤气场光环",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = thisItem.effects.getName(\"乾坤气场\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "// 乾坤气场：格挡成功后以自身为中心生成 5 米光环，持续 2 回合（单实例）；\n// 区域内敌人各自回合初流失 5×招式等级 气血（liushi 真实伤害，必中不暴击）。\nif (!Macros.checkStance(actor, args)) return;\nconst qkLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-qiankun-\" + actor.id,\n    displayName: \"乾坤气场\",\n    follow: true,\n    radius: 5,\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(5 * qkLvl), type: \"liushi\"},\n    durationRounds: 2,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },

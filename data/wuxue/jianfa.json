@@ -1524,7 +1524,7 @@
                             "label": "无涯光环",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 无涯光环：跟随友方增益，单实例（同标签自动替换旧实例），时限随招式等级成长。\n// 半径 = 2 + 等级（3/4/5 米），持续 = 2 + 等级（3/4/5 回合），payload 按等级取对应档位。\nconst lvl = Math.max(1, Math.min(3, move.computedLevel || 1));\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-wuya\",\n    displayName: \"无涯\",\n    follow: true,\n    radius: 2 + lvl,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: `无涯 (${lvl}级)`,\n    durationRounds: 2 + lvl,\n    lifecycle: \"combat\",\n    cleanupOnExit: true\n});"
+                            "script": "// 无涯光环：跟随友方增益，单实例（同标签自动替换旧实例），时限随招式等级成长。\n// 半径 = 2 + 等级（3/4/5 米），持续 = 2 + 等级（3/4/5 回合），payload 按等级取对应档位。\nconst lvl = Math.max(1, Math.min(3, move.computedLevel || 1));\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-wuya-\" + actor.id,\n    displayName: \"无涯\",\n    follow: true,\n    radius: 2 + lvl,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: `无涯 (${lvl}级)`,\n    durationRounds: 2 + lvl,\n    lifecycle: \"combat\",\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -6820,7 +6820,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，内力释放，在周围产生‘云气’，仿佛置身天际，持续三回合。在‘云气’范围内，每有一层“龙气”，闪避值+3。</p><p>当你处于“真龙”状态，吞云吐雾，你可以消耗反应，使一个‘云气’内的角色对你的一次攻击丢失。</p><p><strong>升级：</strong>云气距离+1，内力消耗+2。</p>",
-                    "automationNote": "纯手动。请自行判定范围与闪避加值。",
+                    "automationNote": "施展后自动生成 3+升级 米跟随云气范围显示，持续 3 回合后自动消散（每名施展者独立）；范围内友方（含己）置身云气时，自身每层【龙气】自动使闪避+3。真龙状态消耗反应使云气内角色一次攻击丢失，需 GM 手动处理。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -6832,7 +6832,15 @@
                             4,
                             6
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "云气光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 云气：跟随友方光环（含己），半径 3+升级 米，持续 3 回合。\n// 闪避加成由 payload AE 按携带者自身龙气层数动态结算；真龙反应（使一次攻击丢失）无触发器，由 GM 手动处理。\nconst yqLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-yunqi-\" + actor.id,\n    displayName: \"云气\",\n    follow: true,\n    radius: 3 + yqLvl,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"云气\",\n    durationRounds: 3,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
                 },
                 {
                     "name": "火树银花",
@@ -7005,6 +7013,30 @@
                         "changes": []
                     },
                     "showIcon": 2
+                },
+                {
+                    "name": "云气",
+                    "transfer": false,
+                    "img": "icons/magic/air/fog-gas-cloud-smoke-blue.webp",
+                    "description": "置身云气中，每层龙气使闪避+3（按自身龙气层数）。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yunqi_haiashi",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "云气·龙气闪避",
+                                    "trigger": "passive",
+                                    "active": true,
+                                    "script": "// 云气：携带者每有一层【龙气】闪避+3（读自身龙气层数，动态）。\nconst yqLongqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"longqi\");\nif (!yqLongqi) return;\nconst yqStacks = yqLongqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\nS.combat.dodge += 3 * yqStacks;"
+                                }
+                            ]
+                        }
+                    },
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 2
                 }
             ]
         }
@@ -7093,7 +7125,7 @@
                     "targetInfo": "地面",
                     "actionCost": "主要动作",
                     "description": "<p>剑气横扫，在面前创造一道 3m*1m，高约 2m 的‘剑气白云’，持续 2 回合。</p><p><strong>剑气白云：</strong>在剑气白云中开始回合或进入剑气白云中的所有敌人和其他友方受到 0.4 内息点内功伤害。（必定命中，但无法造成暴击）</p><p>·此招中的内息是施展本招式者的内息属性。</p><p>·剑气白云形成在原地，不会跟随你移动，你只能拥有一个剑气白云，如果你形成新的剑气白云，之前的消失。</p><p>·若战场内有敌人在半空中，可消耗反应动作朝其所在的方向，释放此招。</p><p><strong>升级：</strong>‘剑气白云’伤害+10，内力消耗+2。</p>",
-                    "automationNote": "造物生成手动。区域伤害需手动应用。",
+                    "automationNote": "施展后自动在面前生成 3×1 矩形剑气白云范围显示（按朝向转向，原地不跟随，每名施展者独立），持续 2 回合后自动消散；进入或在其中开始回合的敌人和其他友方自动受到（0.4×施展者内息 + 10×升级）点内功伤害（必中不暴击）。锚位与朝向可在区域配置中微调；半空反应释放需 GM 手动处理。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -7114,10 +7146,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "生成提示",
-                            "trigger": "hit_once",
-                            "script": "const dmg = args.baseDamage || 0;\nui.notifications.info(`请手动生成 [剑气白云] (2回合)。区域伤害: ${dmg} (必定命中，无暴击)。`);",
-                            "active": true
+                            "label": "剑气白云光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 剑气白云：面前 3×1 矩形（按朝向吸附，锚位可在区域配置页微调），原地放置，持续 2 回合（单实例）。\n// 区域内开始回合或进入的敌人和其他友方受 0.4×施展者内息 的内功伤害（必中不暴击）。\n// 半空反应释放（G8）超出框架，由 GM 手动处理。\nconst byLvl = Math.max(1, move.computedLevel || 1);\n      const byDmg = Math.round(0.4 * (S.stats.neixi.total || 0)) + 10 * (byLvl - 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-jianqibaiyun-\" + actor.id,\n    displayName: \"剑气白云\",\n    follow: false,\n    shapeKind: \"rect\",\n    rectWidth: 3,\n    rectHeight: 1,\n    anchorX: 1,\n    anchorY: 0,\n    quarterTurns: \"auto\",\n    faction: \"all\",\n    includeSelf: false,\n    enterEnabled: true,\n    enterAction: {kind: \"damage\", amount: String(byDmg), type: \"neigong\"},\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(byDmg), type: \"neigong\"},\n    durationRounds: 2,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },
@@ -7200,7 +7232,7 @@
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
                     "description": "<p>消耗所有“潮生”，引动周围水气，以自身为中心形成“潮生层数”*“潮生层数”、高约 2 米的‘雾海’区域，持续到战斗脱离。</p><p><strong>雾海：</strong>敌人在雾海范围内视作困难地形且重度遮蔽，无法进行任何需要视力的检定，且只能攻击面前 1 米的敌人，敌人每次在雾海内消耗内力时，受到 0.4 内息点内功伤害。（必定命中，但无法造成暴击）</p><p>·此招中的内息是施展本招式者的内息属性。</p><p>·雾海形成在原地，不会跟随你移动，你只能拥有一个雾海，如果你形成新的雾海，之前的消失。</p><p><strong>升级：</strong>‘雾海’伤害+20，怒气-1，内力消耗+8。</p>",
-                    "automationNote": "消耗潮生、区域生成、区域伤害均为手动。",
+                    "automationNote": "施展后自动消耗全部【潮生】，原地生成 层数² 半径雾海范围显示（不跟随，每名施展者独立，持续到脱战）；范围内敌人进入后，每次消耗内力自动受到（0.4×施展者内息 + 20×升级）点内功伤害（必中不暴击），离开即解除。困难地形、重度遮蔽、视力检定限制与近战射程限制需 GM 手动结算。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -7226,10 +7258,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "生成提示",
+                            "label": "雾海光环",
                             "trigger": "attack",
-                            "script": "const chaosheng = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chaosheng\");\nconst stacks = chaosheng ? (chaosheng.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst size = stacks * stacks;\nconst dmg = args.flags.damageResult.damage; // 基础伤害\n    \nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">雾海生成 (请手动处理)</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请手动消耗所有潮生层数 (当前: <b>${stacks}</b>)</p>\n            <p>区域大小: <b>${size}米</b></p>\n            <p>区域伤害: <b>${dmg}</b> (消耗内力时触发)</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "active": true,
+                            "script": "// 雾海：消耗全部【潮生】，原地生成 层数² 半径雾海，持续到脱战（单实例）。\n// 敌人进入即挂【雾海监听】：每次消耗内力受 0.4×施展者内息 的内功伤害。\n// 困难地形/重度遮蔽/视力检定/近战限制（G1/G2）超出框架，由 GM 手动结算。\nconst whCs = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chaosheng\");\nconst whStacks = whCs ? (whCs.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (whStacks > 0) await game.xjzl.api.effects.removeEffect(actor, \"chaosheng\", whStacks);\nconst whRadius = whStacks * whStacks;\nif (whRadius <= 0) {\n    ui.notifications.warn(\"没有【潮生】层数，雾海未成形。\");\n    return;\n}\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-wuhai-\" + actor.id,\n    displayName: \"雾海\",\n    follow: false,\n    radius: whRadius,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"雾海监听\",\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -7273,6 +7305,30 @@
                         ]
                     },
                     "showIcon": 2
+                },
+                {
+                    "name": "雾海监听",
+                    "transfer": false,
+                    "img": "icons/magic/air/fog-gas-cloud-smoke-blue.webp",
+                    "description": "雾海深处：每次消耗内力时受施展者 0.4×内息 的内功伤害（不可见监听）。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "listener_wuhai",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "雾海·耗内反噬",
+                                    "trigger": "resourceChanged",
+                                    "active": true,
+                                    "script": "// 雾海：携带者每次消耗内力，受施展者 0.4×其内息属性 的内功伤害（必中不暴击）。\nconst whSrc = await fromUuid(thisEffect.origin);\nconst whOwner = whSrc?.parent?.parent;\nif (!whOwner || whOwner.uuid === actor.uuid) return;\nconst whMp = args.byResource?.mp;\nif (!whMp || !whMp.some(c => c.delta < 0)) return;\nconst whWuxue = whOwner.items?.find(i => i.name === \"明月剑法\");\n              const whMoveLv = Math.max(1, whWuxue?.system?.moves?.find(m => m.name === \"斜月沉沉藏海雾\")?.computedLevel || 1);\n              const whDmg = Math.round(0.4 * (whOwner.system?.stats?.neixi?.total || 0)) + 20 * (whMoveLv - 1);\nif (!whDmg) return;\nawait actor.applyDamage({amount: whDmg, type: \"neigong\", attacker: whOwner, isHit: true, isCrit: false, source: \"dot\"});"
+                                }
+                            ]
+                        }
+                    },
+                    "system": {
+                        "changes": []
+                    },
+                    "showIcon": 0
                 }
             ]
         }
@@ -7545,7 +7601,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>你至少拥有 50 道剑气方可施展此招。爆发所有剑气，在自身周围 20 米范围内的每一个空格内布置一道‘剑痕’，持续到战斗脱离。</p><p><strong>剑痕：</strong>区域内敌人开始自己的回合或踏入该区域时，流失 10 点气血。</p><p>“剑痕”持续期间，你可以消耗蓄力动作，缓缓握掌，湮灭所有的剑痕，对站立在剑痕内的所有敌方造成伤害，并使他们陷入“封招”，持续一回合，场上的剑痕在湮灭后消失，返还你 5 层剑气。</p><p><strong>升级：</strong>招式伤害+20，剑痕流失气血+20，剑痕湮灭后返还的剑气+5，怒气-1，消耗+16</p>",
-                    "automationNote": "条件判断自动，光环伤害手动结算（回合初系统会发卡片提醒），湮灭触发请点击附属招式【万剑归宗·湮灭】。",
+                    "automationNote": "施展时校验并消耗全部剑气，自动在原地布置 20 米剑痕区域（不随施展者移动，每名施展者独立；区域覆盖全部格子，含施展时已被占据的格）；敌人踏入、区域内每次移动与回合开始均自动流失（10+20×升级 点）。湮灭：施展附属招式【万剑归宗·湮灭】，自动识别自己的剑痕区域并消散、结算伤害与封招、返还剑气。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -7573,10 +7629,10 @@
                             "script": "const jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks < 50) {\n    args.abort = true;\n    args.abortReason = `剑气不足 50（当前 ${stacks}），无法施展万剑归宗！`;\n    return;\n}\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"万剑归宗\" },\n    content: `<p>当前拥有 ${stacks} 道剑气。是否消耗所有剑气爆发剑痕？</p>`,\n    yes: { label: \"消耗爆发\", icon: \"fas fa-fire\" },\n    no: { label: \"取消\", icon: \"fas fa-times\" }\n});\nif (!confirm) {\n    args.abort = true;\n    args.abortReason = \"已取消施展万剑归宗。\";\n}"
                         },
                         {
-                            "label": "剑气检查与释放",
+                            "label": "剑气检查与剑痕释放",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks < 1) return;\n\nawait game.xjzl.api.effects.removeEffect(actor, \"jianqi\", stacks);\nconst eff = thisItem.effects.getName(\"剑痕光环\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst liushiDmg = 10 + 20 * (lvl - 1);\neff.flags[\"xjzl-system\"].liushiDmg = liushiDmg;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                            "script": "// 万剑归宗：消耗全部剑气，在周身 20 米布置固定剑痕。\n// 踏入、区域内每次移动及开始回合均结算流失（10+20×升级）。\nconst wjJianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst wjStacks = wjJianqi ? (wjJianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (wjStacks < 1) return;\nawait game.xjzl.api.effects.removeEffect(actor, \"jianqi\", wjStacks);\nconst wjLvl = Math.max(1, move.computedLevel || 1);\nconst wjDmg = 10 + 20 * (wjLvl - 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-jianhen-\" + actor.id,\n    displayName: \"万剑归宗·剑痕\",\n    follow: false,\n    radius: 20,\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: true,\n    enterAction: {kind: \"damage\", amount: String(wjDmg), type: \"liushi\"},\n    moveWithin: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(wjDmg), type: \"liushi\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },
@@ -7618,7 +7674,7 @@
                             "label": "湮灭剑痕返还剑气",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const aura = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianhen_aura\");\nif (!aura) {\n    ui.notifications.warn(\"你周围并没有剑痕可以湮灭！\");\n    args.flags.abort = true;\n    return;\n}\n\nawait game.xjzl.api.effects.removeEffect(actor, \"jianhen_aura\", 1);\nconst mainMove = thisItem.system.moves.find(m => m.name === \"万剑归宗\");\nconst lvl = mainMove ? Math.max(1, mainMove.computedLevel || 1) : 1;\nconst regain = 5 + 5 * (lvl - 1);\n\nawait game.xjzl.api.effects.addEffect(actor, { \n    name: \"剑气\", \n    img: \"systems/xjzl-system/assets/icons/wuxue/江湖2.png\",\n    flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, tiedToStance: true } }\n}, regain);\n\nui.notifications.info(`剑痕湮灭，成功返还 ${regain} 道剑气！`);"
+                            "script": "const xnRegions = game.xjzl.aura.query(\"wuxue-jianhen-\" + actor.id);\nif (!xnRegions.length) {\n    ui.notifications.warn(\"场上并没有剑痕可以湮灭！\");\n    args.flags.abort = true;\n    return;\n}\nawait game.xjzl.aura.dismiss(\"wuxue-jianhen-\" + actor.id);\nconst mainMove = thisItem.system.moves.find(m => m.name === \"万剑归宗\");\nconst lvl = mainMove ? Math.max(1, mainMove.computedLevel || 1) : 1;\nconst regain = 5 + 5 * (lvl - 1);\n\nawait game.xjzl.api.effects.addEffect(actor, { \n    name: \"剑气\", \n    img: \"systems/xjzl-system/assets/icons/wuxue/江湖2.png\",\n    flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, tiedToStance: true } }\n}, regain);\n\nui.notifications.info(`剑痕湮灭，成功返还 ${regain} 道剑气！`);"
                         },
                         {
                             "label": "命中封招",
@@ -8215,7 +8271,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>选择“落雨”“听雨”“画雨”中的一个状态消耗，将雨意化入天地，使周围 20 米范围内，产生相应的天候，持续@{1 + @up|一}回合。</p><p><strong>弥天剑雨（落雨）：</strong>剑雨中的所有角色（包括自身），命中值-10。</p><p><strong>欺天剑雨（听雨）：</strong>剑雨中的所有角色（包括自身），虚招值-5。</p><p><strong>破天剑雨（画雨）：</strong>剑雨中的所有角色（包括自身），看破值-5。</p><p>（天候只可存在一个，新天候会替换旧天候）</p><p><strong>升级：</strong>持续回合数+1，消耗+4。</p>",
-                    "automationNote": "状态选择手动，状态消耗自动。天候光环效果手动（无法自动做区域光环）。持续回合结束后自动清除天候标记。",
+                    "automationNote": "施展时弹窗选择并消耗一个雨状态；确认后自动生成 20 米跟随天候范围显示，范围内所有角色（含己）自动获得对应天候减益（落雨命中-10/听雨虚招-5/画雨看破-5），进出即时生效。天候持续 1+升级 回合后自动消散，且全场景只存在一个天候（新天候自动替换旧天候，与规则互斥一致）。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -8232,15 +8288,21 @@
                     "scripts": [
                         {
                             "label": "选择消耗与提示",
-                            "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst duration = 1 + (lvl - 1);\n\nconst slugMap = { \"落雨\": \"luoyu\", \"听雨\": \"tingyu\", \"画雨\": \"huayu\" };\nconst content = `<form><div class=\"form-group\"><label>消耗状态:</label><select name=\"state\"><option value=\"落雨\">落雨 (弥天: 命中-10)</option><option value=\"听雨\">听雨 (欺天: 虚招-5)</option><option value=\"画雨\">画雨 (破天: 看破-5)</option></select></div></form>`;\n\nconst selection = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"潮起潮落\" },\n    content: content,\n    ok: { callback: (event, button) => new FormData(button.form).get(\"state\") }\n});\n\nif (selection) {\n    const slug = slugMap[selection];\n    const eff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\n    if (eff) {\n        await game.xjzl.api.effects.removeEffect(actor, slug, 1);\n        await actor.setFlag(\"xjzl-system\", \"wuxue_fuyu_weather\", selection);\n        await actor.setFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\", duration);\n        ui.notifications.info(`已消耗 [${selection}]，开启对应天候 (${duration}回合)。请手动给范围内角色添加Debuff。`);\n    } else {\n        ui.notifications.warn(`身上没有 [${selection}] 状态！`);\n    }\n}",
+                            "trigger": "attack",
+                             "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst duration = 1 + (lvl - 1);\n\nconst slugMap = { \"落雨\": \"luoyu\", \"听雨\": \"tingyu\", \"画雨\": \"huayu\" };\nconst content = `<form><div class=\"form-group\"><label>消耗状态:</label><select name=\"state\"><option value=\"落雨\">落雨 (弥天: 命中-10)</option><option value=\"听雨\">听雨 (欺天: 虚招-5)</option><option value=\"画雨\">画雨 (破天: 看破-5)</option></select></div></form>`;\n\nconst selection = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"潮起潮落\" },\n    content: content,\n    ok: { callback: (event, button) => new FormData(button.form).get(\"state\") }\n});\n\nif (selection) {\n    const slug = slugMap[selection];\n    const eff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\n    if (eff) {\n        await game.xjzl.api.effects.removeEffect(actor, slug, 1);\n        await actor.setFlag(\"xjzl-system\", \"wuxue_fuyu_weather\", selection);\n        await actor.setFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\", duration);\n        await actor.setFlag(\"xjzl-system\", \"wuxue_fuyu_weatherPending\", true);\n        ui.notifications.info(`已消耗 [${selection}]，开启对应天候 (${duration}回合)。请手动给范围内角色添加Debuff。`);\n    } else {\n        ui.notifications.warn(`身上没有 [${selection}] 状态！`);\n    }\n}",
                             "active": true
                         },
                         {
                             "label": "天候计时",
                             "trigger": "turnEnd",
                             "active": true,
-                            "script": "const left = actor.getFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\");\nif (!left) return;\nif (left <= 1) {\n    await actor.unsetFlag(\"xjzl-system\", \"wuxue_fuyu_weather\");\n    await actor.unsetFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\");\n    ui.notifications.info(\"覆雨神剑的天候已消散。\");\n} else {\n    await actor.setFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\", left - 1);\n}"
+                             "script": "const left = actor.getFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\");\nif (!left) return;\nif (left <= 1) {\n    await actor.unsetFlag(\"xjzl-system\", \"wuxue_fuyu_weather\");\n    await actor.unsetFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\");\n    await actor.unsetFlag(\"xjzl-system\", \"wuxue_fuyu_weatherPending\");\n    ui.notifications.info(\"覆雨神剑的天候已消散。\");\n} else {\n    await actor.setFlag(\"xjzl-system\", \"wuxue_fuyu_weatherLeft\", left - 1);\n}"
+                        },
+                        {
+                            "label": "天候光环",
+                            "trigger": "attack",
+                            "active": true,
+                             "script": "// 只有本次成功消耗天气状态才创建区域，避免取消弹窗后复用旧标记。\nconst thPending = actor.getFlag(\"xjzl-system\", \"wuxue_fuyu_weatherPending\");\nif (!thPending) return;\nawait actor.unsetFlag(\"xjzl-system\", \"wuxue_fuyu_weatherPending\");\nconst thWeather = actor.getFlag(\"xjzl-system\", \"wuxue_fuyu_weather\");\nif (!thWeather) return;\nconst thMap = {\"落雨\": \"弥天剑雨(天候)\", \"听雨\": \"欺天剑雨(天候)\", \"画雨\": \"破天剑雨(天候)\"};\nconst thPayload = thMap[thWeather];\nif (!thPayload) return;\nconst thLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    // 天候按原文全场景唯一（新天候替换旧天候），标签不按施展者隔离\n    label: \"wuxue-tianhou\",\n    displayName: \"天候·\" + thWeather,\n    follow: true,\n    radius: 20,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: thPayload,\n    durationRounds: 1 + (thLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 },
@@ -8436,6 +8498,77 @@
                     "img": "icons/magic/water/bubbles-air-blue.webp",
                     "system": {
                         "changes": []
+                    },
+                    "showIcon": 2
+                },
+                {
+                    "name": "弥天剑雨(天候)",
+                    "transfer": false,
+                    "img": "icons/magic/water/weather-rain-clouds-blue.webp",
+                    "description": "剑雨天候：命中值-10。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tianhou_mitian",
+                            "stackable": false
+                        }
+                    },
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.hit_waigong",
+                                "value": "-10",
+                                "type": "add"
+                            },
+                            {
+                                "key": "system.combat.hit_neigong",
+                                "value": "-10",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
+                },
+                {
+                    "name": "欺天剑雨(天候)",
+                    "transfer": false,
+                    "img": "icons/magic/water/weather-storm-clouds-blue.webp",
+                    "description": "剑雨天候：虚招值-5。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tianhou_qitian",
+                            "stackable": false
+                        }
+                    },
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.xuzhao",
+                                "value": "-5",
+                                "type": "add"
+                            }
+                        ]
+                    },
+                    "showIcon": 2
+                },
+                {
+                    "name": "破天剑雨(天候)",
+                    "transfer": false,
+                    "img": "icons/magic/water/weather-cloud-ice.webp",
+                    "description": "剑雨天候：看破值-5。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tianhou_potian",
+                            "stackable": false
+                        }
+                    },
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.kanpo",
+                                "value": "-5",
+                                "type": "add"
+                            }
+                        ]
                     },
                     "showIcon": 2
                 }

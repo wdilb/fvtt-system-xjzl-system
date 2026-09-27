@@ -7,6 +7,7 @@
  * 入口：
  * - 工具栏按钮（getSceneControlButtons 注入，regions 工具组）；
  * - game.xjzl.auraQuick.open()（工具栏按钮与光环宏共用）。
+ * - game.xjzl.auraQuick.place(params)（招式脚本触发画布选点）。
  */
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -89,72 +90,104 @@ export class XJZLAuraRegionObject extends CONFIG.Region.objectClass {
 
 /**
  * 固定光环的画布放置状态：指针移动显示格心吸附预览，左键创建，Esc/右键取消。
- * @type {{params: object, preview: PIXI.Graphics, onMove: Function, onDown: Function, onKey: Function}|null}
+ * @type {{params: object, preview: PIXI.Graphics, onMove: Function, onDown: Function, onDownCapture: Function, onKey: Function, cancel: Function, cleanup: Function}|null}
  */
 let placement = null;
 
 /**
- * 进入画布放置模式（弹窗确认后调用）。
+ * 进入画布放置模式，供快建窗口和公共选点 API 共用。
  * @param {object} params - 传给 AuraManager.create 的参数（label/radius/color 等）
+ * @returns {Promise<RegionDocument|null>} 创建的 Region；取消、无网格或创建失败时为 null
  */
 function beginPlacement(params) {
     cancelPlacement();
     if (!canvas.scene?.grid || canvas.scene.grid.isGridless) {
         ui.notifications.warn(game.i18n.localize("XJZL.Aura.NoGrid"));
-        return;
+        return Promise.resolve(null);
     }
-    const grid = canvas.scene.grid;
-    const radiusPx = (params.radius ?? 0) * (canvas.dimensions.size ?? 100);
-    const preview = new PIXI.Graphics();
-    canvas.regions.addChild(preview);
 
-    const drawPreview = point => {
-        const offset = grid.getOffset(point);
-        const center = grid.getCenterPoint(offset);
-        const r = Math.max(radiusPx, 4);
-        const colorNum = params.color ? Number.parseInt(params.color.slice(1), 16) : 0x40d0c0;
-        preview.clear();
-        preview.beginFill(colorNum, 0.15);
-        preview.drawCircle(center.x, center.y, r);
-        preview.endFill();
-        preview.lineStyle(2, 0xffffff, 0.8);
-        preview.drawCircle(center.x, center.y, r);
-        // 格心十字标记
-        preview.lineStyle(1, 0xffffff, 0.9);
-        preview.moveTo(center.x - 8, center.y);
-        preview.lineTo(center.x + 8, center.y);
-        preview.moveTo(center.x, center.y - 8);
-        preview.lineTo(center.x, center.y + 8);
-        return center;
-    };
+    return new Promise(resolve => {
+        const grid = canvas.scene.grid;
+        const radiusPx = (params.radius ?? 0) * (canvas.dimensions.size ?? 100);
+        const preview = new PIXI.Graphics();
+        canvas.regions.addChild(preview);
+        let settled = false;
 
-    const onMove = event => {
-        const local = canvas.stage.toLocal(event.global);
-        drawPreview(local);
-    };
-    const onDown = async event => {
-        // 只接受左键：右键交给取消回调（PixiJS 右键同样派发 pointerdown，
-        // 不拦会在取消前误入创建流程）
-        if (event.button !== 0) return;
-        const local = canvas.stage.toLocal(event.global);
-        const center = drawPreview(local);
-        cancelPlacement();
-        await game.xjzl.aura.create({scene: canvas.scene, x: center.x, y: center.y}, params);
-    };
-    const onKey = event => {
-        if (event.key === "Escape") cancelPlacement();
-    };
-    canvas.stage.on("pointermove", onMove);
-    canvas.stage.on("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    // 右键取消：pointerdown 的 button===2 分支
-    const onDownCapture = event => {
-        if (event.button === 2) cancelPlacement();
-    };
-    canvas.stage.on("pointerdown", onDownCapture);
+        const drawPreview = point => {
+            const offset = grid.getOffset(point);
+            const center = grid.getCenterPoint(offset);
+            const r = Math.max(radiusPx, 4);
+            const colorNum = params.color ? Number.parseInt(params.color.slice(1), 16) : 0x40d0c0;
+            preview.clear();
+            preview.beginFill(colorNum, 0.15);
+            preview.drawCircle(center.x, center.y, r);
+            preview.endFill();
+            preview.lineStyle(2, 0xffffff, 0.8);
+            preview.drawCircle(center.x, center.y, r);
+            // 格心十字标记
+            preview.lineStyle(1, 0xffffff, 0.9);
+            preview.moveTo(center.x - 8, center.y);
+            preview.lineTo(center.x + 8, center.y);
+            preview.moveTo(center.x, center.y - 8);
+            preview.lineTo(center.x, center.y + 8);
+            return center;
+        };
 
-    placement = {params, preview, onMove, onDown, onDownCapture, onKey};
-    ui.notifications.info(game.i18n.localize("XJZL.UI.AuraQuick.PlaceHint"), {localize: false});
+        const cleanup = () => {
+            canvas.stage.off("pointermove", onMove);
+            canvas.stage.off("pointerdown", onDown);
+            canvas.stage.off("pointerdown", onDownCapture);
+            window.removeEventListener("keydown", onKey);
+            preview.destroy({children: true});
+            if (placement?.cleanup === cleanup) placement = null;
+        };
+        const cancel = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(null);
+        };
+        const onMove = event => {
+            if (settled) return;
+            const local = canvas.stage.toLocal(event.global);
+            drawPreview(local);
+        };
+        const onDown = async event => {
+            // 只接受左键：右键交给取消回调（PixiJS 右键同样派发 pointerdown，
+            // 不拦会在取消前误入创建流程）
+            if (event.button !== 0 || settled) return;
+            const local = canvas.stage.toLocal(event.global);
+            const center = drawPreview(local);
+            // 先结束交互，避免创建异步 Region 时重复点击或 Esc 再次触发。
+            settled = true;
+            cleanup();
+            let region = null;
+            try {
+                region = await game.xjzl.aura.create(
+                    {scene: canvas.scene, x: center.x, y: center.y},
+                    {...params, follow: false}
+                );
+            } catch (error) {
+                console.error("XJZL | auraQuick.place failed", error);
+                ui.notifications.error("光环创建失败，请查看控制台。");
+            }
+            resolve(region ?? null);
+        };
+        const onKey = event => {
+            if (event.key === "Escape") cancel();
+        };
+        // 右键取消：pointerdown 的 button===2 分支
+        const onDownCapture = event => {
+            if (event.button === 2) cancel();
+        };
+        canvas.stage.on("pointermove", onMove);
+        canvas.stage.on("pointerdown", onDown);
+        window.addEventListener("keydown", onKey);
+        canvas.stage.on("pointerdown", onDownCapture);
+
+        placement = {params, preview, onMove, onDown, onDownCapture, onKey, cancel, cleanup};
+        ui.notifications.info(game.i18n.localize("XJZL.UI.AuraQuick.PlaceHint"), {localize: false});
+    });
 }
 
 /**
@@ -162,12 +195,7 @@ function beginPlacement(params) {
  */
 function cancelPlacement() {
     if (!placement) return;
-    canvas.stage.off("pointermove", placement.onMove);
-    canvas.stage.off("pointerdown", placement.onDown);
-    canvas.stage.off("pointerdown", placement.onDownCapture);
-    window.removeEventListener("keydown", placement.onKey);
-    placement.preview.destroy({children: true});
-    placement = null;
+    placement.cancel();
 }
 
 /* -------------------------------------------- */
@@ -274,7 +302,7 @@ export class AuraQuickCreator extends HandlebarsApplicationMixin(ApplicationV2) 
         } else {
             // 固定模式进入画布放置：弹窗立即关闭，避免遮挡画布视野
             this.close();
-            beginPlacement(params);
+            placeAura(params);
         }
     }
 
@@ -326,4 +354,16 @@ export function registerAuraQuick() {
  */
 export function openAuraQuick() {
     return new AuraQuickCreator().render({force: true});
+}
+
+/**
+ * 打开固定光环的画布选点流程，供招式脚本复用。
+ * @param {object} params - AuraManager.create 的参数；位置由玩家点击选择，follow 会被固定为 false
+ * @returns {Promise<RegionDocument|null>} 创建的 Region；取消、无网格或创建失败时为 null
+ */
+export function placeAura(params) {
+    if (!params || typeof params !== "object" || Array.isArray(params)) {
+        throw new TypeError("game.xjzl.auraQuick.place(params) requires an object");
+    }
+    return beginPlacement(params);
 }

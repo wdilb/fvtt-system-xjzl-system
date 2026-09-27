@@ -152,6 +152,7 @@ passive / calc（持续被动与面板计算）
 | 修改招式或普攻的面板数值与说明 | `calc` |
 | 扣除资源前调整消耗或阻止出招 | `preAttack` |
 | 修改整次动作的命中参数 | `attack` |
+| 出招时选择参数或落点、创建一次区域 | `attack` |
 | 针对单个目标修改命中或穿透 | `check` |
 | 攻击者在应用伤害前修改数值、类型或穿透 | `preDamage` |
 | 防御者响应未命中 | `avoided` |
@@ -715,17 +716,23 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 
 `source` 可传 `TokenDocument`、画布 `Token`、在当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随 Token，`follow: false` 可固定在创建位置；坐标源始终固定。创建坐标源光环时，若需按阵营过滤，可在 `params` 中传 `sourceActorUuid`，该角色须在当前画布上有活动 Token。范围以网格格数计，圆形使用非负整数 `radius`（默认 `0`）；矩形设置 `shapeKind: "rect"`、`rectWidth`、`rectHeight`，可用 `anchorX`、`anchorY` 指定锚格。`quarterTurns` 为 90° 转数，传 `"auto"` 时按源 Token 朝向吸附。`displayName`、`color` 控制 Region 展示，`levelIds` 可指定楼层。`queryTokens` 还接受形状生成器输出的相对 `offsets`（`i` 为列、`j` 为行），此时无需创建光环。
 
-`params.label` 必填。`faction` 可为 `"all"`、`"ally"`、`"enemy"`，`includeSelf` 控制是否包含源；按阵营过滤需要可解析的源 Token。`queryTokens` 使用坐标源时应采用 `"all"`，且无法识别自身；使用 Token/Actor 源时，`includeSelf: false` 按源 Actor 排除。持久光环的 `includeSelf: false` 同样按源 Actor 排除——同一 Actor 的多个关联 Token 都视为自身。
+`params.label` 必填。`faction` 可为 `"all"`、`"ally"` 或 `"enemy"`，`includeSelf` 控制是否包含源；按阵营过滤需要可解析的源 Token。`queryTokens` 使用坐标源时应采用 `"all"`，且无法识别自身；使用 Token/Actor 源时，`includeSelf: false` 按源 Actor 排除。持久光环的 `includeSelf: false` 同样按源 Actor 排除——同一 Actor 的多个关联 Token 都视为自身。
 
-`payloadItemUuid` 和 `payloadEffectName` 指向源物品中的 AE。`enterEnabled` 默认开启：配置 payload 后，目标**每次进入范围**都会挂载一次 AE，可叠层 AE 逐次累加层数、非叠层 AE 走覆盖/刷新；`enterAction` 可直接结算伤害或治疗，`moveWithin` 使区域内移动复用该动作（不重复挂载 AE）。`roundEnabled` 默认关闭；开启后按 `roundTiming`（`tokenRoundStart`、`tokenRoundEnd`、`tokenTurnStart` 或 `tokenTurnEnd`）执行 `roundAction`。`enterAction.kind` 可为 `"none"`、`"damage"` 或 `"healing"`；`roundAction.kind` 还可为 `"effect"`：每个对应时机都对区域内目标执行一次挂载，可叠层 AE 每轮累加一层，非叠层 AE 每轮刷新（覆盖数值与时长）。只需在回合时机挂载时，应设置 `enterEnabled: false`。`amount` 为伤害/治疗数值或按源角色数据计算的公式，`type` 为伤害类型或资源键；`pierce` 仅用于伤害。`enterEnabled` 与 `roundEnabled` 均关闭且未启用 `moveWithin` 时，光环仅标记范围。
+`"all"` 包含中立单位；源角色位于范围内时，`includeSelf: false` 会排除其 Actor。`"ally"`、`"enemy"` 按源与目标 Token 的阵营过滤，其中 `"enemy"` 不包含中立目标。需要作用于场上所有其他角色、但没有空间范围的效果，不应创建 Region。
 
-`throttlePerRound` 将同一目标的进入结算限制为每战斗轮一次，战斗外不节流；节流命中的进入不施加、不执行动作。`cleanupOnExit` 默认开启：光环记录可叠层 AE 的实际贡献层数，以及不可叠层 AE 的清理归属；目标离开时只释放对应记录。首次挂载前已有的同 slug AE 会保留，多个光环维护同一不可叠层 AE 时，最后一条清理记录结束后才决定是否移除。关闭后仍正常施加，但不建立清理记录，目标离开或光环删除时保留效果。已有清理记录期间更改开关不会改变该记录的清理语义；退出并重新进入后采用新值，关闭期间未记录的效果不会被追溯清理。`durationRounds` 控制存活轮数，仅在创建时已有进行中的战斗轮次时生效。`maintain: {resource, amount, perTarget}` 在绑定战斗的源角色回合末消耗资源；`perTarget` 是每名覆盖敌人的追加消耗。未显式传 `combatId` 时，管理器使用创建时的当前战斗。`lifecycle` 默认为 `"manual"`；`"combat"` 在所属战斗结束时清理，`"equip"` 在对应 `sourceItemUuid` 物品卸下或删除时清理，`"yungong"` 在源角色运功切换时清理，`"stance"` 在源角色解除架招时清理。按源清理需要正确设置 `sourceActorUuid` 或 `sourceItemUuid`；Token/Actor 源会自动记录源角色 UUID。
+`payloadItemUuid` 和 `payloadEffectName` 指向源物品中的 AE；`payloadStatusId` 可直接引用 `CONFIG.statusEffects` 中的系统通用状态 ID（如 `bleed_stack`）。同时配置时优先使用 `payloadStatusId`，录入时应只选一种来源。`enterEnabled` 默认开启：配置 payload 后，目标**每次进入范围**都会挂载一次 AE，可叠层 AE 逐次累加层数、非叠层 AE 走覆盖/刷新；`enterAction` 可直接结算伤害或治疗，`moveWithin` 使区域内移动复用该动作（不重复挂载 AE）。`roundEnabled` 默认关闭；开启后按 `roundTiming`（`tokenRoundStart`、`tokenRoundEnd`、`tokenTurnStart` 或 `tokenTurnEnd`）执行 `roundAction`。`enterAction.kind` 可为 `"none"`、`"damage"` 或 `"healing"`；`roundAction.kind` 还可为 `"effect"`：每个对应时机都对区域内目标执行一次挂载，可叠层 AE 每轮累加一层，非叠层 AE 每轮刷新（覆盖数值与时长）。只需在回合时机挂载时，应设置 `enterEnabled: false`。`amount` 为伤害/治疗数值或按源角色数据计算的公式，`type` 为伤害类型或资源键；`pierce` 仅用于伤害。`enterEnabled` 与 `roundEnabled` 均关闭且未启用 `moveWithin` 时，光环仅标记范围。
+
+`throttlePerRound` 将同一目标的进入结算限制为每战斗轮一次，战斗外不节流；节流命中的进入不施加、不执行动作。要让进入与所选回合时机二选一结算，须同时开启 `enterEnabled`、`roundEnabled` 和 `oncePerRound`：同一目标在每个战斗轮只响应先发生的事件。进入事件执行 `enterAction`，回合事件执行 `roundAction`；配置 payload 时，先发生的事件挂载一次。`cleanupOnExit` 默认开启：光环记录可叠层 AE 的实际贡献层数，以及不可叠层 AE 的清理归属；目标离开时只释放对应记录。首次挂载前已有的同 slug AE 会保留，多个光环维护同一不可叠层 AE 时，最后一条清理记录结束后才决定是否移除。关闭后仍正常施加，但不建立清理记录，目标离开或光环删除时保留效果。已有清理记录期间更改开关不会改变该记录的清理语义；退出并重新进入后采用新值，关闭期间未记录的效果不会被追溯清理。`durationRounds` 控制存活轮数，仅在创建时已有进行中的战斗轮次时生效。`maintain: {resource, amount, perTarget}` 在绑定战斗的源角色回合末消耗资源；`perTarget` 是每名覆盖敌人的追加消耗。未显式传 `combatId` 时，管理器使用创建时的当前战斗。`lifecycle` 默认为 `"manual"`；`"combat"` 在所属战斗结束时清理，`"equip"` 在对应 `sourceItemUuid` 物品卸下或删除时清理，`"yungong"` 在源角色运功切换时清理，`"stance"` 在源角色解除架招时清理。按源清理需要正确设置 `sourceActorUuid` 或 `sourceItemUuid`；Token/Actor 源会自动记录源角色 UUID。
+
+使用 `oncePerRound` 时，进入路径须有 payload 或有效 `enterAction`，回合路径须有 payload 或有效 `roundAction`；空配置可能先占用本轮额度而不产生效果。
 
 删除或重建光环会触发区域退出清理；需要按标签更新半径、动作或效果时使用 `refreshAura`。直接修改 Region 行为配置中的范围字段也会重算形状。已有清理记录期间更换 payload 引用不会立即切换，该目标继续使用旧引用直至退出；需要立即切换时调用 `refreshAura` 重建。`cleanupOnExit: false` 产生的效果没有清理记录，修改引用或重建光环都不会移除既有效果，调用方须自行处理。
 
 监听型光环可将无数值、`showIcon: 0` 的 AE 作为 payload，利用被挂角色的现有触发器响应事件。模板 AE 位于角色持有的物品且未预设 `origin` 时，管理器把复制品的 `origin` 设为模板 AE 的 UUID；脚本可用 `fromUuid(thisEffect.origin)` 找回模板，再从所属物品定位主人。退出清理只管理光环直接挂载且已记账的 payload；监听脚本另行添加的 AE 不会自动纳入光环账本。
 
-区域工具栏的光环快建按钮和 `game.xjzl.auraQuick.open()` 会打开快建窗口。快建光环默认只标记范围；需要自动结算时，可编辑区域行为，或在异步脚本中使用 `game.xjzl.aura.create()` 传入结算参数。
+区域工具栏的光环快建按钮和 `game.xjzl.auraQuick.open()` 会打开快建窗口。快建光环默认只标记范围；需要自动结算时，可编辑区域行为，或在异步脚本中使用 `game.xjzl.aura.create()` 传入结算参数。需要让玩家在画布选择固定光环落点时，使用 `await game.xjzl.auraQuick.place(params)`；参数为 `aura.create` 的 `params` 对象，落点由玩家点击决定，`follow` 固定为 `false`。成功时返回 `RegionDocument`，取消选点、无网格或创建失败时返回 `null`；坐标源按阵营过滤时应提供 `sourceActorUuid`。
+
+规则指定“在自身周围生成、留在原地”时，以角色为 `source` 调用 `game.xjzl.aura.create`，并设置 `follow: false`；只有规则允许自行决定落点时才使用 `auraQuick.place`。选点流程不校验施展距离或格子占用，玩家按规则选择。持续流失、挂载状态等进出或回合效果由 Region 行为配置结算；不随离区撤销的状态可设置 `cleanupOnExit: false`，若无独立到期或清理机制则需手动移除。
 
 ## Macros API
 
