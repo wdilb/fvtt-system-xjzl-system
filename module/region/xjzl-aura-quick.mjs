@@ -10,6 +10,8 @@
  * - game.xjzl.auraQuick.place(params)（招式脚本触发画布选点）。
  */
 
+import {drawAuraCircle, isParticlesEnabled, refreshAuraFx, startAuraParticles, stopAuraParticles} from "./xjzl-aura-fx.mjs";
+
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /** 快建光环的默认颜色（与 AuraManager 默认一致，用户可在弹窗改）。 */
@@ -20,8 +22,8 @@ const DEFAULT_COLOR = "#40d0c0";
 /* -------------------------------------------- */
 
 /**
- * 光环 Region 的画布对象：叠加自绘显示名标签。
- * 核心不渲染区域名；跟随光环平移时
+ * 光环 Region 的画布对象：叠加自绘显示名标签与视觉增强（圆轮廓＋粒子，
+ * 见 xjzl-aura-fx.mjs）。核心不渲染区域名；跟随光环平移时
  * 核心会 refresh，标签在 _applyRenderFlags 中跟随 bounds 中心更新。
  */
 export class XJZLAuraRegionObject extends CONFIG.Region.objectClass {
@@ -43,23 +45,43 @@ export class XJZLAuraRegionObject extends CONFIG.Region.objectClass {
         }));
         this.labelDetails.zIndex = 100;
         this.labelDetails.anchor.set(0.5, 0.5);
-        // zIndex 需显式开启子节点排序，否则 shapes 容器在后续 refresh
-        // 重排时会盖住标签（实测文字被色块网格遮挡不可见）
+        // 外圈常驻；可选底幕、粒子、标签分别排序；Region 核心的格子高亮在独立容器内。
         this.sortableChildren = true;
         // PixiJS 7+：eventMode none 使点击穿透文字，直接命中下方交互对象
         this.labelDetails.eventMode = "none";
         this.labelDetails.interactive = false;
         this.#updateLabel();
+        // AURA-07 视觉增强是可选层；任何绘制/纹理失败都不能阻断 Region 核心绘制。
+        try {
+            const circle = drawAuraCircle(this);
+            if (circle && isParticlesEnabled()) startAuraParticles(this, circle);
+        } catch (err) {
+            stopAuraParticles(this);
+            console.warn("XJZL | 光环视觉初始化失败，已保留核心 Region。", err);
+        }
     }
 
     /** @override 每次 refresh 重定位标签（跟随光环整格平移后中心随 bounds 移动）。 */
     _applyRenderFlags(flags) {
         super._applyRenderFlags(flags);
         this.#updateLabel();
+        // 圆轮廓位置与粒子锚点随 bounds 同步；半径/颜色热更新时在此重画
+        refreshAuraFx(this);
     }
 
-    /** @override 销毁时释放文本资源。 */
+    /** @override 重画前解绑粒子 ticker；核心会销毁子节点，须同步清空我们的缓存引用。 */
+    _clear() {
+        stopAuraParticles(this);
+        this._auraCircle = null;
+        this._auraCircleKey = "";
+        this._auraCoverageMesh = null;
+        this.labelDetails = null;
+        super._clear();
+    }
+
+    /** @override 销毁时释放文本资源与粒子生成器。 */
     async _destroy(options) {
+        stopAuraParticles(this);
         this.labelDetails?.destroy();
         this.labelDetails = null;
         await super._destroy(options);

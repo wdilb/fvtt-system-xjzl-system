@@ -65,6 +65,7 @@ import { xjzlSocket } from "./module/socket.mjs";
 import { registerAuraBehavior } from "./module/region/xjzl-aura-behavior.mjs";
 import { AuraManager } from "./module/region/xjzl-aura-manager.mjs";
 import { registerAuraQuick, openAuraQuick, placeAura } from "./module/region/xjzl-aura-quick.mjs";
+import { registerAuraFxSetting } from "./module/region/xjzl-aura-fx.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
 import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
@@ -90,6 +91,8 @@ Hooks.once("init", async function () {
   AuraManager.init();
   // 快建工具：Region placeable 子类（自绘显示名标签）与工具栏按钮注册。
   registerAuraQuick();
+  // 光环视觉增强（AURA-07）：圆轮廓随 Region 子类生效；粒子设置在此注册。
+  registerAuraFxSetting();
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;

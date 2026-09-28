@@ -12,6 +12,7 @@
  */
 
 import {AuraLedger} from "./xjzl-aura-ledger.mjs";
+import {refreshAuraFx} from "./xjzl-aura-fx.mjs";
 import {generateCircleOffsets, generateRectangleOffsets, rotateOffsets90, toCoreOffsets} from "../utils/aura-shapes.mjs";
 import {xjzlSocket} from "../socket.mjs";
 
@@ -202,6 +203,9 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
         super._onUpdate(changed);
         const sys = changed?.system;
         if (!sys || !RANGE_FIELDS.some(f => f in sys)) return;
+        // 即使非活动 GM 不负责写回 shapes，也要让本客户端的视觉层立即采用新形状。
+        // 这覆盖圆形半径 1 与 3×3 矩形等 offsets 相同、不会触发 region.update 的情况。
+        if (this.region?.object) refreshAuraFx(this.region.object);
         // 数据库写操作只在活动 GM 端执行，其余端经文档同步自然收敛
         if (!game.users.activeGM?.isSelf) return;
         // 手动改朝向后同步参数快照：refreshAura 依赖快照的 "auto" 判断
@@ -241,7 +245,11 @@ export class XJZLAuraRegionBehaviorType extends foundry.data.regionBehaviors.Reg
         const key = o => `${o.i}.${o.j}`;
         const before = shape.offsets.map(key).sort().join();
         const after = offsets.map(key).sort().join();
-        if (before === after) return;
+        if (before === after) {
+            // 圆形半径 1 与 3×3 矩形可能共享同一组格子；即使核心无需更新 shapes，
+            // 外圈的形状语义已在 _onUpdate 的客户端通道同步，无需重复重画。
+            return;
+        }
         try {
             // origin 原样写回（改半径不移心）；丢失会使下次重算失去锚格
             await region.update({shapes: [{type: "grid", offsets, origin}]});
