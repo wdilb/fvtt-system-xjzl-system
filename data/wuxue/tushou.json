@@ -2995,7 +2995,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>脚踏朝露，唱音袅袅，对周围敌人造成 0.5 内息点内功伤害。</p><p>·此招可移动释放，对移动路径上周围 2 米范围内的敌人造成伤害。（不会重复造成伤害）</p><p>·在你释放此招时移动过的路径空格上形成‘踏莲’，持续一回合。</p><p><strong>踏莲：</strong>第一次进入此区域的敌人陷入禁足一回合；第一次进入此区域的友方回复 10 气血。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "移动路径伤害、地表效果均需手动处理。伤害加成自动。",
+                    "automationNote": "部分自动化：施展后在所选空格生成“踏莲”（持续 1 回合）：敌人踏入自动陷入禁足、友方踏入自动回复 10 气血。移动路径上其余格子的踏莲需手动补充（框架不追踪移动路径）；禁足以保持在区域内近似“一回合”，提前离开会提前解除。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -3025,6 +3025,12 @@
                             "trigger": "calc",
                             "script": "// [修正] 从 arts 读取\nconst val = actor.system.arts.biaoyan.total || 0;\nargs.output.damage += val * 3;",
                             "active": true
+                        },
+                        {
+                            "label": "踏莲区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 踏莲：落点由玩家在画布选择（移动路径留痕受框架限制，仅自动生成所选格，其余路径格请手动补充）。\n// 同格两层区域：敌方首次进入陷入禁足（在区域内保持，近似\"一回合\"）；友方首次进入回复 10 气血。\nconst tlSuffix = foundry.utils.randomID(4);\nconst tlEnemy = await game.xjzl.auraQuick.place({\n    label: \"wuxue-talian-enemy-\" + actor.id + \"-\" + tlSuffix,\n    sourceActorUuid: actor.uuid,\n    displayName: \"踏莲\",\n    radius: 0,\n    follow: false,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadStatusId: \"root\",\n    enterEnabled: true,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nif (!tlEnemy) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消踏莲落点选择，本次出招中止。\";\n    return;\n}\nconst tlOrigin = tlEnemy.shapes?.[0]?.origin;\nif (!tlOrigin) return;\nawait game.xjzl.aura.create({scene: tlEnemy.parent, x: tlOrigin.x, y: tlOrigin.y}, {\n    label: \"wuxue-talian-ally-\" + actor.id + \"-\" + tlSuffix,\n    sourceActorUuid: actor.uuid,\n    displayName: \"踏莲\",\n    radius: 0,\n    follow: false,\n    faction: \"ally\",\n    includeSelf: true,\n    enterEnabled: true,\n    enterAction: {kind: \"healing\", amount: \"10\", type: \"hp\"},\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 }
@@ -3960,7 +3966,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>浑身飞出上百只蜚蠊，并且呼唤周围地下的蜚蠊，遮天蔽日，使自身周围 1 米的空间变为‘蜚蠊地狱’，下回合可继续消耗蓄力动作施展（不消耗怒气内力），每蓄力 1 回合招式范围+1。</p><p><strong>蜚蠊地狱：</strong>在区域内开始回合的敌人受到 20 点毒素伤害，并且进行[定力]检定（难度 5），检定失败，陷入“眩晕”，持续一回合。</p><p><strong>升级：</strong>招式范围+2，毒素伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "区域生成与地狱效果手动。",
+                    "automationNote": "完全自动化（战斗内）：施展后生成跟随自身的“蜚蠊地狱”（初始 1 米），范围内敌人回合初自动受到毒素伤害并作[定力]检定（难度 5），失败自动陷入眩晕一回合。每以蓄力动作再次施展，范围自动 +1；脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -3977,10 +3983,47 @@
                             6,
                             5
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "蜚蠊地狱光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 蜚蠊地狱：以自身为中心跟随（初始 1 米），敌方回合初受 20+10×升级 毒素伤害并作定力检定（监听 AE）。\n// 每以蓄力动作再次施展，范围 +1（按既有区域重建）。\nconst flLabel = \"wuxue-feilian-\" + actor.id;\nconst flExisting = game.xjzl.aura.query(flLabel)[0];\nconst flLvl = Math.max(1, move.computedLevel || 1);\nif (flExisting) {\n    const flPrev = Number(flExisting.getFlag(\"xjzl-system\", \"aura\")?.params?.radius) || 1;\n    await game.xjzl.aura.refreshAura(flLabel, {radius: flPrev + 1}, {scene: flExisting.parent});\n    return;\n}\nawait game.xjzl.aura.create(actor, {\n    label: flLabel,\n    displayName: \"蜚蠊地狱\",\n    follow: true,\n    radius: 1,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"蜚蠊地狱\",\n    enterEnabled: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(20 + 10 * (flLvl - 1)), type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                        }
+                    ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "蜚蠊地狱",
+                "description": "蜚蠊地狱：回合初进行[定力]检定（难度 5），失败陷入眩晕一回合。",
+                "transfer": false,
+                "showIcon": 2,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "feilian_hell",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "蜚蠊地狱·定力检定",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "// 蜚蠊地狱：回合初定力检定（难度 5），失败陷入眩晕一回合。\nconst flSrc = await fromUuid(thisEffect.origin);\nconst flOwner = flSrc?.parent?.parent;\nawait Macros.requestSave({\n    target: actor,\n    attacker: flOwner ?? actor,\n    type: \"dingli\",\n    dc: 5,\n    label: \"抵抗蜚蠊地狱\",\n    onFail: {id: \"xuanyun\", duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}},\n    failureText: \"定力检定失败，陷入眩晕！\"\n});"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": []
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
+            }
+        ]
     },
     {
         "name": "醉拳",
@@ -6024,7 +6067,7 @@
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，内力腐蚀侵害周围，形成‘魔气’，持续到战斗脱离、再次施展本招式或施展其它套路。</p><p><strong>魔气：</strong>区域内敌人视作处于困难地形，且无法使用轻功，敌人的每回合初，他受到 20 点毒素伤害。</p><p>·魔气区域以你为中心跟随你移动，你只能拥有一个魔气，如果你形成新的魔气，之前的消失。</p><p><strong>升级：</strong>魔气区域范围+1，内力消耗+4。</p>",
-                    "automationNote": "完全手动。请自行放置区域模板或标记。",
+                    "automationNote": "部分自动化：施展后生成跟随自身的“魔气”（1+升级 米），范围内敌人每回合初自动受 20 点毒素伤害；再次施展自动替换旧魔气，脱战时消散。区域内视作困难地形、敌人无法使用轻功需 GM 手动裁定；施展其它套路时魔气不自动消散，需手动移除。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -6037,7 +6080,14 @@
                             12
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "魔气光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 魔气：以自身为中心跟随 1+升级 米（再次施展自动替换旧的）；\n// 困难地形与禁用轻功超出框架，由 GM 手动裁定；\"施展其它套路即消散\"不自动追踪。\nconst mqLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-moqi-\" + actor.id,\n    displayName: \"魔气\",\n    follow: true,\n    radius: 1 + (mqLvl - 1),\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: \"20\", type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                        }
+                    ]
                 },
                 {
                     "name": "魔念横行",
@@ -6970,7 +7020,7 @@
                     "targetInfo": "区域",
                     "actionCost": "蓄力动作",
                     "description": "<p>寒月波涛，在目标及其周围 2 米范围内汇聚内力结成‘水牢’，持续@{3 + @up|三}回合。</p><p><strong>水牢：</strong>在区域中开始回合或第一次进入水牢的敌人受到 50 点气血流失。（必中但不造成暴击）</p><p>·水牢区域视为困难地形。</p><p>·水牢形成在原地，不会跟随你移动，你只能拥有一个水牢，如果你形成新的水牢，之前的消失。</p><p><strong>升级：</strong>气血流失+50，持续回合数+1，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "水牢区域效果及流失手动。",
+                    "automationNote": "部分自动化：以目标所在格为中心原地生成“水牢”（2 米，3+升级 回合），敌人进入或回合开始时自动受到气血流失（必中不暴击；进入与回合开始每轮合计结算一次）。再次施展自动替换旧水牢，到期或脱战时消散。水牢区域视作困难地形需 GM 手动裁定。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -6990,10 +7040,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "创建水牢",
-                            "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 50 + (lvl - 1) * 50;\nconst rounds = 3 + (lvl - 1);\nui.notifications.info(`已生成 [水牢] (2米范围)。持续 ${rounds} 回合。\\n进入/回合开始流失 ${dmg} 气血。`);",
-                            "active": true
+                            "label": "水牢光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 水牢：以目标所在格为中心原地放置（不跟随），持续 3+升级 回合（再次施展自动替换旧的）。\n// 开始回合或进入受 50+50×升级 气血流失（必中不暴击）；oncePerRound 使\"进入/回合开始\"每轮合计一次，\n// 近似原文\"第一次进入\"——跨轮再次进入会再次结算，如需严格每目标仅一次由 GM 裁定。\n// 困难地形超出框架，由 GM 手动裁定。\nconst slTarget = Array.from(game.user.targets ?? [])[0];\nif (!slTarget) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"水牢需要选择目标（以目标所在格为中心）。\";\n    return;\n}\nconst slDoc = slTarget.document ?? slTarget;\nconst slLvl = Math.max(1, move.computedLevel || 1);\nconst slDmg = String(50 + 50 * (slLvl - 1));\nawait game.xjzl.aura.create({scene: slDoc.parent, x: slDoc.x, y: slDoc.y}, {\n    label: \"wuxue-shuilao-\" + actor.id,\n    sourceActorUuid: actor.uuid,\n    displayName: \"水牢\",\n    follow: false,\n    radius: 2,\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: true,\n    enterAction: {kind: \"damage\", amount: slDmg, type: \"liushi\"},\n    oncePerRound: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: slDmg, type: \"liushi\"},\n    durationRounds: 3 + (slLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 }
@@ -9831,9 +9881,8 @@
                     "range": "10米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>下蹲蓄力，准备起跳，在范围中选择一块 3*3 的攻击区域，在这个区域中，所有速度低于你的目标陷入“禁足”状态，直到下个你的回合开始。下个你的回合开始时，一跃飞天，纵身一踢（半空中），对选定区域中所有敌人造成伤害。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "纯手动。",
-                    "x-xjzl-aura": true,
+                    "description": "<p>下蹲蓄力，准备起跳，选择一个或多个目标。选择禁足时，速度低于你的目标直接陷入“禁足”状态，持续 1 回合；选择伤害时，对选定目标正常造成伤害。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "部分自动化：出招时弹窗选择本次效果——添加禁足（对玩家选中的目标直接必中，速度低于你的目标自动陷入禁足 1 回合；本次不造成伤害）或造成伤害（由本次攻击正常结算）。目标选择与半空中的释放判定由玩家/GM 手动把握。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -9856,7 +9905,26 @@
                             5
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "断海择效",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 天神断海：禁足分支跳过命中骰，本次伤害为零；hit_once 从本次结算目标中选出速度低于施展者的目标，施加 1 回合禁足。\n// 伤害分支正常结算；半空释放由 GM 裁定。\nconst dhChoice = await foundry.applications.api.DialogV2.wait({\n    window: {title: \"天神断海\"},\n    content: \"<p>选择本次【天神断海】的效果：</p>\",\n    buttons: [\n        {action: \"root\", label: \"添加禁足（直接必中，速度低于你的选中目标禁足 1 回合；本次不造成伤害）\"},\n        {action: \"damage\", label: \"造成伤害（由本次攻击正常结算）\"}\n    ]\n});\nif (!dhChoice) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消天神断海，本次出招中止。\";\n    return;\n}\nargs.flags.duanhaiMode = dhChoice;\nif (dhChoice === \"root\") args.flags.forceHit = true;"
+                        },
+                        {
+                            "label": "断海禁足免伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 禁足分支保留命中结果供后效使用，本次伤害置零。\nif (args.scriptFlags?.duanhaiMode !== \"root\") return;\nargs.config.amount = 0;\nargs.config.ignoreMinDamage = true;"
+                        },
+                        {
+                            "label": "断海施加禁足",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "// 添加禁足分支：对命中的选中目标做速度比较（仅速度低于自身者陷入禁足，1 回合自然解除）。\nif (args.scriptFlags?.duanhaiMode !== \"root\") return;\nconst dhOwnerSpeed = actor.system.combat?.speedTotal || 0;\nfor (const dhT of args.targets ?? []) {\n    const dhActor = dhT.target;\n    if (!dhActor || !dhT.isHit) continue;\n    if ((dhActor.system.combat?.speedTotal || 0) >= dhOwnerSpeed) continue;\n    await game.xjzl.api.effects.addEffect(dhActor, {id: \"root\", duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}});\n}"
+                        }
+                    ]
                 }
             ],
             "effects": [
@@ -10579,7 +10647,7 @@
                     "targetInfo": "单体",
                     "actionCost": "次要动作",
                     "description": "<p>将汇集的“六气”之一晕化于周遭天地之间，根据释放的气息不同产生不同效果，同一时间只能存在一种六气效果。</p><p>厥阴风木：你的回合结束时，周围 3 米所有友方角色立即恢复 20 点气血，持续@{1 + @up|一}回合。</p><p>少阴君火：周围 3 米所有友方角色造成外功伤害时，伤害提高 20 点，持续@{1 + @up|一}回合。</p><p>太阴湿土：周围 3 米所有友方角色获得 10 点内功防御，持续@{1 + @up|一}回合。</p><p>少阳相火：周围 3 米所有友方角色造成内功伤害时，伤害提高 20 点，持续@{1 + @up|一}回合。</p><p>阳明燥金：周围 3 米所有战斗变得华丽异常，所有角色神采值增加 20 点，持续@{1 + @up|一}回合。</p><p>太阳寒水：周围 3 米所有敌人内力窒碍，施展轻功额外消耗 10 点内力，持续@{1 + @up|一}回合。</p><p><strong>升级：</strong>持续时间+1 回合，内力消耗+4。</p>",
-                    "automationNote": "纯手动。",
+                    "automationNote": "部分自动化：施展时选择一种“六气”，自动生成跟随自身的 3 米六气区域（同一时间只存在一种，新的自动替换旧的），持续 1+升级 回合。少阴君火/少阳相火的招式伤害+20、太阴湿土的内防+10、阳明燥金的神采+20 自动生效；厥阴风木在你的回合末自动为区域内友方回复 20 气血；太阳寒水的“轻功额外消耗 10 内力”需 GM 手动结算。脱战或到期时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -10593,7 +10661,20 @@
                             16
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "六气晕染",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 六气：选择六气之一晕染周身 3 米（同一时间只能存在一种，同标签自动替换旧的）。\n// 阳明燥金作用于所有角色，太阳寒水作用于敌人，其余作用于友方（含己）。\nconst lqLvl = Math.max(1, move.computedLevel || 1);\nconst lqChoice = await foundry.applications.api.DialogV2.wait({\n    window: {title: \"画碧染绿·选择六气\"},\n    content: \"<p>选择本次晕染的“六气”（持续 \" + (1 + (lqLvl - 1)) + \" 回合）：</p>\",\n    buttons: [\n        {action: \"厥阴风木\", label: \"厥阴风木（你的回合末，周围 3 米友方回 20 气血）\"},\n        {action: \"少阴君火\", label: \"少阴君火（周围 3 米友方招式伤害+20）\"},\n        {action: \"太阴湿土\", label: \"太阴湿土（周围 3 米友方内功防御+10）\"},\n        {action: \"少阳相火\", label: \"少阳相火（周围 3 米友方招式伤害+20）\"},\n        {action: \"阳明燥金\", label: \"阳明燥金（周围 3 米所有角色神采+20）\"},\n        {action: \"太阳寒水\", label: \"太阳寒水（周围 3 米敌人轻功额外耗 10 内力，手动）\"}\n    ]\n});\nif (!lqChoice) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消六气选择，本次出招中止。\";\n    return;\n}\nconst lqFaction = lqChoice === \"阳明燥金\" ? \"all\" : (lqChoice === \"太阳寒水\" ? \"enemy\" : \"ally\");\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-liuqi-\" + actor.id,\n    displayName: \"六气·\" + lqChoice,\n    follow: true,\n    radius: 3,\n    faction: lqFaction,\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: lqChoice,\n    durationRounds: 1 + (lqLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n// 记录已消耗过的六气种类（九紫运来的施展前提）。\nconst lqUsed = new Set(actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || []);\nlqUsed.add(lqChoice);\nawait actor.setFlag(\"xjzl-system\", \"wuxue_liuqi_used\", Array.from(lqUsed));\n"
+                        },
+                        {
+                            "label": "六气回复",
+                            "trigger": "turnEnd",
+                            "active": true,
+                            "script": "// 厥阴风木：自身回合结束时，六气区域内友方（含己）恢复 20 气血；\n// 六丁六甲阵（九紫运来）存在时按翻倍口径独立结算 40（阵与风木可并存，各自按所在区域回复）。\nconst lqTok = actor.getActiveTokens?.()[0];\nconst lqDisp = lqTok?.document?.disposition;\nconst lqHealIn = async (lqRegion, lqAmount) => {\n    if (!lqRegion) return;\n    for (const lqT of lqRegion.tokens) {\n        if (!lqT.actor) continue;\n        if (lqT.disposition !== lqDisp) continue;\n        await lqT.actor.applyHealing({amount: lqAmount, type: \"hp\", healer: actor});\n    }\n};\nconst ljRegion2 = game.xjzl.aura.query(\"wuxue-liujia-\" + actor.id)[0];\nawait lqHealIn(ljRegion2, 40);\nconst lqRegion2 = game.xjzl.aura.query(\"wuxue-liuqi-\" + actor.id)[0];\nif (lqRegion2?.getFlag(\"xjzl-system\", \"aura\")?.params?.payloadEffectName === \"厥阴风木\") {\n    await lqHealIn(lqRegion2, 20);\n}\n"
+                        }
+                    ]
                 },
                 {
                     "name": "通黄绣白",
@@ -10683,7 +10764,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>只有使用招式消耗过 6 种不同的“六气”状态才能施展，次要动作，在周围 10 米布下‘六丁六甲阵’，持续 @{3 + @up|3} 回合。</p><p><strong>六丁六甲阵：</strong>区域内具有所有【画碧染绿】中的六气效果，且范围变为六丁六甲阵的范围，相关效果数值翻倍。</p><p><strong>升级：</strong>持续回合+1，内力消耗+8，怒气消耗-1。</p>",
-                    "automationNote": "纯手动。",
+                    "automationNote": "部分自动化：施展前提（曾以画碧染绿消耗过全部六种六气）自动校验。展开的 10 米“六丁六甲阵”持续 3+升级 回合并用于范围显示；厥阴风木的翻倍回复（回合末 40 气血）自动结算，其余五气的翻倍效果请按聊天卡提示手动赋予区域内角色。到期或脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -10703,7 +10784,14 @@
                             5
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "六丁六甲阵",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 六丁六甲阵：前置为本角色曾以画碧染绿消耗过全部六种六气（自动记录）。\n// 阵内六气效果数值翻倍——厥阴风木的翻倍回复由[六气回复]脚本自动结算；\n// 其余五气无法由单一 payload 表达翻倍，需由 GM 手动赋予区域内角色。\nconst ljUsed2 = new Set(actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || []);\nconst ljAll2 = [\"厥阴风木\", \"少阴君火\", \"太阴湿土\", \"少阳相火\", \"阳明燥金\", \"太阳寒水\"];\nconst ljMissing2 = ljAll2.filter(q => !ljUsed2.has(q));\nif (ljMissing2.length) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"尚未以画碧染绿消耗过：\" + ljMissing2.join(\"、\") + \"。\";\n    return;\n}\nconst ljLvl2 = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-liujia-\" + actor.id,\n    displayName: \"六丁六甲阵\",\n    follow: true,\n    radius: 10,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 3 + (ljLvl2 - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: \"<div class='xjzl-chat-card'><b>六丁六甲阵</b> 已展开（10 米，\" + (3 + (ljLvl2 - 1)) + \" 回合）：厥阴风木翻倍回复已自动；少阴君火/少阳相火招式伤害+40、太阴湿土内防+20、阳明燥金神采+40、太阳寒水轻功多耗 20 内力，请手动赋予区域内角色。</div>\"\n});\n"
+                        }
+                    ]
                 }
             ],
             "effects": [
@@ -10722,16 +10810,27 @@
                 },
                 {
                     "name": "少阴君火",
-                    "description": "周围友方外功伤害+20。",
+                    "description": "少阴君火：周围 3 米友方造成外功伤害时，伤害提高 20 点。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "six_qi_2",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "少阴君火·增伤",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "// 少阴君火：仅对外功伤害的招式生效（+20）。\nif ((args.move?.damageType ?? \"\") !== \"waigong\") return;\nargs.output.damage += 20;\nargs.output.bonusDesc.push(\"少阴君火 +20\");\n"
+                                }
+                            ]
                         }
                     },
                     "img": "icons/magic/fire/flame-burning-orange.webp",
-                    "showIcon": 2
+                    "showIcon": 2,
+                    "system": {
+                        "changes": []
+                    }
                 },
                 {
                     "name": "太阴湿土",
@@ -10744,20 +10843,40 @@
                         }
                     },
                     "img": "icons/magic/earth/rock-shatter-yellow.webp",
-                    "showIcon": 2
+                    "showIcon": 2,
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.combat.def_neigong",
+                                "type": "add",
+                                "value": "10"
+                            }
+                        ]
+                    }
                 },
                 {
                     "name": "少阳相火",
-                    "description": "周围友方内功伤害+20。",
+                    "description": "少阳相火：周围 3 米友方造成内功伤害时，伤害提高 20 点。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "six_qi_4",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "少阳相火·增伤",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "// 少阳相火：仅对内功伤害的招式生效（+20）。\nif ((args.move?.damageType ?? \"\") !== \"neigong\") return;\nargs.output.damage += 20;\nargs.output.bonusDesc.push(\"少阳相火 +20\");\n"
+                                }
+                            ]
                         }
                     },
                     "img": "icons/magic/fire/explosion-fireball-red.webp",
-                    "showIcon": 2
+                    "showIcon": 2,
+                    "system": {
+                        "changes": []
+                    }
                 },
                 {
                     "name": "阳明燥金",
@@ -10770,7 +10889,16 @@
                         }
                     },
                     "img": "icons/magic/light/beam-rays-gold.webp",
-                    "showIcon": 2
+                    "showIcon": 2,
+                    "system": {
+                        "changes": [
+                            {
+                                "key": "system.stats.shencai",
+                                "type": "add",
+                                "value": "20"
+                            }
+                        ]
+                    }
                 },
                 {
                     "name": "太阳寒水",
@@ -11383,7 +11511,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>黑烟随着掌风弥漫向敌手，对目标造成伤害，并在目标所在空格产生一道‘黑烟’，持续到战斗脱离。</p><p>若有敌人处于半空中，你可以消耗反应动作释放此招，使招式距离+4，原地释放黑气伤敌。</p><p><strong>黑烟：</strong>处于区域中的角色，招式无法造成暴击，且在他回合开始时，受到 20 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "黑烟区域生成及效果手动。反应动作消耗及半空判定手动。",
+                    "automationNote": "部分自动化：命中后在目标所在格自动生成一道“黑烟”（持续到脱战）：处于黑烟中的角色招式无法造成暴击，且回合开始自动受到 20 点毒素伤害。黑烟可多道并存；脱战时一并消散。若需在半空中消耗反应动作释放（招式距离+4、原地释放），请 GM 手动处理。已知边界：其他效果的“强制暴击”与手动伤害直传暴击可无视黑烟。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -11409,10 +11537,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "提示生成黑烟",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; font-size:0.9em; color:#555;\">\n                <p><b>黑烟产生</b></p>\n                <p>请在目标所在位置标记 [黑烟] 区域。</p>\n                <p>效果：区域内无法暴击，回合开始受20毒伤。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
-                            "active": true
+                            "label": "黑烟生成",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hyParams = {\n    displayName: \"黑烟\",\n    color: \"#333333\",\n    radius: 0,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"黑烟\",\n    enterEnabled: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: \"20\", type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n};\n// 黑烟：在目标所在格生成一道黑烟（持续到脱战，可多道并存）。\n// 半空中消耗反应动作释放（招式距离+4、原地释放）超出框架，由玩家与 GM 手动处理。\nconst hyTargets2 = Array.from(game.user.targets ?? []);\nif (!hyTargets2.length) return;\nconst hyDoc2 = hyTargets2[0].document ?? hyTargets2[0];\nawait game.xjzl.aura.create({scene: hyDoc2.parent, x: hyDoc2.x, y: hyDoc2.y}, {\n    ...hyParams,\n    label: \"wuxue-heiyan-\" + actor.id + \"-\" + foundry.utils.randomID(6)\n});\n"
                         }
                     ]
                 },
@@ -11426,7 +11554,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制目标虚招，黑烟笼罩敌手，对目标造成伤害，并在目标所在空格产生一道‘黑烟’，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "黑烟区域生成手动。反应动作消耗手动。",
+                    "automationNote": "完全自动化：看破对方虚招施展后，目标虚招被压制，并在目标所在格自动生成一道“黑烟”（持续到脱战）：处于黑烟中的角色招式无法造成暴击，且回合开始自动受到 20 点毒素伤害。反应动作的消耗由玩家自行把握。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -11452,10 +11580,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "提示生成黑烟",
-                            "trigger": "hit",
-                            "script": "ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; font-size:0.9em; color:#555;\">\n            <p><b>黑烟产生</b></p>\n            <p>请在目标所在位置标记 [黑烟] 区域。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "label": "黑烟生成",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hyParams = {\n    displayName: \"黑烟\",\n    color: \"#333333\",\n    radius: 0,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"黑烟\",\n    enterEnabled: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: \"20\", type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n};\n// 黑烟：看破压制目标后在目标所在格生成一道黑烟（持续到脱战）。\nconst hyTargets3 = Array.from(game.user.targets ?? []);\nif (!hyTargets3.length) return;\nconst hyDoc3 = hyTargets3[0].document ?? hyTargets3[0];\nawait game.xjzl.aura.create({scene: hyDoc3.parent, x: hyDoc3.x, y: hyDoc3.y}, {\n    ...hyParams,\n    label: \"wuxue-heiyan-\" + actor.id + \"-\" + foundry.utils.randomID(6)\n});\n"
                         }
                     ]
                 },
@@ -11469,7 +11597,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>毒掌之上笼罩层层黑气，开启架招，格挡成功时，在目标所在空格产生一道‘黑烟’，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "黑烟区域生成手动。",
+                    "automationNote": "完全自动化：架招格挡成功时，在进攻方所在格自动生成一道“黑烟”（持续到脱战）：处于黑烟中的角色招式无法造成暴击，且回合开始自动受到 20 点毒素伤害。脱战时一并消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -11487,8 +11615,8 @@
                         {
                             "label": "格挡生烟",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; font-size:0.9em; color:#555;\">\n                <p><b>格挡成功</b></p>\n                <p>请在 ${args.attacker.name} 所在位置产生 [黑烟]。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const hyParams = {\n    displayName: \"黑烟\",\n    color: \"#333333\",\n    radius: 0,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"黑烟\",\n    enterEnabled: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: \"20\", type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n};\n// 架招格挡成功：在进攻方所在格生成一道黑烟（持续到脱战）。\nif (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst hyTok4 = args.attacker.getActiveTokens?.()[0] ?? args.attacker.token;\nconst hyDoc4 = hyTok4?.document ?? hyTok4;\nif (!hyDoc4) return;\nawait game.xjzl.aura.create({scene: hyDoc4.parent, x: hyDoc4.x, y: hyDoc4.y}, {\n    ...hyParams,\n    label: \"wuxue-heiyan-\" + actor.id + \"-\" + foundry.utils.randomID(6)\n});\n"
                         }
                     ]
                 },
@@ -11503,7 +11631,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>将周围的黑烟尽数收入掌中，再爆发而出，化为汹涌黑浪，吞噬一切，对周围敌人造成伤害。</p><p>·每吸纳一团‘黑烟’，招式伤害提高 10 点。</p><p>·若吸纳的‘黑烟’数量达到 7 团，则在攻击范围内的每个空格产生一道‘黑烟’，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "吸纳黑烟数量及对应伤害加成手动输入。黑烟区域生成手动。",
+                    "automationNote": "完全自动化：施展时自动吸纳周围 5 米内你自己生成的所有黑烟，每团使本次招式伤害+10（自动计入伤害）；吸纳达到 7 团时，攻击范围内每个空格自动生成一道黑烟（角色占据的格子除外）。黑烟效果见【乌云盖顶】；脱战时一并消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -11535,15 +11663,44 @@
                     },
                     "scripts": [
                         {
-                            "label": "黑烟计算提示",
+                            "label": "黑烟吸纳与爆发",
                             "trigger": "attack",
-                            "script": "const confirm = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"蒙心绝念 - 吸纳黑烟\" },\n    content: `<p>请输入吸纳的黑烟数量：</p><input type=\"number\" name=\"count\" value=\"0\" autofocus>`,\n    ok: { label: \"确定\", callback: (event, button) => new FormData(button.form).get(\"count\") }\n});\n\nconst count = parseInt(confirm) || 0;\nconst bonus = count * 10;\n\nargs.flags.damageResult.damage += bonus;\nargs.flags.damageResult.breakdown += `\\n+ 黑烟吸纳(${count}): ${bonus}`;\n\nif (count >= 7) {\n    ui.notifications.info(\"吸纳达到7团，请在范围内铺满黑烟！\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const hyParams = {\n    displayName: \"黑烟\",\n    color: \"#333333\",\n    radius: 0,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"黑烟\",\n    enterEnabled: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: \"20\", type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n};\n// 蒙心绝念：吸纳周围 5 米内自己的黑烟（token 区域标签反查 + 距离判定），\n// 每团招式伤害+10；达到 7 团时，攻击范围内每个空格生成一道黑烟（被占据的格子跳过）。\nconst mxPrefix = \"wuxue-heiyan-\" + actor.id;\nconst mxSelf2 = actor.getActiveTokens?.()[0];\nif (!mxSelf2) return;\nlet mxRemoved = 0;\nfor (const mxLabel of game.xjzl.aura.queryLabels().filter(l => l.startsWith(mxPrefix))) {\n    const mxRegion = game.xjzl.aura.query(mxLabel)[0];\n    const mxOrigin = mxRegion?.shapes?.[0]?.origin;\n    if (!mxOrigin) continue;\n    if (canvas.grid.measurePath([mxSelf2.center, mxOrigin]).distance > 5.5) continue;\n    await game.xjzl.aura.dismiss(mxLabel);\n    mxRemoved++;\n}\nif (mxRemoved > 0) {\n    args.flags.damageResult.damage += 10 * mxRemoved;\n    args.flags.damageResult.breakdown += \"\\n+ 吸纳黑烟(\" + mxRemoved + \"): \" + 10 * mxRemoved;\n    ui.notifications.info(\"蒙心绝念：吸纳 \" + mxRemoved + \" 团黑烟，招式伤害+\" + 10 * mxRemoved + \"。\");\n}\nif (mxRemoved < 7) return;\n// 1-2-2-2 口径枚举 5 米内格子；被 Token 占据的格子不生成。\nconst mxScene = canvas.scene;\nconst mxSize = mxScene.grid.sizeX ?? mxScene.grid.size ?? 100;\nconst mxOrig = {i: Math.floor(mxSelf2.center.y / mxSize), j: Math.floor(mxSelf2.center.x / mxSize)};\nconst mxOcc = new Set();\nfor (const mxT of mxScene.tokens) {\n    if (!mxT.actor) continue;\n    const mTi = Math.floor(mxT._source.y / mxSize);\n    const mTj = Math.floor(mxT._source.x / mxSize);\n    for (let di = 0; di < (mxT._source.height ?? 1); di++) {\n        for (let dj = 0; dj < (mxT._source.width ?? 1); dj++) mxOcc.add((mTi + di) + \".\" + (mTj + dj));\n    }\n}\nfor (let di = -5; di <= 5; di++) {\n    for (let dj = -5; dj <= 5; dj++) {\n        const d = Math.min(Math.abs(di), Math.abs(dj));\n        const s = Math.abs(di) + Math.abs(dj) - 2 * d;\n        if ((d === 0 ? s : 1 + 2 * (d - 1) + s) > 5) continue;\n        if (mxOcc.has((mxOrig.i + di) + \".\" + (mxOrig.j + dj))) continue;\n        await game.xjzl.aura.create(\n            {scene: mxScene, x: (mxOrig.j + dj) * mxSize + mxSize / 2, y: (mxOrig.i + di) * mxSize + mxSize / 2},\n            {...hyParams, label: mxPrefix + \"-\" + foundry.utils.randomID(6)}\n        );\n    }\n}\n"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "黑烟",
+                "description": "黑烟：处于区域中的角色招式无法造成暴击，且在其回合开始时受到 20 点毒素伤害。",
+                "transfer": false,
+                "showIcon": 2,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "black_smoke",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "黑烟·无法暴击",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "// 黑烟内招式无法暴击：大幅负向修正暴击阈值使其不可达。\n// 已知边界：forceCrit 强制暴击与手动伤害直传 isCrit 可绕过本修正。\nargs.flags.critThresholdMod = (args.flags.critThresholdMod || 0) - 99;"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": []
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
+            }
+        ]
     },
     {
         "name": "九鼎步",
@@ -11683,7 +11840,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，消耗 5 层‘九鼎’，阴阳相化，纠缠而生，使周身 5 米的场地陷入‘阴阳变’状态，持续@{1 + @up|一}回合。</p><p><strong>阴阳变：</strong>区域内所有目标（包括友方和自己）的武学属性变化，阴阳倒转，刚柔相化，太极不变。</p><p><strong>升级：</strong>持续回合数+1，怒气消耗-1，消耗+8。</p>",
-                    "automationNote": "消耗九鼎自动。场地效果为文字提示（手动处理属性变化）。",
+                    "automationNote": "部分自动化：消耗 5 层九鼎自动结算，并自动生成跟随自身的 5 米“阴阳变”区域（持续 1+升级 回合）用于范围显示。区域内所有目标（含友方和自己）的武学属性阴阳倒转需 GM 与玩家按规则手动裁定，到期或脱战时区域消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -11715,6 +11872,12 @@
                             "trigger": "attack",
                             "script": "const jiuding = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jiuding\");\nconst stacks = jiuding ? (jiuding.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n\nif (stacks < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = `九鼎层数不足 (需5层，当前${stacks})`;\n    return;\n}\n\nawait game.xjzl.api.effects.removeEffect(actor, \"jiuding\", 5);\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; font-weight:bold; color:black;\">阴阳所化 - 场地效果</div>\n        <div style=\"font-size:0.9em;\">\n            <p>已消耗 5 层九鼎。</p>\n            <p>周身 5 米陷入 [阴阳变] (持续 ${rounds} 回合)。</p>\n            <p><i>效果：阴阳倒转，刚柔相化。</i></p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
+                        },
+                        {
+                            "label": "阴阳变区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 阴阳变：周身 5 米区域仅显示范围；武学属性倒转由 GM 手动裁定。\nconst yyLvl = Math.max(1, args.move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-yinyang-\" + actor.id,\n    displayName: \"阴阳变\",\n    follow: true,\n    radius: 5,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1 + (yyLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\n"
                         }
                     ]
                 }

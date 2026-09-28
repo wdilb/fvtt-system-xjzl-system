@@ -355,7 +355,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>清丽圆美，映思回萦，对周围敌方造成 0.5 内息点内功伤害，自身获得“相思”，持续到战斗脱离。</p><p><strong>相思：</strong>在你 3 米范围内开始回合的敌方需要进行难度 16 的[定力]检定，失败受到 10 点精神伤害。</p><p>·若其具有“惜别”，则检定必定失败。</p><p><strong>升级：</strong>招式伤害+10，相思伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "获得相思自动。相思光环效果需手动处理。",
+                    "automationNote": "完全自动化：获得“相思”状态自动；自动生成跟随自身的 3 米相思光环（持续到脱战）：范围内敌人回合初自动进行难度 16 的[定力]检定，失败自动受到 10+10×升级 点精神伤害；具有“惜别”的目标检定必定失败（直接受伤）。脱战时光环消散。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -384,6 +384,12 @@
                             "trigger": "hit_once",
                             "script": "const eff = thisItem.effects.getName(\"相思\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
+                        },
+                        {
+                            "label": "相思光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 相思：跟随施展者 3 米（持续到脱战），范围内敌人回合初进行定力检定（监听 AE 自动结算）。\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-xiangsi-\" + actor.id,\n    displayName: \"相思\",\n    follow: true,\n    radius: 3,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"相思-检定\",\n    enterEnabled: true,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ],
                     "x-xjzl-aura": true
@@ -423,7 +429,36 @@
                     "showIcon": 2
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "相思-检定",
+                "description": "相思：回合初需通过难度 16 的[定力]检定，失败受到 10+10×升级 点精神伤害；具有“惜别”者必定失败。",
+                "transfer": false,
+                "showIcon": 2,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xiangsi_check",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "相思·定力检定",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "// 相思：回合初定力检定（难度 16），失败受 10+10×升级 精神伤害；有“惜别”则必定失败。\nconst xsSrc = await fromUuid(thisEffect.origin);\nconst xsOwner = xsSrc?.parent?.parent;\nconst xsItem = xsSrc?.parent;\nconst xsMove = xsItem?.system?.moves?.find(m => m.name === \"是为相思\");\nconst xsLvl = Math.max(1, xsMove?.computedLevel || 1);\nconst xsDmg = 10 + 10 * (xsLvl - 1);\nif (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xibie\")) {\n    await actor.applyDamage({amount: xsDmg, type: \"mental\", attacker: xsOwner ?? actor, source: \"extra\"});\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'>\" + actor.name + \" 心怀惜别，相思之苦挥之不去：受到 \" + xsDmg + \" 点精神伤害（检定必定失败）。</div>\"});\n    return;\n}\nawait Macros.requestSave({\n    target: actor,\n    attacker: xsOwner ?? actor,\n    type: \"dingli\",\n    dc: 16,\n    label: \"抵抗相思\",\n    damageOnFail: {value: xsDmg, type: \"mental\"},\n    failureText: \"定力检定失败，相思成疾，受到 \" + xsDmg + \" 点精神伤害。\"\n});"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": []
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
+            }
+        ]
     },
     {
         "name": "抬花轿",
@@ -1211,7 +1246,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>犹抱琵琶半遮面，开启架招。格挡成功时在周身 @{3 + @up|3} 米内弹奏‘荻花秋瑟’，持续两回合。</p><p><strong>荻花秋瑟：</strong>区域内敌人速度减半，且攻击距离-@{1 + @up|1}（至少 1）。</p><p><strong>升级：</strong>格挡值+10，荻花秋瑟范围+1，攻击距离再-1，内力消耗+2。</p>",
-                    "automationNote": "荻花秋瑟光环需手动创建/移动。效果自动。",
+                    "automationNote": "部分自动化：开启架招，格挡成功时自动在周身 3+升级 米弹奏“荻花秋瑟”（2 回合）：区域内敌人移动速度自动减半；“攻击距离-（1+升级，至少 1）”超出框架由 GM 手动结算。到期或脱战时消散。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1225,10 +1260,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "生成光环提示",
+                            "label": "荻花秋瑟光环",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"格挡成功：请手动给自己施加 [荻花秋瑟] (使用物品内特效)。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "// 荻花秋瑟：格挡成功时在周身 3+升级 米弹奏（2 回合），区域内敌人移动速度减半（以【荻花秋瑟】状态承载）。\n// \"攻击距离-X（至少 1）\"超出框架（引擎无攻击距离修正入口），由 GM 手动结算。\nif (!Macros.checkStance(actor, args)) return;\nconst dhLvl = Math.max(1, thisItem.system?.moves?.find(m => m.name === \"千呼万唤\")?.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-dihua-\" + actor.id,\n    displayName: \"荻花秋瑟\",\n    follow: true,\n    radius: 3 + (dhLvl - 1),\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"荻花秋瑟\",\n    enterEnabled: true,\n    durationRounds: 2,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ],
                     "x-xjzl-aura": true
@@ -1360,7 +1395,7 @@
             "effects": [
                 {
                     "name": "荻花秋瑟",
-                    "description": "光环：敌人减速，攻击距离减少。",
+                    "description": "荻花秋瑟：区域内敌人移动速度减半（攻击距离减少由 GM 手动结算）。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1370,7 +1405,13 @@
                     },
                     "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "system": {
-                        "changes": []
+                        "changes": [
+                            {
+                                "key": "flags.xjzl-system.unstable",
+                                "type": "override",
+                                "value": "true"
+                            }
+                        ]
                     },
                     "showIcon": 2
                 },

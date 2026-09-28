@@ -2709,7 +2709,7 @@
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，血滴掌心邪蛊，选择范围内一个空格，弹出蛊虫，在目标周围3米范围形成淡绿色的‘腐蛊雾霭’，持续三回合。</p><p><strong>腐蛊雾霭：</strong>该区域不会影响敌我视线，在区域内的角色进行命中检定和虚招对抗时具有劣势。</p><p>·若区域内角色离开此区域（消耗移动速度，施展轻功，被击飞、击退），则陷入“眩晕”一回合。</p><p>·你只能在战场布置一个‘腐蛊雾霭’。</p><p><strong>升级：</strong>战场可布置的最大数量+1。</p>",
                     "requirements": "物品：迷神蛊*1",
-                    "automationNote": "物品消耗需手动。区域布置与效果需手动。",
+                    "automationNote": "部分自动化：施展时选择落点，自动布置“腐蛊雾霭”（3 米、3 回合）：区域内角色命中检定与虚招对抗自动具有劣势。战场可布置的数量上限为 1+升级（达到上限时无法施展）。角色离开雾区时的眩晕由 GM 手动结算（持续一回合）。雾区不影响视线；到期后消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -2724,15 +2724,47 @@
                     },
                     "scripts": [
                         {
-                            "label": "效果提示",
-                            "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxCount = 1 + (lvl - 1);\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">雾锁腐蛊 (上限 ${maxCount})</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请手动放置 [腐蛊雾霭] 区域 (3米/3回合)。</p>\n            <p><b>区域效果:</b> 命中/虚招对抗劣势。</p>\n            <p><b>离开惩罚:</b> 陷入 [眩晕] (手动应用)。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "label": "腐蛊雾霭区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 腐蛊雾霭：选空格放置 3 米雾区（3 回合，战场数量上限 1+升级）。\n// 离开雾区陷入眩晕一回合：当前光环行为仅在离开时清理已挂效果，未配置离开时施加眩晕，由 GM 手动结算。\nconst fgLvl = Math.max(1, move.computedLevel || 1);\nconst fgMax = 1 + (fgLvl - 1);\nconst fgPrefix = \"wuxue-fugu-\" + actor.id;\nconst fgCount = game.xjzl.aura.queryLabels().filter(l => l.startsWith(fgPrefix)).length;\nif (fgCount >= fgMax) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"腐蛊雾霭已达数量上限（\" + fgMax + \"），无法再布置。\";\n    return;\n}\nconst fgRegion = await game.xjzl.auraQuick.place({\n    label: fgPrefix + \"-\" + foundry.utils.randomID(4),\n    displayName: \"腐蛊雾霭\",\n    radius: 3,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"腐蛊雾霭\",\n    enterEnabled: true,\n    durationRounds: 3,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nif (!fgRegion) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消腐蛊雾霭落点选择，本次出招中止。\";\n    return;\n}\n"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "腐蛊雾霭",
+                "description": "腐蛊雾霭：区域内角色进行命中检定和虚招对抗时具有劣势。离开区域则陷入眩晕一回合（需手动结算）。",
+                "transfer": false,
+                "showIcon": 2,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "fuguwuai",
+                        "stackable": false
+                    }
+                },
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.attackLevel",
+                            "type": "add",
+                            "value": "-1"
+                        },
+                        {
+                            "key": "flags.xjzl-system.feintLevel",
+                            "type": "add",
+                            "value": "-1"
+                        }
+                    ]
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
+            }
+        ]
     },
     {
         "name": "欢邪双刃",

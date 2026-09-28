@@ -2,9 +2,9 @@
 
 本文件是 V14 升级的总进度事实源，记录里程碑、跨阶段依赖和验证结果；范围与既定接口约束见 [`V14_UPGRADE.md`](V14_UPGRADE.md)。**AE 相关实施步骤、工作项状态和验收以 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 为唯一执行依据**；本文件仅同步其里程碑与跨阶段依赖，不再作为 AE 施工清单。
 
-**当前进度**：M0～M2 已通过；M4 源数据与合集包已通过，AE-14 首跑演练完成，正式世界迁移待执行。M3 的 AURA-01～06、08 已完成实机回归，账本当前通过 24 个逻辑场景、80 项断言；AURA-09 前半 36 条与 AURA-10/11 已实施，其中 AURA-10 仅部分路径完成实机复验，万毒心经按手动结算归类。socketlib 双客户端委托、AURA-09 后半、AURA-12 与 M5 待完成。
+**当前进度**：M0～M2 已通过；M4 源数据与合集包已通过，AE-14 首跑演练完成，正式世界迁移待执行。M3 的 AURA-01～06、08～12 已实施，AURA-09 清单 90 行（现有标记 93 处）已销项；前三轮审阅修复经实机复验。碧焰扣费前消耗与断海禁足必中已完成静态校验，实机待验。socketlib 双客户端委托及 AURA-10 部分路径仍待复验，M3 尚未定稿；AURA-07 粒子为可选项。详见光环专项计划。
 
-**下一步**：正式迁移前备份世界，在 V13 运行 [`v13-ae-preprocess.js`](migration/v13-ae-preprocess.js) 并确认报告中的 `unverified`、`errors` 均为 0，再按 AE-14 清单验收旧特效与持久化；M3 推进 AURA-09 后半（其余 wuxue 文件约 25 条＋armor 铜铃猫项圈）与 AURA-12 收尾（铺量前建议双客户端补验一次 socketlib 委托），AURA-07 粒子保持可选；完成 M5 回归及文档核对。S5.5 的 AE 文档已随 AE-10 更新。本轮回归结果及待处理项见文末记录。
+**下一步**：正式迁移前备份世界，在 V13 运行 [`v13-ae-preprocess.js`](migration/v13-ae-preprocess.js) 并确认报告中的 `unverified`、`errors` 均为 0，再按 AE-14 清单验收旧特效与持久化；补验 M3 的双客户端委托、AURA-10 部分路径及碧焰/断海新边界后定稿；完成 M5 回归。
 
 ## 使用方式与状态约定
 
@@ -46,15 +46,7 @@
 - [x] S1.11 B7：CSS 旧变量族替换（实测 16 处，原记 17）→ **已完成**：旧变量在 V14 从 `:root` 缩小作用域到 `body.game .app` 兼容层（V13 表过渡保留）；映射（固定色底元素选**稳定色阶**而非主题感知变量，避免用户切主题后对比度反转）：`--color-border-light-2`→`--color-dark-6`（8）、`--color-text-dark-primary`→`--color-dark-1`（4）、`--color-text-light-highlight`→`--color-light-1`（1）、`--color-text-light-primary`→`--color-light-5`（1）、`--color-shadow-highlight`→`--color-warm-1`（1，V14 官方 highlight 即 warm-1）、`--color-border-dark`→`--color-dark-1`（1）；涉及 _encounter/_roll-config/item-trait/item-equipment/item-art-book/item-general 共 6 文件，残留检查为 0
 - [x] S1.12 A8：`bringToTop()` → `bringToFront()`（character-sheet.mjs，V14 已移除）
 - [x] S1.13 A9：ChatMessage 数据 `user:` → `author:`（模块 27 处 + data/ 脚本 88 处；世界内脚本副本由 S4.7 迁移）
-- [x] S1.14 摘除 MeasuredTemplate 启动依赖（应用户要求以注释方式停用、保留代码供 M3 光环/Region 重建参考，未删除文件）；`node --check` 通过，AOE 按钮已消失 → **理由修正（审阅复核 + 14.368 实测）**：V14 保留 MeasuredTemplate 弃用兼容层（类、`CONFIG.MeasuredTemplate`、`scene.templates` 可用），旧代码在兼容层下仍可运行，**停用并非启动所必需，而是不基于弃用 API 继续开发**（兼容层未来移除，届时再摘即为启动阻断）；按计划提前下线 AOE、M3 迁移 Region 的决策不变。相关注释与文档表述已同步修正
-  - 注释位置明细（M3 重建完成后，全局搜索 `【V14 升级 S1.14 停用，代码仅注释未删除】` 标记即可定位全部注释块并删除）：
-    1. `xjzl-system.mjs` 顶部：`XJZLMeasuredTemplate`、`AOECreator` 两条 import
-    2. `xjzl-system.mjs` init 内：`CONFIG.MeasuredTemplate.objectClass` 注册
-    3. `xjzl-system.mjs` getSceneControlButtons 钩子：“4·注入 AOE Creator 按钮”整段（V14 已移除 templates 控制层）
-    4. `xjzl-system.mjs` updateToken 钩子：粘性模板同步算法（保留名称/阵营→战局刷新；注释内含中心点计算、1px 去抖、无权限走 socket 委托的完整原逻辑）
-    5. `xjzl-system.mjs` deleteToken 钩子：整体（该钩子仅负责 autoDelete 模板清理）
-    6. `module/measured-template.mjs`：代码本身未注释（不再被 import 即不求值，可安全保留），文件头标注 M3 参考要点——1-2-2-2 圆形网格高亮算法、`tokens` 范围查询接口、标签绘制与点击穿透
-    7. `module/applications/aoe-creator.mjs`：类整体保留可正常加载，仅 `_onCreate` 创建逻辑注释并加守卫返回；文件头标注 M3 参考要点——跟随/静态取点、GM 代创时所有权移交、`flags.sticky/sourceToken/label` 约定
+- [x] S1.14 摘除 MeasuredTemplate 启动依赖（应用户要求先以注释方式停用；V14 保留 MeasuredTemplate 弃用兼容层，停用并非启动所必需，而是不基于弃用 API 继续开发）；**停用文件已随 AURA-12 删除，updateToken 遗留注释于 2026-09-28 复核清除**（M3 光环/Region 重建完成后执行）：删除 `module/measured-template.mjs`、`module/applications/aoe-creator.mjs` 及孤儿资产 `templates/apps/aoe-creator.hbs`、`styles/apps/_aoe-creator.css`，同步移除 `system.json` styles 与模板预加载中的引用；grep 确认运行代码零残留引用；此前版本世界刷新加载正常，本次注释补删后 `node --check` 通过。删除明细与 1-2-2-2 口径不受影响的说明见专项计划 AURA-12
 - [x] S1.15 对照[官方 #13436](https://github.com/foundryvtt/foundryvtt/issues/13436)审计入口、module 与模板代码 → **审计完成，1 处命中已修复**：`item.mjs` 秘籍查重读/写 `flags.core.sourceId`（V14 已移除）→ 改为官方字段 `_stats.compendiumSource`（旧世界数据由 name+type 兜底比对，无需迁移）。其余类别全部干净：Handlebars `colorPicker`/`select` helper、`CONST.CHAT_MESSAGE_TYPES`、`Math.clamped/roundDecimals`、`_on*Documents` 旧集合钩子、Token 旧 API（getCenter/updateSource/toggle*）、Scene 雾与全局光旧字段、GridLayer 旧属性（`canvas.grid.size` 仅存于 S1.14 注释块）、裸全局引用（SquareGrid 等均走 foundry.* 命名空间）、`advanceTime`/`temporary` 选项、`PerceptionManager#refresh` 等；`updateSource` 两处命中为 `_preCreate` 中改 `_source` 的官方现行 API，非被移除的 Token#updateSource。data/ 脚本字符串的对照审计归 S4.8（M4）
 - [x] S1.16 V14 启动路径修复：`XJZLActor.getRollData` 对缺失资源兜底。V14 的 `applyActiveEffects` 与 `TokenDocument._getReplacementData` 在 prepareEmbeddedDocuments 阶段即调用 getRollData 解析变更中的 @ 引用，早于 creature 在 prepareDerivedData 补建鸭子类型 `hp/mp`，直接读取使该 Actor 数据准备中断（构建 14.368 实机报错）→ **审阅复核后精化**：`hp` 缺失时映射 creature 真实体力 `tili.value`（避免初始阶段 `@hp` 取 0），`mp`/`rage` 按 mock 语义兜底 0；`@resources.hp.value` 当前无脚本使用，不做二级支持；character 的 schema 自带 hp/mp/rage 不受影响；`node --check` 通过，用户刷新复验启动路径无报错
 
@@ -72,7 +64,7 @@ S2.11 在专项计划中只要求独立 AE 文档与合集包的原生互操作�
 **直接执行 [`V14_AURA_PLAN.md`](V14_AURA_PLAN.md)；该文件的实现框架（第 3 节）、决策记录（第 6 节）与专项开发计划（第 7 节，工作项 AURA-01～12）是 M3 的唯一施工与验收依据。**本节只记录总里程碑与 S 编号映射，不把旧 S3 条目当作第二套指令。S3.8（标尺与移动劫持重适配）不属光环专项，仍按本计划跟踪（依赖 S0.5）。
 
 - [x] S3.6 Q4 已定稿并产出专项计划（2026-09-26，与数据作者讨论）：升级为完整光环系统——自定义 Region 行为类型 `xjzlAura` + 光环管理器，94 处 `x-xjzl-aura` 标记全量盘点归类（91 条有自动化路径、3 条手动），核心 `applyActiveEffect` 方案因绕过自研门面否决；决策与盘点见专项计划第 4/6 节
-- [ ] S3.1–S3.5、S3.7 按专项计划 AURA 工作项执行并随其验收（框架部分完成，S3.1 待 AURA-12 收尾）：S3.1→AURA-12（**未完成**，随内容批次收尾）；S3.2/S3.4→AURA-06（**已完成并实机验收**：工具栏按钮、轻量弹窗、格心吸附放置、自绘显示名标签、旧宏改写＋seed 重建）；S3.3→AURA-01（**已完成**：核心 `TokenDocument._onDeleteOperation` 源码核实 + 14.368 运行时复验，源删除自动删区并补发 exit）；S3.5→AURA-02/03（**AURA-02 已完成**：形状生成器 `module/utils/aura-shapes.mjs` + Node 断言；**AURA-03～05 已完成并实机验收（2026-09-26）**：行为类型、管理器和账本结算；自动对账已于 2026-09-27 随决策 45 删除，socketlib 双客户端委托仍待补验，明细见专项计划第 7.2 节）；S3.7→按 2026-09-26 决策不新增脚本触发器（监听 AE 复用既有触发器），随 AURA 工作项关闭
+- [x] S3.1–S3.5、S3.7 按专项计划 AURA 工作项执行并随其验收 → **全部实施，AURA-12 于 2026-09-28 完成清理复核**：S3.1→AURA-12（**已完成**：S1.14 注释块与 measured-template/aoe-creator 及孤儿资产删除、文档同步、第 4 节 90 行条目（93 处标记）销项）；S3.2/S3.4→AURA-06（**已完成并实机验收**：工具栏按钮、轻量弹窗、格心吸附放置、自绘显示名标签、旧宏改写＋seed 重建）；S3.3→AURA-01（**已完成**：核心 `TokenDocument._onDeleteOperation` 源码核实 + 14.368 运行时复验，源删除自动删区并补发 exit）；S3.5→AURA-02/03（**AURA-02 已完成**：形状生成器 `module/utils/aura-shapes.mjs` + Node 断言；**AURA-03～05 已完成并实机验收（2026-09-26）**：行为类型、管理器和账本结算；自动对账已于 2026-09-27 随决策 45 删除，socketlib 双客户端委托仍待补验，明细见专项计划第 7.2 节）；S3.7→按 2026-09-26 决策不新增脚本触发器（监听 AE 复用既有触发器），随 AURA 工作项关闭
 - [ ] S3.8 标尺与移动劫持重适配（依赖 S0.5）
 
 ## M4 数据迁移（依赖 M2；光环宏另依赖 M3）
@@ -114,7 +106,7 @@ S2.11 在专项计划中只要求独立 AE 文档与合集包的原生互操作�
 | M0 | **通过** | 2026-09-23 构建 14.368 实机验证（浏览器自动化，GM 身份）：S0.1–S0.7 全部通过并记录结论。关键结论：无需自定义 AE 数据模型；initial/final 阶段契约确认（initial 先于派生计算，变更必须指向原始字段）；1-2-2-2 劫持存活且计费正确（`_animateTurnMarker` 已被 V14 移除，装饰损失）；duration 全新 `{units,value,expiry,expired}` 结构；Region 行为完整进出周期通过（**裸 `document.update` 传送亦派发事件——2026-09-26 AURA-01 复测修正 M0 初测误判，见 S0.4 与专项计划决策 39**；非链接 token 落合成 Actor）；AE 变更全类型应用与“true”字符串语义安全；TokenHUD/选取器/工具栏注入全链路正常。写入型验证用临时数据已全部清理。影响实现的待定问题：无阻塞项（Q4/Q5 依据已收集，分别在 S3.6/S2.4 定稿） |
 | M1 | **通过** | 2026-09-23 构建 14.368 实机验证：启动路径无报错（S1.16 修复 creature 数据准备，用户复验）；**用户确认刷新后控制台无本阶段涉及的弃用警告**；S1.1–S1.16 全部完成并记录结论（含审阅复核修正：S1.14 停用理由改为“弃用兼容层提前下线”、S1.9 AE 注销修正为传类并实测生效、S1.16 hp 兜底映射 tili）。AE/脚本等功能行为分别留待 M2/M3/M5 验收 |
 | M2 | **通过** | 2026-09-25 构建 14.368 实机验收（testsystem 世界，写入型临时数据已全部清理）。AE-01～09（数据链路、时长与过期、架招绑定、编辑器 AppV2、拖放链路、状态选取器）与 AE-13（showIcon 三层分工：门面兜底 `??= 2` + 施加/拖放/消耗品三路径六用例实测 + 画布图标视觉确认与时长无关性）、AE-12（迁移框架：world setting 分阶段版本、幂等、失败不推进版本、非关联 Token 经合成 Actor 嵌入文档写回）全部完成并逐条记录于专项计划。M2 出口条件（代码链路、编辑器、拖放和状态选取器在 V14 测试数据上通过）达成；正式 AE 合集包与旧世界迁移按计划不在 M2 出口内。语义差异记录：核心 turnStart 到期锚定施加槽位而非目标槽位（AE-05，按 Q5 不作产品约束） |
-| M3 | **框架与样板通过；AURA-09 前半、AURA-10/11 已实施** | AURA-01～06、08 在 Foundry V14（14.368）完成框架与样板实机验证；账本当前 Node 回归为 24 个场景、80 项断言。AURA-09 前半 36 条已实施，五雷范围查询与 4 条批次冒烟已实机验证，其余待逐条验收；AURA-10 监听 7 条仅部分路径完成实机复验；AURA-11 已完成仅标记 6 条和分发 2 条，万毒心经按手动结算归类。socketlib 双客户端委托、AURA-09 后半和 AURA-12 待完成；AURA-07 可选。详见专项计划。 |
+| M3 | **实施完成，待最终验收** | AURA-01～06、08～12 已实施；账本 Node 回归 24 个场景、80 项断言。AURA-09 共 90 行条目（现有标记 93 处）已销项，框架与批次样板经过 Foundry V14 实机验证，前三轮审阅修复已复验。碧焰扣费前消耗、断海禁足必中仅完成静态校验；socketlib 双客户端委托及 AURA-10 的狂沙取档、火浣/罗汉自动伤害待单独实机复验。AURA-07 粒子可选未实施；详见专项计划。 |
 | M4 | **源数据/合集包通过；世界迁移待正式验收** | 2026-09-25 构建 14.368 实机验收：S4.1/S4.2/S4.6 随 AE-10 完成（data/ 源 JSON 全量迁 V14 新写法：2378 条模板 effects、516 处状态查询、约 750 处内联 duration、71 处 mode、169 处 changes 读取，4613 个脚本语法回归通过）；S4.4 随 AE-11 完成（11 类合集包重建、1438 个施加型模板 showIcon:2 透传、端到端常显画布确认）；S4.5 完成（2 处 measureDistance → measurePath，euclidean/cost 语义与 V13 逐一对等）；S4.8 审计完成（user: 0 残留、2 处旧字段读取修复、其余命中均为存活 API）。S4.3 已并入光环专项 AURA-06（改写为指向快建工具的说明宏，随 M3 实施）；S4.7 首跑演练（2026-09-25）：V13 世界数据在 V14 首次加载，阶段 1 迁移日志显示更新 50 条特效，未见报错，版本号为 1；旧特效时长、重启持久化及幂等性尚未验收。正式迁移须先在 V13 完成预处理并核对报告，再按 AE-14 清单复验。详见专项计划 AE-10/AE-11/AE-14 记录 |
 | M5 | 待验 | — |
 

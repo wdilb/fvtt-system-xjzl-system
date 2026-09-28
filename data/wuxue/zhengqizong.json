@@ -2900,7 +2900,7 @@
                     "range": "4米",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，以气为剑，修身以俟之，开启架招。架招开启期间，你周围 4 米的其他友方在濒死状态下不会受到暴击，且内外功防御提升 10 点。</p><p>升级：格挡值+10，内外功防御+10，内力消耗+4。</p>",
-                    "automationNote": "架招开启自动化。光环效果需手动给队友添加AE，双防数值请按招式等级调整（10 × 招式等级，如2级+20、3级+30、4级+40）。",
+                    "automationNote": "完全自动化：开启架招后自动生成跟随自身的 4 米光环（解除架招或脱战时消散）：范围内其他友方自动获得“生民立命”——濒死状态下不会受到暴击，且内外功防御+10×招式等级（按领悟等级自动分档）。自身不享受该光环。",
                     "x-xjzl-aura": true,
                     "requirements": "剑-单剑",
                     "costs": {
@@ -2926,7 +2926,15 @@
                     "calculation": {
                         "base": 0,
                         "growth": 10
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "生民立命光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 生民立命：架招开启期间生成跟随 4 米光环（解除架招或脱战即散），\n// 其他友方按招式等级获得对应档位 payload（濒死免暴击 + 双防 10×等级）。\nconst smLvl = Math.max(1, move.computedLevel || 1);\nconst smTier = smLvl <= 1 ? \"生民立命\" : \"生民立命 (\" + Math.min(4, smLvl) + \"级)\";\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-shengmin-\" + actor.id,\n    displayName: \"生民立命\",\n    follow: true,\n    radius: 4,\n    faction: \"ally\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: smTier,\n    enterEnabled: true,\n    lifecycle: \"stance\",\n    sourceItemUuid: item.uuid,\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                        }
+                    ]
                 },
                 {
                     "name": "为往圣继绝学",
@@ -2973,7 +2981,7 @@
                     "range": "@{1 + @up|1}米",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，收剑入鞘，万民归仁，开启架招。架招开启期间，你周围 @{1 + @up|1} 米的所有敌人无法获得怒气。</p><p>升级：格挡值+10，招式范围+1，内力消耗+4。</p>",
-                    "automationNote": "架招开启自动化。光环效果(不怒)需手动给敌人添加AE。",
+                    "automationNote": "完全自动化：开启架招后自动生成跟随自身的 1+升级 米光环（解除架招或脱战时消散）：范围内所有敌人无法获得怒气（自动封锁）。",
                     "x-xjzl-aura": true,
                     "requirements": "剑-单剑",
                     "costs": {
@@ -2999,7 +3007,15 @@
                     "calculation": {
                         "base": 0,
                         "growth": 10
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "万世开太平光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 万世开太平：架招开启期间生成跟随 1+升级 米光环（解除架招或脱战即散），\n// 范围内所有敌人无法获得怒气（payload 的 noRecoverRage 封锁链路自动生效）。\nconst wsLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-wanshi-\" + actor.id,\n    displayName: \"万世开太平\",\n    follow: true,\n    radius: 1 + (wsLvl - 1),\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"万世开太平\",\n    enterEnabled: true,\n    lifecycle: \"stance\",\n    sourceItemUuid: item.uuid,\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                        }
+                    ]
                 }
             ]
         },
@@ -3060,6 +3076,123 @@
                     ]
                 },
                 "showIcon": 2
+            },
+            {
+                "name": "生民立命 (2级)",
+                "description": "为生民立命：濒死免暴击，内外功防御+20（按招式等级分档）。",
+                "transfer": false,
+                "showIcon": 2,
+                "img": "icons/svg/shield.svg",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_zhengqi_shengmin_l2",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "trigger": "preDefense",
+                                "label": "濒死免暴击",
+                                "active": true,
+                                "script": "if(actor.effects.some(e=>e.statuses.has('dying'))) args.config.isCrit = false;"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "type": "add",
+                            "value": "20"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "type": "add",
+                            "value": "20"
+                        }
+                    ]
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
+            },
+            {
+                "name": "生民立命 (3级)",
+                "description": "为生民立命：濒死免暴击，内外功防御+30（按招式等级分档）。",
+                "transfer": false,
+                "showIcon": 2,
+                "img": "icons/svg/shield.svg",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_zhengqi_shengmin_l3",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "trigger": "preDefense",
+                                "label": "濒死免暴击",
+                                "active": true,
+                                "script": "if(actor.effects.some(e=>e.statuses.has('dying'))) args.config.isCrit = false;"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "type": "add",
+                            "value": "30"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "type": "add",
+                            "value": "30"
+                        }
+                    ]
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
+            },
+            {
+                "name": "生民立命 (4级)",
+                "description": "为生民立命：濒死免暴击，内外功防御+40（按招式等级分档）。",
+                "transfer": false,
+                "showIcon": 2,
+                "img": "icons/svg/shield.svg",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_zhengqi_shengmin_l4",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "trigger": "preDefense",
+                                "label": "濒死免暴击",
+                                "active": true,
+                                "script": "if(actor.effects.some(e=>e.statuses.has('dying'))) args.config.isCrit = false;"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "type": "add",
+                            "value": "40"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "type": "add",
+                            "value": "40"
+                        }
+                    ]
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
             }
         ]
     },

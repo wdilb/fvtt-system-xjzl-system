@@ -56,13 +56,6 @@ import { EffectSelectionDialog } from "./module/applications/effect-selection-di
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 import { setupSocket } from "./module/socket.mjs";
-// 【V14 升级 S1.14 停用，代码仅注释未删除】按升级计划提前下线 AOE 模板功能：
-// 14.368 实测仍提供 MeasuredTemplate 弃用兼容层（类、CONFIG 注册点、scene.templates 可用），
-// 停用不是启动所必需，而是不基于弃用层继续开发；待 M3 用 Region 体系重建
-// （光环设计见 docs/V14_UPGRADE.md §3.3）。以下代码与 module/measured-template.mjs、
-// module/applications/aoe-creator.mjs 保留原逻辑，供 M3 重建光环/区域功能时参考复用。
-// import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
-// import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
 import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
@@ -119,11 +112,6 @@ Hooks.once("init", async function () {
   // 获取用户设置
   const useCustomRule = game.settings.get("xjzl-system", "customDistanceRule");
   if (useCustomRule) {
-
-    // 【V14 升级 S1.14 停用，代码仅注释未删除】14.368 仍提供 CONFIG.MeasuredTemplate 弃用兼容层，
-    // 此处代码在兼容层下可运行，但基于弃用 API 不再继续使用；保留供 M3 Region 重建参考。
-    // 替换系统的测量模板
-    // CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
 
     // 替换FVTT自带的一定距离计算方式
     const SquareGrid = foundry.grid.SquareGrid;
@@ -1058,67 +1046,6 @@ Hooks.on('getSceneControlButtons', (controls) => {
       }
     }
   }
-
-  // 【V14 升级 S1.14 停用，代码仅注释未删除】V14 的 templates 控制层已弃用（14.368 兼容层仍提供），
-  // AOE Creator 工具栏按钮一并下线；以下注入逻辑保留，供 M3 按钮迁移（S3.4）与 Region 重建参考。
-  // // 4·注入 AOE Creator 按钮
-  // // 1. 查找 templates 层级 (测量工具在代码里叫 templates)
-  // let templateLayer = null;
-  //
-  // // 层级查找方式与上方 tokenLayer 一致
-  // if (controls.templates) {
-  //   templateLayer = controls.templates;
-  // }
-  // else if (controls instanceof Map && controls.has('templates')) {
-  //   templateLayer = controls.get('templates');
-  // }
-  // else if (Array.isArray(controls)) {
-  //   templateLayer = controls.find(c => c.name === "templates");
-  // }
-  //
-  // // 2. 注入按钮
-  // if (templateLayer) {
-  //   const aoeBtn = {
-  //     name: "xjzl-aoe",
-  //     title: game.i18n.localize("XJZL.UI.Toolbar.AoeCreator"),
-  //     icon: "fas fa-bullseye",
-  //     visible: true,
-  //     button: true, // 关键：这是点击型按钮
-  //     onChange: () => {
-  //       const existingApp = Object.values(ui.windows).find(
-  //         (app) => app.options.id === "xjzl-aoe-creator"
-  //       );
-  //       if (existingApp) {
-  //         existingApp.render(true, { focus: true });
-  //       } else {
-  //         new AOECreator().render(true);
-  //       }
-  //     }
-  //   };
-  //
-  //   const tools = templateLayer.tools;
-  //
-  //   // 3. 处理 tools 集合 (兼容 Map/数组/对象三种形态)
-  //
-  //   // 情况 A: Map 结构
-  //   if (tools instanceof Map) {
-  //     if (!tools.has('xjzl-aoe')) {
-  //       tools.set('xjzl-aoe', aoeBtn);
-  //     }
-  //   }
-  //   // 情况 B: 数组结构
-  //   else if (Array.isArray(tools)) {
-  //     if (!tools.some(t => t.name === 'xjzl-aoe')) {
-  //       tools.push(aoeBtn);
-  //     }
-  //   }
-  //   // 情况 C: 普通对象结构 (Object)
-  //   else if (tools) {
-  //     if (!tools['xjzl-aoe']) {
-  //       templateLayer.tools['xjzl-aoe'] = aoeBtn;
-  //     }
-  //   }
-  // }
 });
 
 /* -------------------------------------------- */
@@ -1584,10 +1511,6 @@ async function _routeActorTurnScript(actor, trigger, regenTiming) {
 
 /**
  * 统一处理 Token 更新：名称/阵营变化刷新战局目标。
- * 【V14 升级 S1.14 停用，代码仅注释未删除】位置变化同步“粘性”模板的逻辑已注释：
- * V14 的 MeasuredTemplate/scene.templates 属弃用兼容层，跟随效果将在 M3 改用 Region
- * attachment.token 原生实现（总纲 §3.2）；原同步算法（含中心点计算、1px 去抖、
- * 权限不足走 socket 委托）保留在下方注释中，供重建时参考。
  */
 Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
   if (("name" in change) || ("disposition" in change)) {
@@ -1598,61 +1521,6 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
     }
   }
 
-  // // 1. 没有位移、非当前用户、场景未准备好，直接退出
-  // if (!canvas.ready) return;
-  // if (!change.x && !change.y) return;
-  // if (game.user.id !== userId) return;
-  //
-  // const scene = tokenDoc.parent;
-  // if (!scene) return;
-  //
-  // // 2. 场景里根本没有模板，直接退出 (避免无意义遍历)
-  // // V13 Collection 使用 .size
-  // if (scene.templates.size === 0) return;
-  //
-  // // 3. 预计算 Token 新中心点
-  // const gridSize = canvas.grid.size;
-  // // 使用 ?? 运算符处理 0 的情况
-  // const newX = change.x ?? tokenDoc.x;
-  // const newY = change.y ?? tokenDoc.y;
-  //
-  // const targetCenterX = newX + (tokenDoc.width * gridSize) / 2;
-  // const targetCenterY = newY + (tokenDoc.height * gridSize) / 2;
-  //
-  // // 4. 单次遍历查找并构建更新数据
-  // const directUpdates = [];
-  //
-  // // V13 推荐直接遍历 Collection
-  // for (const t of scene.templates) {
-  //   // 快速检查 Flag
-  //   const flags = t.flags["xjzl-system"]; // 直接访问属性比 getFlag 稍微快一点点
-  //   if (!flags || flags.sourceToken !== tokenDoc.id || flags.sticky !== true) continue;
-  //
-  //   // 检查是否真的需要更新
-  //   // 如果位置差异小于 1 像素，视为未移动，跳过数据库更新
-  //   if (Math.abs(t.x - targetCenterX) < 1 && Math.abs(t.y - targetCenterY) < 1) continue;
-  //
-  //   const updateData = { _id: t.id, x: targetCenterX, y: targetCenterY };
-  //
-  //   // ==========================================
-  //   // 🌟 如果玩家权限不足，则交给Socket 委托
-  //   // ==========================================
-  //   // t.canUserModify 是 Foundry 底层 API，判断当前玩家能否直接改它
-  //   if (t.canUserModify(game.user, "update")) {
-  //     // 自己建的，或者 GM 操作：直接改，零延迟！
-  //     directUpdates.push(updateData);
-  //   } else {
-  //     // 没权限（比如 GM 给玩家建的）：委托 Socket 让 GM 帮忙改，不报错！
-  //     if (xjzlSocket) {
-  //       xjzlSocket.executeAsGM("updateDocument", t.uuid, updateData);
-  //     }
-  //   }
-  // }
-  //
-  // // 5. 批量提交
-  // if (directUpdates.length > 0) {
-  //   scene.updateEmbeddedDocuments("MeasuredTemplate", directUpdates);
-  // }
 });
 
 /**
@@ -1693,32 +1561,6 @@ Hooks.on("deleteCombat", async (combat, options, userId) => {
     ui.notifications.info(game.i18n.localize("XJZL.UI.Combat.RageClearedOnCombatEnd"));
   }
 });
-
-/**
- * 处理 Token 删除
- * 【V14 升级 S1.14 停用，代码仅注释未删除】本钩子仅负责清理 Token 关联的自动删除模板，
- * MeasuredTemplate 已按计划下线（V14 为弃用兼容层）；M3 重建时需先验证 Region 原生附着
- * （attachment.token）是否随 Token 删除自动清理，若不自动清理再参考此逻辑补 Region 删除。
- */
-// Hooks.on("deleteToken", (tokenDoc, options, userId) => {
-//   if (game.user.id !== userId) return;
-//
-//   const scene = tokenDoc.parent;
-//   if (!scene || scene.templates.size === 0) return;
-//
-//   const idsToDelete = [];
-//
-//   for (const t of scene.templates) {
-//     const flags = t.flags["xjzl-system"];
-//     if (flags && flags.sourceToken === tokenDoc.id && flags.autoDelete === true) {
-//       idsToDelete.push(t.id);
-//     }
-//   }
-//
-//   if (idsToDelete.length > 0) {
-//     scene.deleteEmbeddedDocuments("MeasuredTemplate", idsToDelete);
-//   }
-// });
 
 /**
  * 监听宏栏放置事件 (Hotbar Drop Hook)
@@ -2088,7 +1930,6 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/compendiumbrowser/card-list.hbs", // 合集浏览器卡片列表（含增量追加）
     "systems/xjzl-system/templates/apps/compendiumbrowser/random-dialog.hbs", // 合集浏览器随机抽取对话框
     "systems/xjzl-system/templates/apps/compendiumbrowser/draw-reveal.hbs", // 合集浏览器抽取演出
-    "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览
     "systems/xjzl-system/templates/apps/tone-tracker.hbs",//音阶计数器
     "systems/xjzl-system/templates/apps/action-tracker.hbs",//动作计数器

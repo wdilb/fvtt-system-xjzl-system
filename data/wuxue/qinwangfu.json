@@ -1001,7 +1001,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>聚气下肢，双剑刺地，在自身周围创造‘地宫’，持续@{3 + @up|三}回合，并对周围敌人造成伤害，若目标无架招，为其添加“禁足”，持续一回合。</p><p><strong>地宫：</strong>区域内友方速度+1；敌方处于困难地形。</p><p><strong>升级：</strong>招式伤害+10，地宫持续回合+1，消耗+8。</p>",
-                    "automationNote": "无架招禁足自动。施展完毕卡片提示地宫效果，可手动把武学自带AE赋予队友。",
+                    "automationNote": "部分自动化：施展后自动生成跟随自身的 5 米“地宫”（持续 3+升级 回合），区域内友方速度+1 自动生效，无架招目标的禁足自动施加；敌方处于困难地形需 GM 手动裁定。到期或脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -1033,10 +1033,10 @@
                             "active": true
                         },
                         {
-                            "label": "地宫播报",
-                            "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-chess-board\"></i> 地宫生成 (${rounds}回合)</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">区域内友方速度+1；敌方处于困难地形。<br>请从武学把对应【地宫】AE 赋予队友。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
-                            "active": true
+                            "label": "地宫光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 地宫：以自身为中心跟随 5 米（持续 3+升级 回合），区域内友方速度+1（payload 自动）；\n// 敌方视作困难地形超出框架，由 GM 手动裁定。\nconst dgLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-digong-\" + actor.id,\n    displayName: \"地宫\",\n    follow: true,\n    radius: 5,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"地宫-友方\",\n    enterEnabled: true,\n    durationRounds: 3 + (dgLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: \"<div class='xjzl-chat-card'><b>地宫</b> 已生成（3+\" + (dgLvl - 1) + \" 回合）：友方速度+1 已自动赋予；敌方处于困难地形请 GM 手动裁定。</div>\"\n});\n"
                         }
                     ]
                 },
@@ -1050,7 +1050,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>凝气双手，双剑擎天，在自身周围创造‘天宫’，持续@{3 + @up|三}回合，并对周围敌人造成伤害，然后将他们击倒。</p><p><strong>天宫：</strong>区域内友方暴击骰-1；敌方闪避-5。</p><p><strong>升级：</strong>招式伤害+10，天宫持续回合+1，消耗+8。</p>",
-                    "automationNote": "命中击倒自动。施展完毕卡片提示天宫效果，可手动把武学自带AE赋予队友和敌人。",
+                    "automationNote": "完全自动化：施展后自动生成跟随自身的 5 米“天宫”（持续 3+升级 回合），区域内友方暴击骰-1、敌方闪避-5 自动生效（以两个同范围区域分别承载友方与敌方效果）；命中击倒自动。到期或脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -1076,16 +1076,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "天宫播报与击倒",
-                            "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52,152,219,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-cloud-moon\"></i> 天宫生成 (${rounds}回合)</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">区域内友方暴击骰-1；敌方闪避-5。<br>请从武学中把对应【天宫】AE 给双方。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
-                            "active": true
-                        },
-                        {
                             "label": "击倒",
                             "trigger": "hit",
                             "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"prone\" });\n}",
                             "active": true
+                        },
+                        {
+                            "label": "天宫光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 天宫：以自身为中心跟随 5 米（持续 3+升级 回合）。\n// 友方暴击骰-1 与敌方闪避-5 分别以两个同口径区域承载（每个区域单一 payload 槽位）。\nconst tgLvl = Math.max(1, move.computedLevel || 1);\nconst tgRounds = 3 + (tgLvl - 1);\nconst tgBase = {\n    follow: true,\n    radius: 5,\n    enterEnabled: true,\n    durationRounds: tgRounds,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n};\nawait game.xjzl.aura.create(actor, {\n    ...tgBase,\n    label: \"wuxue-tiangong-ally-\" + actor.id,\n    displayName: \"天宫（友方）\",\n    color: \"#4d9fdc\",\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"天宫-友方\"\n});\nawait game.xjzl.aura.create(actor, {\n    ...tgBase,\n    label: \"wuxue-tiangong-enemy-\" + actor.id,\n    displayName: \"天宫（敌方）\",\n    color: \"#c0504d\",\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"天宫-敌方\"\n});\n"
                         }
                     ]
                 },

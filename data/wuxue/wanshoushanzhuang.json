@@ -926,7 +926,7 @@
                     "targetInfo": "周围敌人",
                     "description": "蓄力动作，笔走狼势，移步戳笔，对周围敌人造成 0.4 力量点内功伤害，之后为自身添加“走兽”，持续@{1 + @up|一}回合。\n走兽：回合结束时，周围范围内的敌人流失 10 点气血。\n·此招可移动释放，对移动路径上周围 1 米范围内的敌人造成伤害。（不会重复造成伤害）\n升级：招式伤害+10，走兽持续回合+1，消耗+4。",
                     "actionCost": "蓄力动作",
-                    "automationNote": "移动路径伤害需手动。走兽光环伤害需回合末手动。",
+                    "automationNote": "部分自动化（战斗内）：施展后自动获得“走兽”（1+升级 回合），并生成跟随自身的 1 米走兽光环：范围内敌人每回合结束自动流失 10 点气血；光环随走兽到期消散。移动释放的路径伤害随本招结算（路径留痕超出框架，由 GM 把握）。",
                     "x-xjzl-aura": true,
                     "costs": {
                         "mp": [
@@ -961,6 +961,12 @@
                             "trigger": "attack",
                             "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"走兽\").toObject();\neffectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
                             "active": true
+                        },
+                        {
+                            "label": "走兽光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 走兽：跟随自身 1 米光环（与走兽状态同寿命），范围内敌人回合结束时流失 10 点气血。\n// 移动路径伤害仍随本招结算（路径留痕超出框架，手动把握）。\nconst zlLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-zoushou-\" + actor.id,\n    displayName: \"走兽\",\n    follow: true,\n    radius: 1,\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: \"tokenRoundEnd\",\n    roundAction: {kind: \"damage\", amount: \"10\", type: \"liushi\"},\n    durationRounds: 1 + (zlLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 },

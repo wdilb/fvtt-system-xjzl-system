@@ -985,7 +985,7 @@
                     "targetInfo": "范围",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，剑气如炬，澎湃而出，对周围敌人造成 0.6 内息点内功伤害。并且在范围内建立‘听风’，持续@{2 + @up|两}回合。</p><p><strong>听风：</strong>处于其中的友方单位招式伤害+5。</p><p><strong>升级：</strong>招式伤害+10，持续时间+1 回合，消耗+4。</p>",
-                    "automationNote": "听风区域手动(提供AE给玩家手动添加)。",
+                    "automationNote": "完全自动化：看破虚招以反应施展后，压制目标虚招并自动生成跟随自身的 2 米“听风”（持续 2+升级 回合）：区域内友方（含己）招式伤害+5 自动生效。到期或脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -1003,7 +1003,15 @@
                             8,
                             12
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "听风区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 听风：以自身为中心跟随 2 米（持续 2+升级 回合），区域内友方（含己）招式伤害+5（payload 自动）。\nconst tzLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-tingfeng-tianzhu-\" + actor.id,\n    displayName: \"听风\",\n    follow: true,\n    radius: 2,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"听风\",\n    enterEnabled: true,\n    durationRounds: 2 + (tzLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                        }
+                    ]
                 },
                 {
                     "name": "祝融剑",

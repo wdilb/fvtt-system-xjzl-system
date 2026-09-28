@@ -1151,7 +1151,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，伏划暗刃，开启架招。被击破架招时，在自身周围 3 米范围劈出‘遁光’，持续到脱战。</p><p><strong>遁光：</strong>你的敌人在‘遁光’陷入“目盲”“下盘不稳”，且受到攻击时，伤害提升 10 点。</p><p>·遁光形成在原地，不会跟随你移动，你只能拥有一个遁光，如果你劈出新的遁光，之前的消失。</p><p><strong>升级：</strong>格挡值+10，遁光内他人受到的伤害+5，内力消耗+2。</p>",
-                    "automationNote": "被破招时请手动放置遁光区域。",
+                    "automationNote": "完全自动化：开启架招后被击破时，自动在自身周围 3 米劈出“遁光”（原地不跟随，持续到脱战，同一时间只有一道，新的替换旧的）。遁光内的敌人自动陷入等效的目盲与下盘不稳（命中/虚招对抗劣势、移动速度减半，以【遁光】状态承载），且受到攻击时伤害自动提升 10+5×升级 点。",
                     "x-xjzl-aura": true,
                     "costs": {
                         "mp": [
@@ -1169,10 +1169,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "破招提醒",
+                            "label": "破招生遁光",
                             "trigger": "damaged",
-                            "script": "if (args.isBroken) ui.notifications.info(\"架招被破！请手动放置遁光区域。\");",
-                            "active": true
+                            "active": true,
+                            "script": "// 被击破架招时：在自身周围 3 米劈出遁光（原地不跟随，持续到脱战；同一时间只有一道，新的替换旧的）。\nif (!args.isBroken) return;\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-dunguang-\" + actor.id,\n    displayName: \"遁光\",\n    follow: false,\n    radius: 3,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"遁光\",\n    enterEnabled: true,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 },
@@ -1225,7 +1225,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制对方虚招，掠影截杀，对目标造成 0.6 力量点外功伤害。</p><p>同时自身获得“蕴影”状态，持续三回合。</p><p><strong>蕴影：</strong>你格挡成功时，在自身周围 1 米范围形成‘遁光’，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "命中给予自身蕴影状态。格挡产生遁光需手动。",
+                    "automationNote": "完全自动化：命中后自动获得“蕴影”（持续三回合）；蕴影期间格挡成功时，自动在自身周围 1 米形成“遁光”（原地不跟随，持续到脱战，同一时间只有一道）。遁光内的敌人自动陷入等效目盲与下盘不稳，且受到攻击时伤害自动提升（按施展者的光影荏苒等级）。",
                     "x-xjzl-aura": true,
                     "costs": {
                         "mp": [
@@ -1250,7 +1250,7 @@
                         {
                             "label": "获得蕴影",
                             "trigger": "hit_once",
-                            "script": "const effect = thisItem.effects.getName(\"蕴影\");\nif (effect) {\n    const effData = effect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                            "script": "const effect = thisItem.effects.getName(\"蕴影\");\nif (effect) {\n    const effData = effect.toObject();\n    delete effData._id;\n    effData.origin = effect.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
                             "active": true
                         }
                     ]
@@ -1297,7 +1297,7 @@
         "effects": [
             {
                 "name": "蕴影",
-                "description": "格挡成功时，在周围 1 米范围形成‘遁光’，持续到脱战。",
+                "description": "蕴影：格挡成功时，在自身周围 1 米范围形成“遁光”，持续到脱战。",
                 "transfer": false,
                 "duration": {
                     "value": 3,
@@ -1306,12 +1306,71 @@
                 },
                 "flags": {
                     "xjzl-system": {
-                        "slug": "wuxue_mingjiao_yunying",
-                        "stackable": false
+                        "slug": "yunying",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "蕴影·格挡生遁光",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "// 蕴影：格挡成功时在自身周围 1 米生成遁光（原地不跟随，持续到脱战；同一时间只有一道）。\n// origin 指向模板 AE（望风扑影 hit_once 写入），回溯物品与主人后用物品 UUID 解析遁光 payload。\nif (!Macros.checkStance(actor, args)) return;\nconst yySrc = await fromUuid(thisEffect.origin);\nconst yyItem = yySrc?.parent instanceof Item ? yySrc.parent : (yySrc instanceof Item ? yySrc : null);\nconst yyOwner = yyItem?.parent ?? actor;\nawait game.xjzl.aura.create(yyOwner, {\n    label: \"wuxue-dunguang-\" + yyOwner.id,\n    displayName: \"遁光\",\n    follow: false,\n    radius: 1,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: yyItem?.uuid,\n    payloadEffectName: \"遁光\",\n    enterEnabled: true,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                            }
+                        ]
                     }
                 },
                 "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-                "showIcon": 2
+                "showIcon": 2,
+                "system": {
+                    "changes": []
+                }
+            },
+            {
+                "name": "遁光",
+                "description": "遁光：命中与虚招对抗劣势、移动速度减半（等效目盲与下盘不稳），且受到攻击时伤害提升 10+5×升级 点。",
+                "transfer": false,
+                "showIcon": 2,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "dunguang",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "遁光·受击加深",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "// 遁光：受到攻击时伤害提升 10+5×升级（按施展者的光影刺等级计算）。\nconst dgSrc = foundry.utils.fromUuidSync(thisEffect.origin);\nconst dgOwner = dgSrc?.parent?.parent;\nconst dgMove = dgOwner?.items?.find(i => i.name === \"光影刺\")?.system?.moves?.find(m => m.name === \"光影荏苒\");\nconst dgLvl = Math.max(1, dgMove?.computedLevel || 1);\nargs.output.damage += 10 + 5 * (dgLvl - 1);"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.attackLevel",
+                            "type": "add",
+                            "value": "-1"
+                        },
+                        {
+                            "key": "flags.xjzl-system.feintLevel",
+                            "type": "add",
+                            "value": "-1"
+                        },
+                        {
+                            "key": "flags.xjzl-system.grantAttackLevel",
+                            "type": "add",
+                            "value": "1"
+                        },
+                        {
+                            "key": "flags.xjzl-system.unstable",
+                            "type": "override",
+                            "value": "true"
+                        }
+                    ]
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
             }
         ]
     },

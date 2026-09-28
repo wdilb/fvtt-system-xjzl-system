@@ -246,7 +246,7 @@
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
                     "description": "<p>在周身 @{1 + @up|1} 米范围扫起沙尘，持续一回合。沙尘空间内无法视物，陷入“目盲”，沙尘内的角色可以使用【普度四方】替代《趁虚而入》。</p><p>升级：沙尘的半径范围增加 1 米，内力消耗+1。</p>",
-                    "automationNote": "区域与目盲效果需手动处理。",
+                    "automationNote": "部分自动化：施展后自动扫起周身 1+升级 米“沙尘”（1 回合），沙尘内的角色自动陷入“目盲”；“可用【普度四方】替代《趁虚而入》”的招式替换由玩家按规则手动把握。到期后消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -265,6 +265,12 @@
                             "trigger": "hit",
                             "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst radius = 1 + (lvl - 1);\nawait ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">恒河结沙 - 区域效果</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>已生成沙尘区域，半径 <b>${radius}</b> 米。</p>\n            <p>区域内目标陷入 [目盲] (需手动施加)。</p>\n            <p>区域内可用 [普度四方] 替代 [趁虚而入]。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
+                        },
+                        {
+                            "label": "沙尘区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 沙尘：以自身为中心 1+升级 米（1 回合），沙尘空间内无法视物（目盲自动）。\n// \"可用【普度四方】替代《趁虚而入》\"为招式替换规则（手动把握）。\nconst hhLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-henghe-\" + actor.id,\n    displayName: \"沙尘\",\n    follow: false,\n    radius: 1 + (hhLvl - 1),\n    faction: \"all\",\n    includeSelf: true,\n    payloadStatusId: \"blind\",\n    enterEnabled: true,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 },
@@ -3453,7 +3459,7 @@
                     "range": "@{1 + @up * 4|1米}",
                     "targetInfo": "范围",
                     "description": "<p>双掌摊开，掌藏须弥，对范围内所有敌人造成0.7内息点内功伤害。同时内劲如天空落雨般倾泻而下，可消耗X层“须弥”，在招式范围内形成‘小须弥天’，持续到战斗脱离。</p><p>小须弥天：区域内的敌人持续陷入下盘不稳，同时招式释放距离减少X米（至少1），移动速度减少X米（至少1）。</p><p>升级：招式伤害+20，怒气-1，消耗+8。</p>",
-                    "automationNote": "伤害自动。脚本提示消耗层数，区域效果手动。",
+                    "automationNote": "部分自动化：伤害自动结算；施展时可选择消耗全部“须弥”层数展开小须弥天（招式范围，持续到脱战）：区域内敌人自动持续陷入下盘不稳且移动速度-1（离开恢复）；招式释放距离减少 X 米与 X>1 的额外速度减少由 GM 手动结算。再次展开自动替换旧区域，脱战时消散。",
                     "x-xjzl-aura": true,
                     "costs": {
                         "mp": [
@@ -3481,7 +3487,8 @@
                         {
                             "label": "小须弥天",
                             "trigger": "hit_once",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xumi_stack\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"须弥镇邪\" },\n        content: `<p>是否消耗 ${stacks} 层须弥，展开小须弥天？</p>`,\n        yes: { label: \"展开\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_xumi_stack\", 99);\n        ui.notifications.info(`已消耗 ${stacks} 层须弥。请手动放置【小须弥天】区域效果（敌人下盘不稳，减射程 ${Math.max(1, stacks)}，减速 ${Math.max(1, stacks)}）。`);\n    }\n}"
+                            "active": true,
+                            "script": "// 小须弥天：消耗全部须弥层数 X，在招式范围内生成区域（持续到脱战，可替换）。\n// 区域内敌人自动陷入下盘不稳且移动速度-1（\"至少 1\"口径）；\n// 招式释放距离减少 X 米与 X>1 的额外减速由 GM 手动结算。\nconst xmBuff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xumi_stack\");\nconst xmStacks = xmBuff ? (xmBuff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (xmStacks < 1) {\n    ui.notifications.info(\"没有可消耗的须弥层数，小须弥天未生成。\");\n    return;\n}\nconst xmConfirm = await foundry.applications.api.DialogV2.confirm({\n    window: {title: \"须弥镇邪\"},\n    content: \"<p>是否消耗 \" + xmStacks + \" 层须弥，展开小须弥天？</p>\",\n    yes: {label: \"展开\"},\n    no: {label: \"取消\"}\n});\nif (!xmConfirm) return;\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_xumi_stack\", 99);\nconst xmLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-xumitian-\" + actor.id,\n    displayName: \"小须弥天\",\n    follow: true,\n    radius: 1 + 4 * (xmLvl - 1),\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"小须弥天\",\n    enterEnabled: true,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nui.notifications.info(\"小须弥天已展开（消耗 \" + xmStacks + \" 层）：敌人下盘不稳、速度-1 自动；招式释放距离-\" + xmStacks + \" 与 X>1 的额外减速请手动结算。\");\n"
                         }
                     ],
                     "weaponType": "unarmed"
@@ -3502,6 +3509,36 @@
                 "img": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
                 "transfer": false,
                 "showIcon": 2
+            },
+            {
+                "name": "小须弥天",
+                "description": "小须弥天：区域内敌人持续陷入下盘不稳（移动速度减半）且移动速度额外-1；招式释放距离减少 X 米与超出部分的速度减少由 GM 手动结算。",
+                "transfer": false,
+                "showIcon": 2,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xumitian",
+                        "stackable": false
+                    }
+                },
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.unstable",
+                            "type": "override",
+                            "value": "true"
+                        },
+                        {
+                            "key": "system.combat.speed",
+                            "type": "add",
+                            "value": "-1"
+                        }
+                    ]
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
             }
         ]
     },

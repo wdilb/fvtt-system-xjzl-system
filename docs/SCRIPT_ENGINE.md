@@ -70,7 +70,7 @@
 | `Macros` | `XJZLMacros` | 系统公开宏工具，例如 `requestSave()`、`requestContest()` 和 `checkStance()`。 |
 | `game` / `ui` / `console` | Foundry 全局对象 | 游戏对象、通知对象和控制台。 |
 
-脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 Foundry 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。
+脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 Foundry 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。旧版全局 `randomID` 在 V14 中已不存在，需要随机 ID 时使用 `foundry.utils.randomID()`。
 
 ### `args` 与同名顶层变量
 
@@ -152,7 +152,8 @@ passive / calc（持续被动与面板计算）
 | 修改招式或普攻的面板数值与说明 | `calc` |
 | 扣除资源前调整消耗或阻止出招 | `preAttack` |
 | 修改整次动作的命中参数 | `attack` |
-| 出招时选择参数或落点、创建一次区域 | `attack` |
+| 扣费前可取消的选择或施展前提 | `preAttack` |
+| 不影响扣费的参数、落点选择或区域创建 | `attack` |
 | 针对单个目标修改命中或穿透 | `check` |
 | 攻击者在应用伤害前修改数值、类型或穿透 | `preDamage` |
 | 防御者响应未命中 | `avoided` |
@@ -234,6 +235,8 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `abort` | `boolean` | **可写** | 设为 `true` 会在扣除资源前中止出招。 |
 | `abortReason` | `string` | **可写** | 中止时向操作者显示的提示。 |
 
+内置余额检查在所有 `preAttack` 脚本之后执行。若此阶段必须先消耗场上区域等对象，应先核对 `costConfig` 与当前资源，并检查消耗 API 的返回值；`abort` 只能阻止后续扣费，不能撤销脚本已完成的文档操作。需要把选择传到命中后结算时，写入 `args.scriptFlags`。
+
 ### `attack`（异步）
 
 **时机：**资源已扣除、基础面板已计算，但尚未掷骰。攻击、治疗、Buff 和主动开启架招都可进入。
@@ -268,7 +271,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `target` | `Actor` | 只读 | 当前目标。 |
 | `attacker` | `Actor` | 只读 | 出招者。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；掷骰时与手动补算新目标时均提供。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；掷骰时与手动补算新目标时均提供。 |
 | `flags.grantLevel` / `flags.grantFeintLevel` | `number` | **可写** | 仅针对当前目标的命中/虚招优劣势计数。 |
 | `flags.targetKanpoLevel` | `number` | **可写** | 当前动作给予目标本次看破检定的优劣势计数；会随攻击卡固化，正数为优势，负数为劣势。 |
 | `flags.grantHit` / `flags.grantFeint` | `number` | **可写** | 仅针对当前目标的命中值/虚招值加成。 |
@@ -287,7 +290,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `targets` | `Actor[]` | 只读 | 本次实际结算的全部目标（自动与手动结算均提供）；需要跨目标统计（如按持有某状态的个数增伤）时使用。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张攻击卡独立。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张攻击卡独立。 |
 | `element` | `string` | 只读 | 招式原始属性。 |
 | `outcome.isHit` / `.isCrit` / `.isBroken` | `boolean` | 只读 | 攻击方已确定的命中、暴击和破架结果。 |
 | `config.amount` | `number` | **可写** | 即将传入伤害 API 的原始数值。 |
@@ -450,7 +453,7 @@ await actor.applyHealing({
 | `finalDamage` | `number` | 条件提供 | 进入目标资源分配前的最终伤害。 |
 | `isDying` / `isDead` | `boolean` | 条件提供 | 本次结算是否使目标进入濒死或死亡。 |
 | `damageResult` | `Object` | 只读 | `applyDamage()` 返回的原始结果对象。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张卡片独立。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张卡片独立。 |
 | `isAttack` / `isHeal` / `isBuff` | `boolean` | 条件提供 | 攻击结算（自动与手动）提供 `true/false/false`。 |
 | `isManual` | `boolean` | 条件提供 | 自动结算为 `false`，手动结算为 `true`。 |
 
@@ -485,7 +488,7 @@ await actor.applyHealing({
 | `isHeal` | `boolean` | 条件提供 | 治疗为 `true`，Buff 为 `false`。 |
 | `costConsumed` | `Object` | 条件提供 | 自动攻击和治疗/Buff 的实际消耗。 |
 | `isManual` | `boolean` | 条件提供 | 手动攻击结算时为 `true`。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张卡片独立。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张卡片独立。 |
 
 `targets` 的元素结构：
 
@@ -708,7 +711,7 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 | 方法 | 用途与返回值 |
 |---|---|
 | `await game.xjzl.aura.create(source, params)` | 创建光环；同场景同 `label` 的旧光环先删除。返回 `RegionDocument`；缺少标签、源不可用、无网格或半径非法时返回 `null`。矩形尺寸、锚点非法时抛错。 |
-| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene})` | 按标签或 Region ID 删除光环，返回删除数量。`scene` 默认当前画布场景。 |
+| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene})` | 按标签或 Region ID 删除光环，返回删除数量；返回 `0` 表示未删到。`scene` 默认当前画布场景。 |
 | `game.xjzl.aura.query(label, {scene})` | 查询同标签的 Region，返回数组。`scene` 默认当前画布场景。 |
 | `game.xjzl.aura.queryLabels({scene})` | 返回场景中去重后的光环标签数组。`scene` 默认当前画布场景。 |
 | `await game.xjzl.aura.refreshAura(label, overrides, {scene})` | 用已有实例的参数和覆盖项重建光环，返回新 Region；标签不存在或源失效时返回 `null`。 |
@@ -728,7 +731,9 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 
 删除或重建光环会触发区域退出清理；需要按标签更新半径、动作或效果时使用 `refreshAura`。直接修改 Region 行为配置中的范围字段也会重算形状。已有清理记录期间更换 payload 引用不会立即切换，该目标继续使用旧引用直至退出；需要立即切换时调用 `refreshAura` 重建。`cleanupOnExit: false` 产生的效果没有清理记录，修改引用或重建光环都不会移除既有效果，调用方须自行处理。
 
-监听型光环可将无数值、`showIcon: 0` 的 AE 作为 payload，利用被挂角色的现有触发器响应事件。模板 AE 位于角色持有的物品且未预设 `origin` 时，管理器把复制品的 `origin` 设为模板 AE 的 UUID；脚本可用 `fromUuid(thisEffect.origin)` 找回模板，再从所属物品定位主人。退出清理只管理光环直接挂载且已记账的 payload；监听脚本另行添加的 AE 不会自动纳入光环账本。
+把移除某个光环作为招式前提时，先查询可选实例，再按选中的 Region ID 调用 `dismiss` 并检查返回值；查询后实例仍可能消失，返回 `0` 时应停止后续结算。若还需在扣费前取消施展，应在 `preAttack` 完成选择并按该阶段的资源检查规则处理。
+
+监听型光环可将无数值、`showIcon: 0` 的 AE 作为 payload，利用被挂角色的现有触发器响应事件。模板 AE 位于角色持有的物品且未预设 `origin` 时，管理器把复制品的 `origin` 设为模板 AE 的 UUID；脚本可用 `fromUuid(thisEffect.origin)` 找回模板，再从所属物品定位主人。退出清理只管理光环直接挂载且已记账的 payload；监听脚本另行添加的 AE 不会自动纳入光环账本。脚本反查目标脚下的光环时使用 Token 文档的 `regions` 集合——它是集合不是数组，须先展开（`[...(tokenDoc.regions ?? [])]`）再 `filter`/`some`。
 
 区域工具栏的光环快建按钮和 `game.xjzl.auraQuick.open()` 会打开快建窗口。快建光环默认只标记范围；需要自动结算时，可编辑区域行为，或在异步脚本中使用 `game.xjzl.aura.create()` 传入结算参数。需要让玩家在画布选择固定光环落点时，使用 `await game.xjzl.auraQuick.place(params)`；参数为 `aura.create` 的 `params` 对象，落点由玩家点击决定，`follow` 固定为 `false`。成功时返回 `RegionDocument`，取消选点、无网格或创建失败时返回 `null`；坐标源按阵营过滤时应提供 `sourceActorUuid`。
 

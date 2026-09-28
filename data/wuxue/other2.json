@@ -1150,7 +1150,7 @@
                     "targetInfo": "周围所有敌人",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，俯身甩链横扫，对所有敌人造成0.4力量点外功伤害，若卷起沙尘，使周围3米范围尘沙密布，所有范围内角色会陷入“目盲”状态，尘沙三回合后消散。<br>若你被击倒在地，可以消耗反应施展此招，并顺势立即站起。<br><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害计算自动。目盲需手动。起身手动。",
+                    "automationNote": "完全自动化：施展后自动扬起跟随施展者的 3 米“尘沙”（3 回合），范围内所有角色（含己方）自动陷入“目盲”；被击倒时以反应施展此招会自动顺势起身（解除倒地）。到期或脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -1171,10 +1171,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "目盲提示",
-                            "trigger": "hit_once",
-                            "script": "ui.notifications.info('请手动为范围内角色添加 [目盲] (持续3回合)。');",
-                            "active": true
+                            "label": "尘沙区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 尘沙：以自身为中心 3 米（不跟随），所有范围内角色陷入目盲，3 回合后消散。\n// 被击倒状态下以反应施展此招时顺势起身（移除倒地）。\nif (actor.effects.some(e => e.statuses?.has(\"prone\"))) {\n    await game.xjzl.api.effects.removeEffect(actor, \"prone\", 1);\n    ui.notifications.info(\"顺势起身：已解除倒地状态。\");\n}\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-chensha-\" + actor.id,\n    displayName: \"尘沙\",\n    follow: false,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadStatusId: \"blind\",\n    enterEnabled: true,\n    durationRounds: 3,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 },

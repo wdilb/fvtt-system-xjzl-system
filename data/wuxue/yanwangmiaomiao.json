@@ -307,7 +307,7 @@
                         {
                             "label": "格挡禁足",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    // 使用系统预设的禁足\n    const eff = game.xjzl.api.effects.getStatus('root');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        actor.showFloatyText(\"禁足反击\", {fill: \"#0000FF\"});\n    }\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    // 使用系统预设的禁足\n    const eff = game.xjzl.api.effects.getStatus('root');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        actor.showFloatyText(\"禁足反击\", {fill: \"#0000FF\"});\n    }\n    // 热恼地狱联动：格挡者身处热恼地狱时，进攻方额外陷入“行刑”一回合。\n    const rnDoc = actor.getActiveTokens?.()[0]?.document;\n    const rnInHell = rnDoc && [...(rnDoc.regions ?? [])].some(r => (r.getFlag(\"xjzl-system\", \"aura\")?.label ?? \"\").startsWith(\"wuxue-renao-\"));\n    if (rnInHell) {\n        const rnXing = thisItem.effects.getName(\"行刑\");\n        if (rnXing) {\n            const rnData = rnXing.toObject();\n            delete rnData._id;\n            rnData.origin = thisItem.uuid;\n            rnData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\" };\n            await game.xjzl.api.effects.addEffect(args.attacker, rnData);\n            ChatMessage.create({\n                speaker: ChatMessage.getSpeaker({actor}),\n                content: \"<div class='xjzl-chat-card'><b>热恼地狱</b>：阿鼻降难格挡成功，\" + args.attacker.name + \" 陷入【行刑】一回合。</div>\"\n            });\n        }\n    }\n}",
                             "active": true
                         },
                         {
@@ -379,7 +379,7 @@
                     "targetInfo": "地面",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，将内力灌注于棍，奋力插地，入土三分。在周围地面引起阵阵阴气，化为‘热恼地狱’，持续 @{1 + @up|1} 回合。</p><p><strong>热恼地狱：</strong>在其中施展的【大热恼】，不会被“行刑”状态的敌人压制反击。</p><p>·在其中开启【阿鼻降难】成功格挡时，还可使敌方陷入“行刑”，持续一回合。</p><p><strong>升级：</strong>‘热恼地狱’持续回合+1，内力消耗+8。</p>",
-                    "automationNote": "仅提示生成地狱，具体区域判定需手动。包含计数。",
+                    "automationNote": "部分自动化：施展后自动生成跟随自身的 2 米“热恼地狱”区域（持续 1+升级 回合）用于范围显示。在区域内开启【阿鼻降难】成功格挡时，敌方自动陷入“行刑”（一回合，联动自动）；“在其中施展【大热恼】不会被行刑压制反击”的免压制规则维持手动裁定。到期或脱战时区域消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -401,10 +401,10 @@
                             "active": true
                         },
                         {
-                            "label": "生成提示",
-                            "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #7f8c8d;\"><b>泰山锥肉</b> 生效！<br>已生成 [热恼地狱] (2米)<br>持续 <b>${rounds}</b> 回合。<br><i>请手动放置模板。</i></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "label": "热恼地狱区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 热恼地狱：以自身为中心跟随 2 米标记区域（持续 1+升级 回合）用于范围显示。\n// \"【大热恼】免行刑压制反击\"（免压制）超出框架维持手动；阿鼻降难的格挡附\"行刑\"联动自动。\nconst rnLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-renao-\" + actor.id,\n    displayName: \"热恼地狱\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1 + (rnLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\n"
                         }
                     ]
                 },
