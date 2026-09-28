@@ -164,7 +164,7 @@
             "sect": "wanfosi",
             "description": "<p>万佛寺核心内功心法，为万佛七十二绝技之一。修行者皆身心六根清净，无明烦恼已断，大成后刚猛顽强，排除万魔。</p>",
             "requirement": "悟性需求: 4",
-            "automationNote": "分档自动化（圆满运功特效）：诸相非相（怒气≥5 招式伤害+10）为圆满档 calc 常驻；圆满档进战时生成 2 米跟随监听光环，主人招式命中（hit_once，排除普通攻击）后自动对 2 米内敌人造成 10 点气血流失（必中不暴击）；小成档仅提示，伤害由 GM 手动结算。切换运功或脱战时光环消散。",
+            "automationNote": "完全自动化：出招命中后对周围2米内敌人自动结算气血流失，小成5点、圆满10点（必中不暴击）；圆满时怒气≥5，招式伤害+10。切换运功或脱战时光环消散。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -192,9 +192,9 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "伏魔震伤提示",
-                            "trigger": "hit_once",
-                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nawait ChatMessage.create({content: `<div class='xjzl-chat-card'><div class='card-header'><h3>罗汉伏魔功</h3></div><div class='card-content' style='padding-left:10px;'>请手动扣除周围2米内敌方 <b>5点</b> 气血流失。</div></div>`, speaker: ChatMessage.getSpeaker({actor: args.attacker})});",
+                            "label": "伏魔光环",
+                            "trigger": "combatStart",
+                            "script": "// 监听 AE 挂在范围内角色身上，仅主人招式命中时按境界结算震伤（小成 5、圆满 10）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-luohanzhen-\" + actor.id,\n    displayName: \"罗汉伏魔功\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"罗汉伏魔功监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});",
                             "active": true
                         }
                     ]
@@ -218,10 +218,10 @@
                             "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (S.resources.rage.value >= 5) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push('诸相非相 +10');\n}"
                         },
                         {
-                            "label": "震伤光环",
+                            "label": "伏魔光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 监听 AE 挂在范围内角色身上，仅主人招式命中时结算震伤。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-luohanzhen-\" + actor.id,\n    displayName: \"震伤\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"震伤监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                            "script": "// 监听 AE 挂在范围内角色身上，仅主人招式命中时按境界结算震伤（小成 5、圆满 10）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-luohanzhen-\" + actor.id,\n    displayName: \"罗汉伏魔功\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"罗汉伏魔功监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -251,19 +251,19 @@
         },
         "effects": [
             {
-                "name": "震伤监听",
+                "name": "罗汉伏魔功监听",
                 "description": "光环监听标记（不可见）。离开光环范围后自动移除，效果随之失效。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "listener_震伤监听",
+                        "slug": "listener_罗汉伏魔功监听",
                         "stackable": false,
                         "scripts": [
                             {
-                                "label": "震伤监听",
+                                "label": "罗汉伏魔功监听",
                                 "trigger": "hit_once",
                                 "active": true,
-                                "script": "// 震伤监听：仅主人以招式（含借机普攻，排除普通攻击）命中后对 2 米内敌人造成 10 点气血流失。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner || owner.uuid !== actor.uuid) return;\nif (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif ((args.move?.type === 'basic' && args.move?.id !== 'opportunity-attack')) return;\nconst targets = await game.xjzl.aura.queryTokens(owner, {radius: 2, faction: 'enemy', includeSelf: false});\nfor (const t of targets) {\n    await t.applyDamage({amount: 10, type: 'liushi', attacker: owner, isHit: true, isCrit: false, source: 'dot'});\n}\nif (targets.length) owner.showFloatyText('罗汉伏魔功·震伤!', {fill: '#c0392b', fontSize: 30});"
+                                "script": "// 罗汉伏魔功监听：仅主人以招式（含借机普攻，排除普通攻击）命中后，按境界对 2 米内敌人结算气血流失（小成 5、圆满 10）。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner || owner.uuid !== actor.uuid) return;\nif (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif ((args.move?.type === 'basic' && args.move?.id !== 'opportunity-attack')) return;\nconst stage = srcAE.parent?.system?.stage ?? 1;\nconst victims = await game.xjzl.aura.queryTokens(owner, {radius: 2, faction: 'enemy', includeSelf: false});\nfor (const t of victims) {\n    await t.applyDamage({amount: stage >= 3 ? 10 : 5, type: 'liushi', attacker: owner, isHit: true, isCrit: false, source: 'dot'});\n}\nif (victims.length) owner.showFloatyText('罗汉伏魔功·震伤!', {fill: '#c0392b', fontSize: 30});"
                             }
                         ]
                     }
