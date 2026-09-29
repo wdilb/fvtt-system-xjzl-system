@@ -2,9 +2,9 @@
 
 本文件是 V14 升级的总进度事实源，记录里程碑、跨阶段依赖和验证结果；范围与既定接口约束见 [`V14_UPGRADE.md`](V14_UPGRADE.md)。**AE 相关实施步骤、工作项状态和验收以 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 为唯一执行依据**；本文件仅同步其里程碑与跨阶段依赖，不再作为 AE 施工清单。
 
-**当前进度**：M0～M4 已通过（正式世界升级于 2026-09-28 验证完成）；M5 的 S5.1～S5.4 已在 Foundry 14.368 实机回归通过。回归修复了目标头像取图与审计日志窗口问题；审计日志异常渲染的关闭路径已于 2026-09-29 实机复验。剩余 S5.5 文档同步、S5.6 发布核验、S5.7 冗余清理及 S3.8 战斗标记旋转决策。
+**当前进度**：M0～M4 已通过（正式世界升级于 2026-09-28 验证完成）；M5 的 S5.1～S5.4 已在 Foundry 14.368 实机回归通过。回归修复了目标头像取图与审计日志窗口问题；审计日志异常渲染的关闭路径已于 2026-09-29 实机复验。S3.8 已定案为方案 A（删除自研战斗标记、改用 V14 原生回合标记）并于 2026-09-29 浏览器自动化实机验证销项。S5.7 冗余清理已于 2026-09-29 完成，验证范围见工作项。剩余 S5.5 文档同步、S5.6 发布核验。
 
-**下一步**：完成 S5.5～S5.7 收尾，并对 S3.8 战斗标记旋转做出重适配或放弃的决策。
+**下一步**：完成 S5.5 文档同步与 S5.6 发布前核验。
 
 ## 使用方式与状态约定
 
@@ -23,9 +23,9 @@
 
 - [x] S0.1 确认是否需要自定义 AE system 数据模型（Q3 已解：官方接口 `CONFIG.ActiveEffect.dataModels`、基础模型 `foundry.data.ActiveEffectTypeDataModel`；待验证派生字段如何应用变更）→ **已验证（14.368 实测）**：`dataModels` 仅注册 `{base: ActiveEffectTypeDataModel}`，基础模型 schema 仅含 `changes` ArrayField；我方 `documentClass=XJZLActiveEffect` 在 V14 正常加载。结论：核心模型足够，无需自定义；派生字段应用行为归 S0.7
 - [x] S0.2 验证内置 initial/final 阶段与本系统基础值、物品准备、派生值计算的先后关系，确保每条变更只在指定阶段应用；仅确有需要时注册并调用附加阶段 → **已验证（核心源码确认）**：`initial` 在 `prepareEmbeddedDocuments` 内应用（早于 `prepareDerivedData`），`final` 在 `prepareData` 末尾应用（晚于派生计算）；`applyActiveEffects(phase)` 必须显式传阶段字符串（V14 新契约，缺省仅发兼容警告），`_completedActiveEffectPhases` 防同阶段重复；变更默认 `phase="initial"`。我方不自行调用该钩子，保持现状即等价 V13 时序，无需附加阶段
-- [x] S0.3 按官方契约保留状态条目的 `id`，验证对象键与条目 `id` 一致，以及 TokenHUD、状态选取器和状态创建流程 → **已验证（14.368 实测）**：①数据层：V14 将 `CONFIG.statusEffects` 包装为原生混合结构（Proxy：可数组迭代 63 项无双重计数、`CONFIG.statusEffects[slug]` 直查命中、键=id 一致）；我方 `Object.fromEntries` 转换（xjzl-system.mjs:282）不报错但已无意义（V14 原生提供同等能力），列入 S5.7 冗余代码清理；②TokenHUD：HUD 正常打开（`canvas.hud.token.bind`），63 个状态图标全部渲染且 `data-status-id` 与状态表一致；左键点击创建带完整 slug 语义的特效（name/img/slug/stacks 来自 CONFIG），不可叠层状态二次点击保持 1 层，系统 `renderTokenHUD` 改造在 V14 的 HUD 三栏结构下工作正常；③状态选取器：**`getSceneControlButtons` 钩子在 V14 正常触发**，damage-tool/effect-picker/combat-meter 三个按钮均注入成功（V14 控制栏 DOM 从 `#controls` 改为 `#scene-controls` ApplicationV2，按钮带 `data-tool`，注入数据结构兼容）；选取器窗口完整渲染（分类/计数/最近/常用/场上特效分组），状态网格点击经 slug→addEffect 链路成功施加到受控 token，“身上状态”面板与网格 active 态同步正确。备注：测试时用户自研 TokenHUD mod 处于开启状态，mod 兼容性回归按用户要求推迟到系统升级完成后（S5.x）；可叠层状态的 HUD 加层细化归 S2.8 联调。测试数据已全部清理
+- [x] S0.3 按官方契约保留状态条目的 `id`，验证对象键与条目 `id` 一致，以及 TokenHUD、状态选取器和状态创建流程 → **已验证（14.368 实测）**：①数据层：V14 将 `CONFIG.statusEffects` 包装为原生混合结构（Proxy：可数组迭代 63 项无双重计数、`CONFIG.statusEffects[slug]` 直查命中、键=id 一致）；当时的 `Object.fromEntries` 转换未报错，但会替换核心 Proxy；最终实现见 S5.7；②TokenHUD：HUD 正常打开（`canvas.hud.token.bind`），63 个状态图标全部渲染且 `data-status-id` 与状态表一致；左键点击创建带完整 slug 语义的特效（name/img/slug/stacks 来自 CONFIG），不可叠层状态二次点击保持 1 层，系统 `renderTokenHUD` 改造在 V14 的 HUD 三栏结构下工作正常；③状态选取器：**`getSceneControlButtons` 钩子在 V14 正常触发**，damage-tool/effect-picker/combat-meter 三个按钮均注入成功（V14 控制栏 DOM 从 `#controls` 改为 `#scene-controls` ApplicationV2，按钮带 `data-tool`，注入数据结构兼容）；选取器窗口完整渲染（分类/计数/最近/常用/场上特效分组），状态网格点击经 slug→addEffect 链路成功施加到受控 token，“身上状态”面板与网格 active 态同步正确。备注：测试时用户自研 TokenHUD mod 处于开启状态，mod 兼容性回归按用户要求推迟到系统升级完成后（S5.x）；可叠层状态的 HUD 加层细化归 S2.8 联调。测试数据已全部清理
 - [x] S0.4 验证 Region 行为 API 与核心 Apply Active Effect 行为能力（光环设计 Q4 前置）→ **已验证（14.368 实测，含完整进出周期）**：①区域形状字段为 `shapes` 数组，元素为 `{type: "circle", radius, x, y}`（判别字段是 `type` 不是 `kind`，错误键会被静默丢弃）；②行为条目 `{name, type: "applyActiveEffect", system: {effects: [uuid]}}`；③核心行为语义：tokenEnter 时 `fromUuid` 解析特效并复制到 `token.actor`（`origin=behavior.uuid`），tokenExit 按 origin 清理，实测“出→0 个、进→恰好 1 个”；④**区域进出事件的派发口径（2026-09-26 AURA-01 复测修正，取代 M0 初测"仅官方移动派发"的误判，见专项计划决策 39）**：官方移动（`tokenDocument.move()`/`scene.moveTokens`）与 **`document.update` 裸传送 x/y** 均派发 enter/exit/moveWithin（复测含 `animate:false`/`noHook:true` 变体，movement 数据携带）；**`updateSource` 为纯内存数据模型更新——不产生数据库更新操作、不触发 updateToken 钩子与区域事件、`region.tokens` 包含性跟踪也不更新（AURA-01 复测），其漂移仅是单端内存态与数据库的暂时背离，不改变服务端权威状态，由后续真实同步自然收敛**；⑤派发按 `event.user.isSelf` 门控，仅移动发起者的客户端执行施加/清理；⑥**非链接 token 的 `token.actor` 是合成 Actor**，特效落在合成实例而非 world Actor——M3 光环的自研 addEffect/removeEffect 与权限代理必须处理该分支；⑦`region.testPoint` 需带 elevation 属性；`RegionDocument.createTokenEmanation` 为静态方法；`attachment.token` 字段存在（跟随光环基础）；`attachment`/`restriction`/`displayMeasurements` 等字段齐备。测试数据已全部清理
-- [x] S0.5 验证画布劫持点存活：`SquareGrid.measurePath`、`rulerClass._getWaypointLabelContext`、`Token._refreshTurnMarker`/`_animateTurnMarker` → **已验证（14.368 实测）**：measurePath 劫持存活且计费正确（直行1+首斜1=2；三连斜=1+2+2=5）；`CONFIG.Canvas.rulerClass=Ruler`，`_getWaypointLabelContext` 存活；`Token._refreshTurnMarker` 存活；**`_animateTurnMarker` 已被 V14 移除**——我方 combat-turn-marker.mjs 有 if 守卫不会崩，仅“顶底图交错旋转”装饰失效，重适配或放弃由 S3.8 决定
+- [x] S0.5 验证画布劫持点存活：`SquareGrid.measurePath`、`rulerClass._getWaypointLabelContext`、`Token._refreshTurnMarker`/`_animateTurnMarker` → **已验证（14.368 实测）**：measurePath 劫持存活且计费正确（直行1+首斜1=2；三连斜=1+2+2=5）；`CONFIG.Canvas.rulerClass=Ruler`，`_getWaypointLabelContext` 存活；`Token._refreshTurnMarker` 存活；**`_animateTurnMarker` 已被 V14 移除**——当时的自研模块仅失去交错旋转，后续按 S3.8 决策删除
 - [x] S0.6 确认 duration 新 schema 字段与 expiry 事件清单 → **已验证（实例清洗实测）**：新文档级 schema 为 `{units, value, expiry, expired}` + 派生 `{seconds, remaining, secondsRemaining, label, _worldTime}`；V13 的 `rounds/turns` 在清洗时按 `CONFIG.time.roundTime` 折算为 seconds（3轮×2s=6s 实测），`startRound/startTurn/startTime` 不复存在（改由 worldTime 锚定）；`expiry` 缺省 `"turnStart"`；`CONFIG.ActiveEffect.expiryEvents` 启动时为空表（可注册）；`ActiveEffect.registry` 存在（启动时为空）。战斗中逐轮递减与 registry 清理分工归 M2/S2.4 实测（Q5 依据）
 - [x] S0.7 验证数值字段、非 schema 派生字段与 flags 的 `add`/`multiply`/`override` 类型处理（见 M2 备注）→ **已验证（14.368 实测，临时 Actor 全类型变更）**：①`add`/`multiply`/`subtract`/`override` 全部生效，`subtract` 无下限钳制、`multiply` 按当前值计算；②**变更到派生字段（`stats.*.total`、`resources.*.max`）会被 `prepareDerivedData` 重算覆盖**（initial 阶段先于派生计算，语义与 V13 一致，变更 key 必须指向原始字段——与现有设计一致）；③`@` 引用按应用时点的 rollData 解析（initial 阶段取派生前基础值）；④`value:"true"` 在 DB 写入、模型清洗、flags 应用全链路保持字符串，布尔 override 语义安全；⑤`flags.xjzl-xxx.key` 路径 override 正常写入；⑥标准数据准备中 initial 与 final 两阶段均完成；清洗层结论：字符串 `type` 生效、`priority` 按类型默认（add=20/override=50/custom=0）、`phase` 默认 `"initial"`；静态 `ActiveEffect.applyChange/applyChangeField` 与原型 `shouldApplyChange/getReplacementData` 均存在。**结论：现有变更模型无需 `applyChange` 定制即可迁移**
 
@@ -65,7 +65,7 @@ S2.11 在专项计划中只要求独立 AE 文档与合集包的原生互操作�
 
 - [x] S3.6 Q4 已定稿并产出专项计划（2026-09-26，与数据作者讨论）：升级为完整光环系统——自定义 Region 行为类型 `xjzlAura` + 光环管理器，94 处 `x-xjzl-aura` 标记全量盘点归类（91 条有自动化路径、3 条手动），核心 `applyActiveEffect` 方案因绕过自研门面否决；决策与盘点见专项计划第 4/6 节
 - [x] S3.1–S3.5、S3.7 按专项计划 AURA 工作项执行并随其验收 → **全部实施，AURA-12 于 2026-09-28 完成清理复核**：S3.1→AURA-12（**已完成**：S1.14 注释块与 measured-template/aoe-creator 及孤儿资产删除、文档同步、第 4 节 90 行条目（93 处标记）销项）；S3.2/S3.4→AURA-06（**已完成并实机验收**：工具栏按钮、轻量弹窗、格心吸附放置、自绘显示名标签、旧宏改写＋seed 重建）；S3.3→AURA-01（**已完成**：核心 `TokenDocument._onDeleteOperation` 源码核实 + 14.368 运行时复验，源删除自动删区并补发 exit）；S3.5→AURA-02/03（**AURA-02 已完成**：形状生成器 `module/utils/aura-shapes.mjs` + Node 断言；**AURA-03～05 已完成并实机验收（2026-09-26）**：行为类型、管理器和账本结算；自动对账已于 2026-09-27 随决策 45 删除，socketlib 双客户端委托仍待补验，明细见专项计划第 7.2 节）；S3.7→按 2026-09-26 决策不新增脚本触发器（监听 AE 复用既有触发器），随 AURA 工作项关闭
-- [ ] S3.8 标尺与移动劫持重适配（依赖 S0.5）
+- [x] S3.8 标尺与移动劫持重适配（依赖 S0.5）→ **已定案并实施（2026-09-29，方案 A：弃用自研战斗标记，改用 V14 原生回合标记）**：V14 已把回合标记做成正式功能——`TokenTurnMarker` 类 + `CONFIG.Combat.settings.turnMarker` 世界级配置（战斗追踪器配置窗口：开关/动画/标记图/阵营染色）+ Token 配置页每 Token 覆盖（禁用/跟随/自定义）+ 原生 spin/pulse 动画循环（TokensLayer ticker 驱动）+ `addTurnMarkerAnimation` 扩展点；自研双图交错旋转是唯一未被原生覆盖的美术效果，且可由原生 spin 近似。实施：删除 `module/combat-turn-marker.mjs`、6 个 `xjzl-system` 战斗标记设置与 `Token#_refreshTurnMarker` 劫持（该劫持默认开启，正压制原生动画标记；`_animateTurnMarker` 被移除后双图已不旋转，S5.1 所见静态双图即此状态）；init 将 `CONFIG.Combat.fallbackTurnMarker` 指向合并后的 `assets/picture/pause-bg.png`，未配置标记图的世界即用系统图，用户仍可在战斗追踪器配置或 Token 配置页覆盖；按用户决策不做世界设置迁移，存量世界的旧设置值未注册即被核心忽略，留存无害。`pause-bg1/2.png` 为暂停画面样式在用图，保留。**实机验证（2026-09-29，14.368，testsystem 世界，浏览器自动化 GM 身份，临时数据已清理）**：刷新后 `CONFIG.Combat.fallbackTurnMarker` 指向系统图、启动与全程错误收集器零命中；创建临时战斗员开战后，当前行动者 Token 自动注册原生 `TokenTurnMarker`，贴图宽高 905×905 与 pause-bg.png 一致（核心默认图为 512×512），画布截图确认金环图案；手动推进 ticker 帧采样旋转速率恰为 -0.419 rad/0.7s（spin 默认 -4 圈/分钟逆时针）；`nextTurn` 正常流转后标记自动从旧行动者摘除并挂到新行动者；世界暂停画面（pause-bg1/2 样式）不受影响。
 
 ## M4 数据迁移（依赖 M2；光环宏另依赖 M3）
 
@@ -90,12 +90,12 @@ S2.11 在专项计划中只要求独立 AE 文档与合集包的原生互操作�
 - [x] S5.4 完整战斗流程实测 → **通过（2026-09-28，14.368 实机）**：出招/对抗/伤害/状态/战局全流程用户实机确认无问题
 - [ ] S5.5 文档同步（CLAUDE.md / SCRIPT_ENGINE.md / SEEDING_GUIDELINES.md / README / PROJECT_MAP.md）
 - [ ] S5.6 发布前核验：各阶段必需项与验收记录齐全、未解决问题已关闭或明确排除在本次范围外，确认 `system.json` 的兼容声明与 download 链接；本项不包含自动提交或发布
-- [ ] S5.7 升级遗留冗余代码清理（不报错但已失去意义的代码，收尾时以最简正确形态过一遍）：
-  1. `xjzl-system.mjs` init 的 `CONFIG.statusEffects = Object.fromEntries(...)` 转换：S0.3 实测 V14 原生包装已提供数组迭代与 slug 直查，改为直接赋值 `CONFIG.XJZL.statusEffects` 数组，删除转换层；
-  2. `getSceneControlButtons` 中为旧构建保留的 Array/Object 多形态兼容分支：V14 实测按钮注入成功，先确认 `tools` 实际类型后精简为单一路径；
-  3. 复审升级期间新增的防御性代码：S1.16 的 getRollData `?.` 兜底经确认为 V14 数据准备时序的必要修复（creature 鸭子类型晚于 AE 应用），须保留；其余临时防御代码确认无必要时删除；
-  4. 通读 M2–M4 改动，删除数据迁移完成后失去意义的旧格式检测与转换分支；D2 入参归一化层长期保留属已定产品决策（2026-09-25：作为世界宏/玩家脚本等外部调用的兜底，系统自带 data/ 一律新写法，见专项计划 AE-10），不计入冗余；
-  5. 复核仍使用 `.window-app` 前缀的窗口样式；按 V14 实际根元素类名保留或调整所需规则。
+- [x] S5.7 升级遗留冗余代码清理 → **已完成（2026-09-29；状态表和工具栏经 14.368 testsystem 实机验证，样式经选择器核对）**：
+  1. **statusEffects 转换层（实现与原设想不同，按源码核实修正）**：`CONFIG.statusEffects` 是核心维护的 Proxy 混合容器（数组迭代 + 按 id 直查双索引，`client/config.mjs` 源码核实），直接赋值数组会整体替换容器、丢失 slug 直查并破坏 S1.5 迁移的十余处对象访问点；改为 `length=0` 清空后按 id 逐条写入，容器仍由核心 Proxy 承载，全量替换语义不变。实机验证：数组迭代/Object.values/slug 直查/`.find` 四形态、核心 `toggleStatusEffect`（内部 slug 直查）施加与移除、`getStatus` 副本不污染 `CONFIG.statusEffects`，全部通过；
+  2. **getSceneControlButtons 精简**：核心 `SceneControls.#prepareControls` 源码核实 controls 为以组 id 为键的普通对象、每组 `tools` 为普通对象记录（无 Map/数组形态），三处注入的 Map/数组/对象多形态兼容分支精简为 `controls.tokens.tools` 单一路径。**审阅修复（2026-09-29）**：①恢复"同名工具已存在则不覆盖"保护，避免覆盖先注册模块的同名工具；②改分按钮独立权限——原实现以伤害工具开关提前返回，玩家关闭该开关时 `allowPlayerEffectPicker` 与战斗统计按钮被连带隐藏，现三个按钮分别按 伤害工具=GM||allowPlayerDamageTool、状态选取器=GM||allowPlayerEffectPicker、战斗统计=enableCombatStats 判断（玩家侧行为变化，默认设置下可见性与原先一致）；实机 DOM 断言三按钮注入成功，伤害工具与状态选取器经按钮 onChange 实开实关、渲染完好、零报错（玩家路径为逻辑推演，未以玩家客户端实测）；
+  3. **防御性代码复审**：S1.16 getRollData `?.` 兜底保留（必要修复）；`active-effect.mjs` `_preCreate` 与 manager 覆盖分支的 `system?.changes` 判空是"无 changes 的合法被动"语义所需，保留；无其他可删项；
+  4. **旧格式分支清理**：删除 seeding 层迁移期产物 `module/utils/seeding/effect-data.mjs#normalizeLegacyChanges` 及 6 个 seed 文件的 `|| e.changes`、`|| e.icon` 旧格式回退（全量扫描实证 data/ 源 JSON 2409 个 effects 零 icon、零顶层 changes、零数字 mode）；世界迁移事实源 `effect-conversion.mjs`/`ae-migration.mjs` 按其定位保留（其他 V13 世界升级仍需要）；D2 门面归一化层按既定决策保留；
+  5. **`.window-app` 样式复核**：被清理规则对应的窗口均为 AppV2，根类为 `application`；这些 `.window-app` 选择器不会命中对应窗口——删除 `_reset.css` 四组死块（保留在用的 `.xjzl-level-formula-result`）、`_action-tracker.css` 窗口壳死块、`_compendium-browser.css` 最小化选择器兜底组；万卷阁最小化收拢由 V14 核心原生接管（`minimize()` 自动设 `maxWidth=var(--minimized-width)`、`maxHeight=var(--header-height)`）。本项通过选择器与窗口根类核对，动作追踪器和万卷阁未逐窗实机复测。若日后要恢复 `_reset.css` 的窗口壳重置意图，应以 `.application.xjzl-window` 选择器另立样式任务并逐窗验证。
 
 ## 阶段验收记录
 
@@ -108,7 +108,7 @@ S2.11 在专项计划中只要求独立 AE 文档与合集包的原生互操作�
 | M2 | **通过** | 2026-09-25 构建 14.368 实机验收（testsystem 世界，写入型临时数据已全部清理）。AE-01～09（数据链路、时长与过期、架招绑定、编辑器 AppV2、拖放链路、状态选取器）与 AE-13（showIcon 三层分工：门面兜底 `??= 2` + 施加/拖放/消耗品三路径六用例实测 + 画布图标视觉确认与时长无关性）、AE-12（迁移框架：world setting 分阶段版本、幂等、失败不推进版本、非关联 Token 经合成 Actor 嵌入文档写回）全部完成并逐条记录于专项计划。M2 出口条件（代码链路、编辑器、拖放和状态选取器在 V14 测试数据上通过）达成；正式 AE 合集包与旧世界迁移按计划不在 M2 出口内。语义差异记录：核心 turnStart 到期锚定施加槽位而非目标槽位（AE-05，按 Q5 不作产品约束） |
 | M3 | **通过** | 2026-09-28 定稿验收：AURA-01～12 全部实施完成，账本 Node 回归 24 个场景、80 项断言，90 行条目（93 处标记）逐项销项。用户实机验证：框架全周期（进出/回合/账本/生命周期，含决策 45 后回归）、socketlib 双客户端委托、AURA-07 视觉美术、内容批次（含火浣/罗汉小成档自动化、罗汉监听 hit_once `targets` 编译冲突修复与改名）、碧焰扣费前消耗与断海禁足必中。狂沙·孤影经决策 48 改手动；完全手动 5 条（大风域、星罗棋布×2、万毒心经、狂沙·孤影）＋借机窗口 2 条按决策保留手动。详见专项计划。 |
 | M4 | **通过** | 2026-09-25 构建 14.368 实机验收：S4.1/S4.2/S4.6 随 AE-10 完成（data/ 源 JSON 全量迁 V14 新写法：2378 条模板 effects、516 处状态查询、约 750 处内联 duration、71 处 mode、169 处 changes 读取，4613 个脚本语法回归通过）；S4.4 随 AE-11 完成（11 类合集包重建、1438 个施加型模板 showIcon:2 透传、端到端常显画布确认）；S4.5 完成（2 处 measureDistance → measurePath，euclidean/cost 语义与 V13 逐一对等）；S4.8 审计完成（user: 0 残留、2 处旧字段读取修复、其余命中均为存活 API）。S4.3 已并入光环专项 AURA-06（改写为指向快建工具的说明宏，随 M3 实施）；S4.7 正式世界从 V13 升级并验证通过（2026-09-28 用户确认，AE-14 销项）。详见专项计划 AE-10/AE-11/AE-14 记录 |
-| M5 | 部分通过 | S5.1～S5.4 于 2026-09-28～29 在 Foundry 14.368 实机回归通过；审计日志异常渲染的关闭路径已于 2026-09-29 实机复验。S5.5 文档同步、S5.6 发布核验、S5.7 冗余清理待做。 |
+| M5 | 部分通过 | S5.1～S5.4 于 2026-09-28～29 在 Foundry 14.368 实机回归通过；审计日志异常渲染的关闭路径已于 2026-09-29 实机复验。S3.8 已定案为方案 A（原生回合标记）并经实机验证销项。S5.7 冗余清理已完成（2026-09-29；实机与静态核对范围见工作项）。S5.5 文档同步、S5.6 发布核验待做。 |
 
 ### 2026-09-25 手动回归记录（Foundry 14.368，testsystem 世界）
 
@@ -124,9 +124,9 @@ S2.11 在专项计划中只要求独立 AE 文档与合集包的原生互操作�
 
 **待处理**：
 
-1. **战斗标记旋转**：`Token#_animateTurnMarker` 在 V14 已移除，当前守卫使双层标记的交错旋转不再执行；标记仍可显示。重适配或放弃该装饰由 S3.8 决定。
+1. **战斗标记旋转（已销项，2026-09-29 随 S3.8）**：`Token#_animateTurnMarker` 在 V14 已移除，自研双图标记不再旋转且压制原生动画标记。S3.8 定案删除自研模块，改用 V14 原生回合标记并回退系统标记图，见 S3.8 条目。
 2. **xjzl-token-hud mod 的"剩余 Infinity"**：模组仍读取 V13 时长字段，需由模组侧适配 V14 `duration` 结构（2026-09-28 用户确认属模组自身任务，不属系统范围）；永久效果单独显示为无限时长。`game.xjzl.api.effects.getDurationLabel(effect)` 对永久效果返回 `null`，调用方需处理。
-3. **旧窗口样式选择器**：`styles/base/_reset.css` 及部分应用样式仍使用 `.window-app` 前缀，在对应 V14 AppV2 窗口中可能失配；按 S5.7 逐条复核。
+3. **旧窗口样式选择器（已销项，2026-09-29 随 S5.7）**：`.window-app` 前缀规则在 V13/V14 的 AppV2 根类（`application`）上均未命中，属迁移前死样式；相关规则已删除，对应窗口未逐窗实机复测，见 S5.7 条目。
 ### 2026-09-28～29 M5 回归记录（S5.1–S5.4，Foundry 14.368，testsystem 世界）
 
 S5.1–S5.4 的画布 API、特效行为、杂项和完整战斗流程经用户实机回归通过，控制台无 `XJZL |` 报错与弃用警告。相关 UI 验收结果：

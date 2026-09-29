@@ -1,5 +1,4 @@
 /* module/utils/seeding/seed-wuxue.mjs */
-import { normalizeLegacyChanges } from "./effect-data.mjs";
 
 const PACK_NAME = "xjzl-system.wuxue";
 
@@ -339,7 +338,7 @@ export async function seedWuxue() {
                     transfer: e.transfer ?? false,
                     showIcon: e.showIcon,
                     disabled: e.disabled ?? false,
-                    system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) },
+                    system: { changes: e.system?.changes ?? [] },
                     flags: e.flags || {},
                     description: e.description || "",
                     // 补上 duration

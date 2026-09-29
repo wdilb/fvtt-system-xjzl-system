@@ -1,4 +1,3 @@
-import { normalizeLegacyChanges } from "./effect-data.mjs";
 
 const PACK_NAME = "xjzl-system.consumables";
 
@@ -80,10 +79,10 @@ export async function seedConsumables() {
             // 准备 AE 数据
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                img: e.img || e.icon, // V14 字段为 img；兼容读取旧 JSON 的 icon
+                img: e.img,
                 transfer: e.transfer ?? false, // 消耗品通常为 false
                 showIcon: e.showIcon,
-                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) },
+                system: { changes: e.system?.changes ?? [] },
                 flags: e.flags,
                 description: e.description,
                 // 补上 duration

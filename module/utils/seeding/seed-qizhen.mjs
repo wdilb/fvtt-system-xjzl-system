@@ -1,5 +1,4 @@
 /* module/utils/seeding/seed-qizhen.mjs */
-import { normalizeLegacyChanges } from "./effect-data.mjs";
 
 const PACK_NAME = "xjzl-system.qizhen";
 
@@ -110,11 +109,11 @@ export async function seedQizhen() {
             // 3. 处理 Active Effects
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                img: e.img || e.icon || d.img, // V14 字段为 img；兼容读取旧 JSON 的 icon，缺省回退物品图标
+                img: e.img || d.img,
                 transfer: e.transfer ?? true, // 奇珍默认为被动传输
                 showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) },
+                system: { changes: e.system?.changes ?? [] },
                 flags: e.flags || {},
                 description: e.description || "",
                 // 补上 duration

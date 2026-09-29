@@ -70,7 +70,7 @@
 | `Macros` | `XJZLMacros` | 系统公开宏工具，例如 `requestSave()`、`requestContest()` 和 `checkStance()`。 |
 | `game` / `ui` / `console` | Foundry 全局对象 | 游戏对象、通知对象和控制台。 |
 
-脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 Foundry 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。旧版全局 `randomID` 在 V14 中已不存在，需要随机 ID 时使用 `foundry.utils.randomID()`。
+脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 Foundry 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。生成随机 ID 时使用 `foundry.utils.randomID()`，不要依赖全局 `randomID`。
 
 ### `args` 与同名顶层变量
 

@@ -84,7 +84,7 @@ AE 工作直接按 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 实施和验收；本文�
 | AE 文档拖放与独立 AE | 物品内嵌 AE 在各 Sheet 管理；角色/Token 默认拖放路径会直接创建文档 | AE 可独立存入合集包；ActorSheetV2/ItemSheetV2 和画布提供拖放入口 | 这里的转移是拖放复制施加，源 AE 保留；可施加 AE 的角色/Token 落点走 `addEffect`，物品之间复制模板。Item 内嵌 `transfer:true` 被动 AE 不允许拖出，目标端也禁止施加；`tiedToStance` AE 仅在来源与目标 Actor 当前使用同一架招时复制并交由目标架招清理，不同或无法确认则结束施加，成功时保留原 flags/origin/时长。独立 AE 兼容原生合集包打开、编辑、拖放，不要求把所有 AE 搬入合集包 |
 | 特效挂载脚本（`flags.scripts` + `collectScripts`/`runScripts`） | `XJZLActiveEffect.scripts` | 无对应 | 保留 |
 | 权限代理（玩家操作经 socketlib 委托 GM） | manager + `module/socket.mjs` | 无对应 | 保留 |
-| 状态定义（全量替换核心状态表） | `module/config.mjs` 的 `XJZL.statusEffects`，经 `CONFIG.XJZL` 暴露 | `CONFIG.statusEffects` 按 id 键访问 | S1.5 已在 `xjzl-system.mjs` 的 init 赋值处用 `Object.fromEntries` 转换；源定义继续保持数组。S2.6 仅迁移条目内 AE 数据字段，不再次改变容器形态（§4-A5） |
+| 状态定义（全量覆盖核心默认状态） | `module/config.mjs` 的 `XJZL.statusEffects`，经 `CONFIG.XJZL` 暴露 | `CONFIG.statusEffects` 原生 Proxy 支持数组迭代与按 id 直查 | 源定义保持数组；init 清空核心默认状态后按 id 写入，保留 Proxy 容器（§4-A5） |
 | V13 入参兼容 | 无 | — | 新增：`addEffect/removeEffect` 入口做格式归一化（D2），覆盖 `changes`/`mode`/旧 `duration`/`icon→img`；不能修复到达入口前的文档访问，见 §2.3 |
 
 ### 2.3 数据格式迁移细节
@@ -184,7 +184,7 @@ V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层：�
 | A2 | `foundry.applications.ux.TextEditor.implementation.enrichHTML(...)` → 直接调用该 TextEditor 类的 `enrichHTML(...)` | 已改 10 处 / 8 文件：compendium-browser、loot-workbench-sheet、equipment-sheet、neigong-sheet、general-item-sheet、art-book-sheet、trait-sheet、wuxue-sheet。[官方 `.implementation` getter 仍有效](https://foundryvtt.com/api/classes/foundry.applications.ux.TextEditor.html#implementation)；这是可选调整，存在编辑器替换模块时不保证行为等价，列入 M5 兼容性回归 |
 | A3 | 数字 `mode` → 字符串 `type` 字面量（如 `2→"add"`、`5→"override"`）；不做两个 CONST 表之间的成员替换 | 首批 active-effect.mjs、personality.mjs、config.mjs 已改；其他代码构造点与数据分别由 S2.6/S4.1 迁移 |
 | A4 | ActiveEffect 数据 `icon:` → `img:` | personality.mjs（唯一一处） |
-| A5 | `CONFIG.statusEffects` 数组 → 按 id 键对象；`.find(e => e.id === x)` → `CONFIG.statusEffects[x]`；`.map(...)` → `Object.values(...)` | 源定义保持数组，在 [xjzl-system.mjs](../xjzl-system.mjs) 的 CONFIG 赋值处用 `Object.fromEntries` 转换；[条目 `id` 仍按官方接口保留](https://foundryvtt.com/api/interfaces/CONFIG._StatusEffectConfig.html#id)，并与对象键保持一致。调用侧涉及 active-effect-manager、chat-manager、effect-selection-dialog、xjzl-system.mjs |
+| A5 | 按 id 查询使用 `CONFIG.statusEffects[id]`；遍历可用数组方法或 `Object.values(...)` | 源定义保持数组；在 [xjzl-system.mjs](../xjzl-system.mjs) 的 init 处清空核心默认状态后按 id 写入原生 Proxy，不整体替换容器。[条目 `id` 仍按官方接口保留](https://foundryvtt.com/api/interfaces/CONFIG._StatusEffectConfig.html#id)，并与索引键一致。调用侧涉及 active-effect-manager、chat-manager、effect-selection-dialog、xjzl-system.mjs |
 | A6 | `game.settings.get("core","rollMode")` → `"messageMode"`；`ChatMessage.applyRollMode` → `ChatMessage.applyMode`；模式串 `publicroll→public`、`gmroll→gm`、`blindroll→blind`、`selfroll→self` | `utils.mjs` 的 `rollDisabilityTable`、`XJZLActor.rollBasicAttack`、`XJZLItem.roll`、`XJZLContainerTransactionManager.#postNeedChat`（固定公开消息） |
 | A7 | `system.json` 兼容版本 13 → 14；发布时更新 download 链接（`verified: 14` 的发布依据须通过 M5 完整回归，M0 机制试验不足以代替） | [system.json](../system.json) |
 | A8 | `ApplicationV2#bringToTop()` → `bringToFront()`（V14 已移除） | character-sheet.mjs 审计日志入口（1 处） |
@@ -226,13 +226,13 @@ V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层：�
 
 ## 7. 实机验证清单（V14 未标破坏，但我们踩在内部 API 上）
 
-**画布原型劫持**：`SquareGrid.prototype.measurePath`（1-2-2-2 计费）；`rulerClass.prototype._getWaypointLabelContext`（标尺）；`Token.prototype._refreshTurnMarker`/`_animateTurnMarker`（[combat-turn-marker.mjs](../module/combat-turn-marker.mjs)）。
+**画布原型劫持**：`SquareGrid.prototype.measurePath`（1-2-2-2 计费）；`rulerClass.prototype._getWaypointLabelContext`（标尺）。回合标记由 V14 `TokenTurnMarker` 负责；系统仅配置 `CONFIG.Combat.fallbackTurnMarker`，标记图和动画可由核心战斗设置及 Token 设置覆盖。
 
 **画布 API**：`canvas.interface.createScrollingText`；`CONST.TEXT_ANCHOR_POINTS`；`actor.getActiveTokens`；`canvas.tokens.hover/controlled`。
 
 **特效行为**：`isSuppressed` override；`_displayScrollingStatus` override；`{scrollingStatusText: false}` 选项；`new XJZLActiveEffect(data, {parent})` 临时实例化（叠层计算用）；`isTemporary`/`duration.remaining` 新语义；`transfer` 字段行为。
 
-**杂项**：`CONFIG.specialStatusEffects.BLIND`（目盲屏蔽）；`CONFIG.time.roundTime`；`getSceneControlButtons` 注入结构（tools 对象/Map）与 `onChange` 按钮；`CONFIG.ui.pause` 替换（GamePause 类）；`hotbarDrop` 钩子（V14 调整了锁检查顺序）；`ClientDocument.fromDropData` 不再写 `_stats.compendiumSource`（影响拖拽查重）；附着 Region 是否随 Token 删除。
+**杂项**：`CONFIG.specialStatusEffects.BLIND`（目盲屏蔽）；`CONFIG.time.roundTime`；`getSceneControlButtons` 的 `controls.tokens.tools` 对象、`onChange` 按钮及玩家权限组合；`CONFIG.ui.pause` 替换（GamePause 类）；`hotbarDrop` 钩子（V14 调整了锁检查顺序）；`ClientDocument.fromDropData` 不再写 `_stats.compendiumSource`（影响拖拽查重）；附着 Region 是否随 Token 删除。
 
 **首批替换回归**：聊天作者与 public/gm/blind/self 可见性（含 `Roll.toMessage`）；审计日志重复打开后置前；富文本增强、链接与编辑器配置实现兼容性（A2）；状态对象的 key/id 一致性与 HUD 操作。
 

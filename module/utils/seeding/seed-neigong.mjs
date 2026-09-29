@@ -1,5 +1,4 @@
 /* module/utils/seeding/seed-neigong.mjs */
-import { normalizeLegacyChanges } from "./effect-data.mjs";
 
 const PACK_NAME = "xjzl-system.neigong";
 
@@ -150,11 +149,11 @@ export async function seedNeigong() {
             // 但如果有特殊效果（如持续性 Buff 模板），依然可以保留
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                img: e.img || e.icon || d.img, // V14 字段为 img；兼容读取旧 JSON 的 icon
+                img: e.img || d.img,
                 transfer: e.transfer ?? false, // 内功特效通常不直接 transfer，而是通过脚本调用
                 showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                system: { changes: normalizeLegacyChanges(e.system?.changes || e.changes) },
+                system: { changes: e.system?.changes ?? [] },
                 flags: e.flags || {},
                 description: e.description || "",
                 // 补上 duration

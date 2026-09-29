@@ -57,7 +57,6 @@ import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包�
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 import { setupSocket } from "./module/socket.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
-import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
 import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
@@ -97,8 +96,8 @@ Hooks.once("init", async function () {
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
 
-  // 替换系统的当前战斗指示物
-  XJZLTurnMarkerManager.registerSettings();
+  // 原生回合标记未指定图片或图片加载失败时使用系统图；世界与 Token 均可配置专用图片。
+  CONFIG.Combat.fallbackTurnMarker = "systems/xjzl-system/assets/picture/pause-bg.png";
 
   registerAEMigrationSetting();
 
@@ -286,10 +285,11 @@ Hooks.once("init", async function () {
     label: "XJZL Active Effect Config"
   });
 
-  // 替换系统核心的状态效果列表
-  // V14 的 CONFIG.statusEffects 是按 id 键对象（数组形态已废弃）；
-  // 源定义保持数组（条目自带 id 便于维护），在此处转换为对象形态
-  CONFIG.statusEffects = Object.fromEntries(CONFIG.XJZL.statusEffects.map(e => [e.id, e]));
+  // 保留核心状态表的数组迭代与 id 直查能力，清空默认条目后写入系统状态。
+  CONFIG.statusEffects.length = 0;
+  for (const status of CONFIG.XJZL.statusEffects) {
+    CONFIG.statusEffects[status.id] = status;
+  }
 
   // 修改世界时间配置
   CONFIG.time.roundTime = 2; // 1 轮 = 2 秒（侠界时长规则）
@@ -918,135 +918,64 @@ async function openDamageTool() {
   );
 }
 
+/** 向 Token 控制组添加系统工具；controls 须包含 tokens.tools，原有同名工具优先。 */
 Hooks.on('getSceneControlButtons', (controls) => {
-
-  // 检查权限
-  const isGM = game.user.isGM;
-  const allowPlayer = game.settings.get("xjzl-system", "allowPlayerDamageTool");
-
-  // 如果既不是GM，也没有开启玩家权限，直接退出
-  if (!isGM && !allowPlayer) return;
-
-  // 只有 GM，或者设置允许玩家使用时，才显示
-  const damageToolBtn = {
-    name: "damage-tool",
-    title: "XJZL.UI.DamageTool.Title",
-    icon: "fas fa-meteor",
-    visible: true,
-    button: true,
-    // V13 必须使用 onChange，废弃 onClick
-    onChange: () => openDamageTool()
-  };
-
-  // --- 步骤 1: 查找 Token 控制层级 ---
-  let tokenLayer = null;
-
-  // V13 模式: controls 是对象，直接通过属性访问
-  if (controls.token) {
-    tokenLayer = controls.token; // 层级键名在不同构建中可能为 token 或 tokens，下一行做兼容
-  }
-  else if (controls.tokens) {
-    tokenLayer = controls.tokens; // 兼容 controls.tokens 的写法
-  }
-  // 兼容 Map 结构 (V13 的某些构建版本)
-  else if (controls instanceof Map && controls.has('token')) {
-    tokenLayer = controls.get('token');
-  }
-
-  // --- 步骤 2: 注入按钮到控制层 ---
-  if (tokenLayer) {
-    const tools = tokenLayer.tools;
-
-    // 情况 A: V13 Map/Object 结构
-    if (tools && !Array.isArray(tools)) {
-      // 如果是 Map 类型
-      if (tools instanceof Map) {
-        if (!tools.has('damage-tool')) {
-          tools.set('damage-tool', damageToolBtn);
-        }
-      }
-      // 如果是普通 Object 类型
-      else {
-        // 防止重复添加 (虽然 Object Key 本身就防重复，但为了逻辑严谨)
-        if (!tools['damage-tool']) {
-          tokenLayer.tools['damage-tool'] = damageToolBtn;
-        }
-      }
-    }
-    // 情况 B: 数组结构 (V12 或 V13 早期)
-    // 数组形态兜底：兼容旧构建的 tools 结构
-    else if (Array.isArray(tools)) {
-      if (!tools.some(t => t.name === 'damage-tool')) {
-        tools.push(damageToolBtn);
-      }
-    }
-  } else {
+  const tools = controls.tokens?.tools;
+  if (!tools) {
     console.warn("XJZL | 无法找到 Token 控制层级，按钮添加失败。");
+    return;
   }
 
-  // 2. 状态选取器逻辑
-  const allowPicker = game.settings.get("xjzl-system", "allowPlayerEffectPicker");
+  // 工具权限分别受各自设置控制；保留先注册的同名工具。
+  const isGM = game.user.isGM;
 
-  if (isGM || allowPicker) {
-    const effectPickerBtn = {
-      name: "effect-picker",
-      title: game.i18n.localize("XJZL.UI.Toolbar.EffectPicker"),
-      icon: "fas fa-hand-sparkles", // 找一个好看的图标
-      visible: true,
-      button: true,
-      onChange: () => {
-        EffectSelectionDialog.open();
-      }
-    };
-
-    // 注入逻辑（与上方按钮相同的层级查找方式）
-    let tokenLayer = null;
-    if (controls.token) tokenLayer = controls.token;
-    else if (controls.tokens) tokenLayer = controls.tokens;
-    else if (controls instanceof Map && controls.has('token')) tokenLayer = controls.get('token');
-
-    if (tokenLayer) {
-      const tools = tokenLayer.tools;
-      if (tools instanceof Map) {
-        if (!tools.has('effect-picker')) tools.set('effect-picker', effectPickerBtn);
-      } else if (Array.isArray(tools)) {
-        if (!tools.some(t => t.name === 'effect-picker')) tools.push(effectPickerBtn);
-      } else if (tools && !tools['effect-picker']) {
-        tokenLayer.tools['effect-picker'] = effectPickerBtn;
-      }
+  if (isGM || game.settings.get("xjzl-system", "allowPlayerDamageTool")) {
+    if (!tools["damage-tool"]) {
+      tools["damage-tool"] = {
+        name: "damage-tool",
+        title: "XJZL.UI.DamageTool.Title",
+        icon: "fas fa-meteor",
+        visible: true,
+        button: true,
+        onChange: () => openDamageTool()
+      };
     }
   }
 
-  // 3·战斗统计面板
+  if (isGM || game.settings.get("xjzl-system", "allowPlayerEffectPicker")) {
+    if (!tools["effect-picker"]) {
+      tools["effect-picker"] = {
+        name: "effect-picker",
+        title: game.i18n.localize("XJZL.UI.Toolbar.EffectPicker"),
+        icon: "fas fa-hand-sparkles",
+        visible: true,
+        button: true,
+        onChange: () => {
+          EffectSelectionDialog.open();
+        }
+      };
+    }
+  }
+
   if (game.settings.get("xjzl-system", "enableCombatStats")) {
-    const meterBtn = {
-      name: "combat-meter",
-      title: game.i18n.localize("XJZL.UI.Toolbar.CombatMeter"),
-      icon: "fas fa-chart-bar", // 柱状图图标
-      visible: true,
-      button: true, // 点击型按钮
-      onChange: () => {
-        // 直接通过单例实例来控制开关
-        const app = CombatMeterUI.instance;
-        if (app) {
-          if (app.rendered) {
-            app.close();
-          } else {
-            app.render({ force: true });
+    if (!tools["combat-meter"]) {
+      tools["combat-meter"] = {
+        name: "combat-meter",
+        title: game.i18n.localize("XJZL.UI.Toolbar.CombatMeter"),
+        icon: "fas fa-chart-bar",
+        visible: true,
+        button: true,
+        onChange: () => {
+          const app = CombatMeterUI.instance;
+          if (app) {
+            if (app.rendered) {
+              app.close();
+            } else {
+              app.render({ force: true });
+            }
           }
         }
-      }
-    };
-
-    if (tokenLayer) {
-      const tools = tokenLayer.tools;
-      if (tools instanceof Map) {
-        if (!tools.has('combat-meter')) tools.set('combat-meter', meterBtn);
-      } else if (Array.isArray(tools)) {
-        if (!tools.some(t => t.name === 'combat-meter')) tools.push(meterBtn);
-      } else if (tools && !tools['combat-meter']) {
-        tokenLayer.tools['combat-meter'] = meterBtn;
-      }
+      };
     }
   }
 });
