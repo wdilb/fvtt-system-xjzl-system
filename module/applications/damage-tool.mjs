@@ -3,6 +3,7 @@
  * 目标读取支持两种模式（工具内可切换）：框选 = 画布当前选中的 Token；瞄准 = Alt+左键 瞄准的 Token。
  * 窗口保持打开时会实时同步目标变化，并按 Actor UUID 去重结算。
  */
+import { resolveTargetPortrait } from "../utils/portrait.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -99,7 +100,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       app._fixedTargets.push({
         actor: actor?.applyDamage && actor?.applyHealing ? actor : null,
         name: targetData.name || document?.name || actor?.name || targetData.uuid,
-        img: document?.texture?.src || actor?.img || "icons/svg/mystery-man.svg"
+        img: resolveTargetPortrait(document, actor)
       });
     }
 
@@ -295,7 +296,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         token,
         actor: token.actor,
         name: token.name || token.actor.name,
-        img: token.document?.texture?.src || token.actor.img
+        img: resolveTargetPortrait(token.document, token.actor)
       });
     }
 

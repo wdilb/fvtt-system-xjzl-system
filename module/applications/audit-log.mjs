@@ -26,14 +26,105 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     };
 
+    // 核心注册表不覆盖首次渲染前的实例，单例判断需跟踪完整窗口生命周期。
+    static #instances = new Set();
+
     constructor(options = {}) {
         super(options);
         this.actor = options.actor;
+        XJZLAuditLog.#instances.add(this);
     }
 
     /**
-     * 准备数据给 HBS
+     * 使用 Actor UUID 区分链接角色与各非关联 Token 的合成角色。
+     * @param {Actor|null} actor 目标 Actor（可为合成 Actor）
+     * @returns {string} 单例匹配键（含点号，不用于 DOM id）
      */
+    static matchKey(actor) {
+        return actor?.uuid ?? actor?.id ?? "unknown";
+    }
+
+    /**
+     * 将 Actor 匹配键转换为 DOM id 可用的片段。
+     * @param {Actor|null} actor 目标 Actor（可为合成 Actor）
+     * @returns {string} 可用作 DOM id 片段的键
+     */
+    static windowKey(actor) {
+        return this.matchKey(actor).replace(/[^a-zA-Z0-9]/g, "-");
+    }
+
+    /**
+     * 初始化窗口标识、标题和位置。随机后缀避免关闭中的旧窗口注销新窗口的核心登记；
+     * 同一 Actor 的窗口去重由类级实例表负责。
+     * @param {object} options ApplicationV2 选项，须包含目标 actor。
+     * @returns {object} 带独立窗口 id 的应用选项。
+     */
+    _initializeApplicationOptions(options) {
+        const appOptions = super._initializeApplicationOptions(options);
+        const actor = options.actor;
+        appOptions.id = `xjzl-audit-log-${XJZLAuditLog.windowKey(actor)}-${foundry.utils.randomID()}`;
+        appOptions.window.title = game.i18n.localize("XJZL.History.WindowTitle", { name: actor?.name ?? "?" });
+        const offset = (XJZLAuditLog.#instances.size % 6) * 28;
+        if (offset > 0) {
+            const { width = 500, height = 600 } = appOptions.position;
+            appOptions.position.left = Math.max(0, Math.round((window.innerWidth - width) / 2)) + offset;
+            appOptions.position.top = Math.max(0, Math.round((window.innerHeight - height) / 2)) + offset;
+        }
+        return appOptions;
+    }
+
+    /**
+     * 聚焦目标 Actor 的窗口；首次渲染中的窗口仍占用单例名额，关闭中的窗口允许重开。
+     * @param {Actor|null} actor 目标 Actor（可为合成 Actor）
+     * @returns {boolean} true=已有窗口在用，调用方无需新建；false=可新建
+     */
+    static focusActorWindow(actor) {
+        const states = this.RENDER_STATES;
+        const key = this.matchKey(actor);
+        for (const app of XJZLAuditLog.#instances) {
+            if (this.matchKey(app.actor) !== key) continue;
+            if (app.state === states.RENDERED) {
+                app.bringToFront();
+                return true;
+            }
+            if (app.state === states.RENDERING || app.state === states.NONE) return true;
+            XJZLAuditLog.#instances.delete(app);
+        }
+        return false;
+    }
+
+    /** @inheritdoc */
+    _onClose(options) {
+        XJZLAuditLog.#instances.delete(this);
+        return super._onClose(options);
+    }
+
+    /**
+     * 渲染失败时关闭可能已显示但未完成事件绑定的窗口，并释放单例登记。
+     * @param {boolean|object} [options] ApplicationV2 渲染选项。
+     * @param {object} [_options] 布尔形式调用时的兼容选项。
+     * @returns {Promise<this>} 成功渲染的窗口；失败时抛出原始异常。
+     */
+    async render(options, _options) {
+        try {
+            return await super.render(options, _options);
+        } catch (err) {
+            console.error("XJZL | 审计日志窗口渲染失败:", err);
+            try {
+                await this.close({ animate: false });
+            } catch (closeError) {
+                console.error("XJZL | 审计日志窗口关闭失败:", closeError);
+            } finally {
+                XJZLAuditLog.#instances.delete(this);
+                if (foundry.applications.instances.get(this.id) === this) {
+                    foundry.applications.instances.delete(this.id);
+                }
+            }
+            throw err;
+        }
+    }
+
+    /** 准备历史记录的展示字段，供审计窗口模板使用。 */
     async _prepareContext(options) {
         const history = this.actor.system.history || [];
 
@@ -60,13 +151,12 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * 绑定事件 (V13 原生机制)
+     * 为搜索、日期过滤和删除按钮绑定窗口事件。
      */
     _onRender(context, options) {
         super._onRender(context, options);
         const html = this.element;
 
-        // 1. 原有的搜索逻辑
         const searchInput = html.querySelector(".audit-filter-input");
         const dateInput = html.querySelector(".audit-date-input");
         const entries = html.querySelectorAll(".audit-entry");
@@ -90,7 +180,6 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
             dateInput.addEventListener("change", filterList);
         }
 
-        // 2. 绑定删除按钮
         const deleteBtns = html.querySelectorAll(".audit-delete-btn");
         deleteBtns.forEach(btn => {
             btn.addEventListener("click", (event) => this._onClickDelete(event));
@@ -123,8 +212,7 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
         let targetPoolKey = null;
         let poolName = "";
 
-        // 根据你 `manualModifyXP` 里的逻辑，修为变动会记录 balance: "poolKey: newBalance"
-        // 我们通过切割 balance 字符串提取池子类型
+        // 修为记录的 balance 前缀标识所属修为池，避免误扣其他资源。
         if (targetEntry.balance) {
             const possibleKey = targetEntry.balance.split(":")[0].trim();
             if (xiuweiPools[possibleKey]) {
@@ -177,7 +265,7 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
                     return;
                 }
 
-                // 计算新的修为值：原本加上去的，现在减掉；原本减掉的，现在加回来。
+                // 撤销修为变动时反向应用原记录的 delta。
                 const newBalance = currentPoolBalance - deltaValue;
 
                 await this._executeDeleteAndRevert(index, targetPoolKey, newBalance);
@@ -222,8 +310,8 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
 
         await this.actor.update({ "system.history": newHistory });
 
-        // 确保 App 重绘
-        this.render();
+        // 写入已成功；刷新失败只提示重新打开窗口。
+        this.render().catch(() => this.#notifyRefreshFailed());
     }
 
     /**
@@ -239,7 +327,12 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
             [`system.cultivation.${poolKey}`]: newBalance
         });
 
-        // 确保 App 重绘
-        this.render();
+        // 写入已成功；刷新失败只提示重新打开窗口。
+        this.render().catch(() => this.#notifyRefreshFailed());
+    }
+
+    /** 删除成功但列表刷新失败时的用户提示（渲染异常详情已由 render 兜底记入控制台）。 */
+    #notifyRefreshFailed() {
+        ui.notifications.error(game.i18n.localize("XJZL.History.RefreshFailed"));
     }
 }

@@ -102,8 +102,13 @@ Hooks.on("xjzl.containerNeedResult", payload => {
         winner: winner?.name || ""
     });
     ui.notifications[outcome === "failed" ? "error" : "info"](message);
-    for (const application of Object.values(ui.windows || {})) {
-        if (application.document?.uuid === payload.containerUuid) application.render({ force: true });
+    // 从 AppV2 实例注册表刷新本节点已打开的窗口。
+    for (const application of foundry.applications.instances.values()) {
+        if (application.document?.uuid !== payload.containerUuid) continue;
+        application.render({ force: true }).catch(error => {
+            console.error("XJZL | 需求结果窗口刷新失败:", error);
+            ui.notifications.error(game.i18n.localize("XJZL.Container.NeedResultRefreshFailed"));
+        });
     }
 });
 

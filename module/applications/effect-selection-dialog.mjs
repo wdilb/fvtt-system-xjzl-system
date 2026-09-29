@@ -1,6 +1,7 @@
 // module/applications/effect-selection-dialog.mjs
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { promptEffectDuration } from "../sheets/behaviors/effect-interactions.mjs";
+import { resolveTargetPortrait } from "../utils/portrait.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -212,13 +213,17 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
-     * 准备渲染数据 - 扫描全场景
+     * 准备状态选取器模板数据，目标头像与操作目标来自同一快照。
+     * @param {object} options ApplicationV2 渲染选项。
+     * @returns {Promise<object>} 状态、目标及头像的模板数据。
      */
     async _prepareContext(options) {
-        const targetActors = this._getTargetActors();
+        const targets = this._collectTargets();
+        const targetActors = targets.map(target => target.actor);
         const targetMode = targetActors.length === 0 ? "none" : (targetActors.length === 1 ? "single" : "multiple");
         const targetActor = targetMode === "single" ? targetActors[0] : null;
-        const targetAvatarInfo = targetMode === "multiple" ? this._buildTargetAvatars(targetActors) : null;
+        const targetPortrait = targetMode === "single" ? targets[0]?.img : null;
+        const targetAvatarInfo = targetMode === "multiple" ? this._buildTargetAvatars(targets) : null;
         const currentEffects = targetActor ? this._prepareCurrentEffects(targetActor) : [];
         const activeEffectSlugs = new Set(currentEffects.map(e => e.slug).filter(Boolean));
         const recentIds = await this._getRecentStatusIds();
@@ -340,6 +345,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         return {
             targetMode,
             targetActor,
+            targetPortrait,
             targetActors,
             currentEffects,
             hasTarget: targetActors.length > 0,
@@ -358,12 +364,12 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
-     * 构建多目标模式下头部展示的头像列表；入参已由 _getTargetActors 按 Actor UUID 去重。
-     * @param {Actor[]} actors 当前目标 Actor 列表（去重后）。
+     * 构建多目标模式下头部展示的头像列表；入参已由 _collectTargets 按 Actor UUID 去重。
+     * @param {Array<{actor: Actor, img: string}>} targets 当前目标列表（去重后，img 为目标头像）。
      * @returns {{avatars: Array<{img: string, name: string}>, total: number}}
      */
-    _buildTargetAvatars(actors) {
-        const avatars = actors.map(actor => ({ img: actor.img, name: actor.name, uuid: actor.uuid }));
+    _buildTargetAvatars(targets) {
+        const avatars = targets.map(({ actor, img }) => ({ img, name: actor.name, uuid: actor.uuid }));
         return { avatars, total: avatars.length };
     }
 
@@ -455,12 +461,13 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
-     * 辅助：获取当前选中的目标
-     * 若从角色卡打开（this.actor 已指定）则固定为该角色；否则按当前目标模式读取框选或瞄准的 Token。
-     * 统一按 Actor UUID 去重，让头部头像、目标计数与各项操作共用同一列表（同一 Actor 的多个 Token 只算一次）。
+     * 汇总角色卡或画布目标及可用于图片元素的头像，画布目标按 Actor UUID 去重。
+     * @param {{notify?: boolean}} [options] 无目标时是否显示提示。
+     * @returns {Array<{actor: Actor, img: string}>} 目标 Actor 与对应头像。
      */
-    _getTargetActors({ notify = false } = {}) {
-        if (this.actor) return [this.actor].filter(Boolean);
+    _collectTargets({ notify = false } = {}) {
+        // 合成 Actor 的 token 保留所属 Token 贴图；链接 Actor 回退角色卡立绘。
+        if (this.actor) return [{ actor: this.actor, img: resolveTargetPortrait(this.actor.token, this.actor) }];
 
         const tokens = this._targetMode === "targeted"
             ? Array.from(game.user.targets || [])
@@ -471,13 +478,22 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             const actor = token.actor;
             if (!actor?.uuid || seen.has(actor.uuid)) continue;
             seen.add(actor.uuid);
-            targets.push(actor);
+            targets.push({ actor, img: resolveTargetPortrait(token.document, actor) });
         }
         if (targets.length === 0) {
             if (notify) ui.notifications.warn(game.i18n.localize("XJZL.UI.EffectPicker.NoTargetSelected"));
             return [];
         }
         return targets;
+    }
+
+    /**
+     * 获取当前目标 Actor，供操作入口复用。
+     * @param {{notify?: boolean}} [options] 无目标时是否显示提示。
+     * @returns {Actor[]} 按 UUID 去重的目标 Actor。
+     */
+    _getTargetActors({ notify = false } = {}) {
+        return this._collectTargets({ notify }).map(target => target.actor);
     }
 
     /**

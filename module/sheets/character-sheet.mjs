@@ -2856,18 +2856,16 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-      * 查看审计日志 - [调用独立 App 类]
+      * 打开或聚焦当前角色的审计日志窗口。
       */
     _onViewHistory(event, target) {
-        // 防止重复打开
-        const existingApp = Object.values(ui.windows).find(w => w instanceof XJZLAuditLog && w.actor.id === this.document.id);
-        if (existingApp) {
-            existingApp.bringToFront();
-            return;
-        }
+        // 首次渲染中的窗口也需要参与单例判断。
+        if (XJZLAuditLog.focusActorWindow(this.document)) return;
 
-        // 实例化并渲染
-        new XJZLAuditLog({ actor: this.document }).render(true);
+        // 窗口清理和异常详情由 render 处理，此处提示用户打开失败。
+        new XJZLAuditLog({ actor: this.document }).render(true).catch(() => {
+            ui.notifications.error(game.i18n.localize("XJZL.History.OpenFailed"));
+        });
     }
     /**
      * 修炼工作区即时搜索（内功、武学/招式、技艺书、特性）
