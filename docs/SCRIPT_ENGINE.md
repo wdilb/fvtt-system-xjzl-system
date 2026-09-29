@@ -1,8 +1,8 @@
 # 脚本引擎手册
 
-本手册面向物品、招式、特性和 Active Effect（AE）脚本作者，描述当前系统公开的脚本契约。本手册只描述运行时脚本契约；源数据录入还需遵循项目内部的录入规范。下文明确列出的上下文字段、可写字段和公共方法才是可依赖接口，未列出的内部变量不要作为 API 使用。
+本手册面向物品、招式、特性和 Active Effect（AE）脚本作者，说明脚本触发器、上下文和公共 API。仅依赖本文列出的上下文字段、可写字段和公共方法；源数据录入规则由项目内部规范维护。
 
-## 事实源与兼容边界
+## 实现依据与安全边界
 
 文档与代码不一致时，以以下实现为准：
 
@@ -42,7 +42,7 @@
 
 `trigger` 必须来自 `module/data/common.mjs#SCRIPT_TRIGGERS`。Item、招式和内功脚本受 Schema 选项约束；AE 脚本虽然存放在普通 flags 中，标准编辑界面也只提供这些选项。未知触发器不会在攻击、受伤或回合等标准时机执行，不应使用。
 
-## 参数：参数分为两层
+## 脚本参数
 
 每段脚本能看到两类参数：
 
@@ -65,7 +65,7 @@
 | `system` / `S` | `Actor.system` | 每个脚本开始执行时绑定为当前 `actor.system`；`S` 是便捷别名。脚本通过 `await` 更新 Actor 后，如需读取最新状态应使用 `actor.system`。 |
 | `args` | `Object` | 本次触发的阶段上下文。只有后文对应触发器列出的字段才是稳定公开契约。 |
 | `trigger` | `string` | 当前触发器名称。 |
-| `thisItem` | `Item` / `ActiveEffect` / `null` | 当前脚本来源。Item 脚本指向该 Item；AE 脚本为兼容也指向该 AE。 |
+| `thisItem` | `Item` / `ActiveEffect` / `null` | 当前脚本来源。Item 脚本指向该 Item；AE 脚本指向该 AE。 |
 | `thisEffect` | `ActiveEffect` / `null` | 当前脚本来自 AE 时指向该 AE，否则为 `null`。 |
 | `Macros` | `XJZLMacros` | 系统公开宏工具，例如 `requestSave()`、`requestContest()` 和 `checkStance()`。 |
 | `game` / `ui` / `console` | Foundry 全局对象 | 游戏对象、通知对象和控制台。 |
@@ -96,8 +96,8 @@
 
 | 类型 | 触发器 | 约束 |
 |---|---|---|
-| <span style="white-space: nowrap;">同步</span> | <span style="white-space: nowrap;"><code>passive</code>、<code>calc</code></span> | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
-| <span style="white-space: nowrap;">异步</span> | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
+| 同步 | `passive`、`calc` | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
+| 异步 | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
 
 同步脚本异常会写入控制台；异步脚本异常还会向操作者显示错误通知。单个脚本失败不会回滚此前脚本或数据库操作。
 
@@ -613,7 +613,7 @@ await actor.changeResources({
 
 `changeResources(updates, context)` 的 `updates` 默认是 Foundry 更新路径到绝对值的对象；如果需要原子增减，可显式传入 `{ delta: n }`，例如 `{"system.resources.rage.value": { delta: 1 }}`。普通数字的绝对值语义保持不变。`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。返回底层 Actor 更新结果。它会串行提交同一 Actor 的事务，并按实际差值派发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
 
-这 6 类资源字段——`system.resources.hp.value`、`system.resources.mp.value`、`system.resources.rage.value`、`system.resources.huti`（旧世界兼容 `system.resources.huti.value`）、`system.resources.tili.value`、`system.resources.morale.value`——在脚本中必须通过 `changeResources`（或语义匹配的 `applyDamage` / `applyHealing`）写入，不要直接 `actor.update()` / `args.target.update()` 修改这些路径。直接 `update` 只有兼容兜底，新脚本统一使用资源事务入口，以保留非 owner 的 GM socket 委托和按实际差值触发的 `resourceChanged` 语义。
+这 6 类资源字段——`system.resources.hp.value`、`system.resources.mp.value`、`system.resources.rage.value`、`system.resources.huti`、`system.resources.tili.value`、`system.resources.morale.value`——在脚本中必须通过 `changeResources`（或语义匹配的 `applyDamage` / `applyHealing`）写入。不要直接 `actor.update()` / `args.target.update()` 修改这些路径，以保留非 owner 的 GM 委托和按实际差值触发的 `resourceChanged` 语义。
 
 ### 资源事务错误
 
@@ -654,7 +654,7 @@ await game.xjzl.api.effects.addEffect(args.target, {
 });
 ```
 
-系统预置数据与脚本统一使用上述结构。`addEffect` 兼容外部宏和玩家脚本传入的 `icon`、顶层 `changes`、数字 `mode` 及旧式 `duration`；读取已有 AE 时须使用 `effect.system.changes`、`effect.duration.value`、`effect.duration.units` 和 `effect.duration.expiry`。入参兼容不适用于文档字段读取。
+系统预置数据与脚本使用上述结构。读取已有 AE 时使用 `effect.system.changes`、`effect.duration.value`、`effect.duration.units` 和 `effect.duration.expiry`。
 
 从来源 Item 复制 AE 时先转为普通对象并清除 `_id`：
 

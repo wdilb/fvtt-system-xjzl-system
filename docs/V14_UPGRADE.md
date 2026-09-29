@@ -2,7 +2,7 @@
 
 本文档是 `feat/v14-upgrade` 分支的总纲，负责记录升级范围、决策、API 依据、代码定位和验收标准；[`V14_PLAN.md`](V14_PLAN.md) 负责总里程碑与跨阶段依赖，AE 工作项及其进度、验收由 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 负责。新会话先读执行计划，再按工作项查阅对应专项计划、本文和实际代码。本文中的设计描述不代表待办状态。
 
-AE 工作直接按 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 实施和验收；本文只保留总体范围、接口与跨阶段决策，不再作为 AE 的第二套施工说明。标注「待验证」或「倾向」的内容不能当作已经确认的事实。
+标注「待验证」或「倾向」的历史设计内容不能当作已经确认的事实。
 
 信息来源以[官方发布说明](https://foundryvtt.com/releases/14.368)、[V14 API](https://foundryvtt.com/api/) 和[弃用移除清单 #13436](https://github.com/foundryvtt/foundryvtt/issues/13436) 为准；DCC 迁移参考与社区记录仅提供实测线索。截至 2026-09-22，发布说明核查至 14.368，API 页面标注 14.365，后续验收须记录实际构建号。
 
@@ -21,17 +21,17 @@ AE 工作直接按 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 实施和验收；本文�
 
 **已确认 Q3（保留原问题编号）**：ActiveEffect system 数据模型通过 `CONFIG.ActiveEffect.dataModels` 注册，基础模型为 `foundry.data.ActiveEffectTypeDataModel`，详见 §2.4。S0.1/S0.7 已验证核心模型足够，派生字段的旧有重算时序保持不变；S2.1 决定沿用核心模型，无需自定义注册。
 
-**已确认 Q4（保留原问题编号）**：升级为完整光环系统（§3.3 方案 B）——自定义 Region 行为类型 + 光环管理器，2026-09-26 与数据作者讨论定稿。94 处 `x-xjzl-aura` 标记的盘点、分类、能力缺口与实现框架见 [`V14_AURA_PLAN.md`](V14_AURA_PLAN.md)（第 6 节为决策记录），工作项（AURA-01～12）与验收以其第 7 节为唯一依据；核心 `applyActiveEffect` 行为（方案 A）因绕过自研门面被否决。本轮零新增脚本引擎触发器，复杂规则以监听 AE 复用既有触发器。
+**已确认 Q4（保留原问题编号）**：升级为完整光环系统（§3.3 方案 B）——自定义 Region 行为类型 + 光环管理器，2026-09-26 与数据作者讨论定稿。`x-xjzl-aura` 标记初始盘点 94 处，现为 93 处；分类、能力缺口与实现框架见 [`V14_AURA_PLAN.md`](V14_AURA_PLAN.md)（第 6 节为决策记录），工作项（AURA-01～12）与验收以其第 7 节为唯一依据；核心 `applyActiveEffect` 行为（方案 A）因绕过自研门面被否决。本轮零新增脚本引擎触发器，复杂规则以监听 AE 复用既有触发器。
 
-### 待定问题（在相关实现前定稿，不阻塞无关工作）
+### 已定稿决策
 
-| # | 问题 | 倾向 | 落点 |
+| # | 问题 | 结论 | 落点 |
 |---|------|------|------|
-| Q1 | 世界数据迁移框架：`flags.xjzl-system.baseChanges`（V13 格式叠层快照）等系统私有数据如何迁移 | 用独立 world setting 记录已完成的迁移版本；迁移可重复执行，仅全部成功后推进版本，失败时保留可重试状态（见 §6） | S2.7 定稿并实现框架；S4.7 实施与验收世界迁移 |
-| Q2 | data/ 源 JSON 的格式转换方式 | 直接把 data/ 全量改为 V14 格式，再 `game.xjzl.seed.all()` 重建合集包（保持事实源唯一）；不采用 seeding 时转换 | S2.6/S4.1 涉及转换方式的改动前定稿，两处遵循同一决策；S4.4 重建合集 |
-| Q5 | 过期清理分工：自研 `cleanExpiredEffects` 与 V14 expiry 事件/registry 如何共存 | 到期时正常清理、不重复执行即可；核心与系统回合脚本的先后不作产品约束。战斗外按每回合 2 秒计时。AE-05 优先采用 registry 的 `expiryAction: "delete"` 并撤下重复扫描；若全局影响实际冲突，再用 `"update"` 加单一系统清理。`tiedToStance` 仍由架招生命周期清理 | S2.4 按 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) 实施和联调 |
+| Q1 | 世界数据迁移框架：`flags.xjzl-system.baseChanges`（V13 格式叠层快照）等系统私有数据如何迁移 | 独立 world setting 记录分阶段迁移版本；版本达标即跳过，仅全部成功后推进版本，失败留待下次重试。 | S2.7、S4.7；实测记录见 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) AE-12、AE-14 |
+| Q2 | data/ 源 JSON 的格式转换方式 | `data/` 源 JSON 转为 V14 格式，再由 seeder 重建合集包；不在 seeding 时转换。 | S4.1、S4.4；实测记录见 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) AE-10、AE-11 |
+| Q5 | 过期清理分工：自研 `cleanExpiredEffects` 与 V14 expiry 事件/registry 如何共存 | 使用核心 registry，设置 `expiryAction: "delete"` 并撤下回合钩子的重复扫描；保留 `cleanExpiredEffects` 公开方法。`tiedToStance` 仍由架招生命周期清理。 | S2.4；实测记录见 [`V14_AE_PLAN.md`](V14_AE_PLAN.md) AE-05 |
 
-定稿后把结论移至上方已确认区，保留原编号和对应工作项；倾向不等于已经决定。§2.6 的可选能力与 Q4 的扩展方案只有明确纳入范围后才安排实施。
+Q1、Q2、Q5 均已实施并验收，进度见 [`V14_PLAN.md`](V14_PLAN.md)。§2.6 的可选能力与 Q4 的扩展方案只有明确纳入范围后才安排实施。
 
 ### 环境注意
 
@@ -134,13 +134,13 @@ S2.2 同步清理 [active-effect.mjs](../module/documents/active-effect.mjs) 的
 - `RegionLayer#placeRegion(s)`：交互式放置，支持 `attachToToken`、`preCommit` 等。
 - 其他：隐藏区域（仅 GM）、传送/生成 Token 行为、表面遮挡行为等。
 
-### 3.2 现有 MeasuredTemplate 功能归宿
+### 3.2 MeasuredTemplate 功能迁移记录
 
-V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层：类、`CONFIG.MeasuredTemplate`、`scene.templates` 仍可用，未来版本移除），逐项归宿：
+V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层）。下表记录迁移前实现和设计归宿，实施结果见 [`V14_AURA_PLAN.md`](V14_AURA_PLAN.md) AURA-12；宏包残留见 [`V14_PLAN.md`](V14_PLAN.md) S5.8。
 
-| 现功能 | 现实现 | V14 归宿 |
+| 原功能 | 原实现 | 设计归宿 |
 |---|---|---|
-| AOE 圆圈创建（静态/跟随两种模式） | [aoe-creator.mjs](../module/applications/aoe-creator.mjs) `createEmbeddedDocuments("MeasuredTemplate")` | 创建圆形 Region；跟随模式用 `attachment.token` |
+| AOE 圆圈创建（静态/跟随两种模式） | `module/applications/aoe-creator.mjs` 中的 `createEmbeddedDocuments("MeasuredTemplate")` | 创建圆形 Region；跟随模式用 `attachment.token` |
 | 跟随同步（粘性模板随 Token 移动） | [xjzl-system.mjs](../xjzl-system.mjs) `updateToken` 钩子手写同步 | `attachment.token` 原生替代，**删除手写同步** |
 | Token 删除时自动清理 | `deleteToken` 钩子 | 验证核心是否自动清理附着区域；若不自动清理，再补充 Region 删除逻辑 |
 | 自定义标签显示 | 模板 flag `label` + `measured-template.mjs` 自绘文字 | Region 名称/显示测量选项 |
@@ -148,7 +148,7 @@ V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层：�
 | `tokens` 接口（AoE 自动化预留，暂无调用方） | `XJZLMeasuredTemplate.tokens` | Region 事件/查询 API 重新设计 |
 | 工具栏 AOE 按钮 | 注入 `controls.templates` 层 | templates 层已删除；按钮迁至 token 层或 region 层 |
 | 跟随光环宏 | [data/macros/utility.json](../data/macros/utility.json) | 改写为 Region 版，或并入光环系统（§3.3） |
-| `CONFIG.MeasuredTemplate.objectClass` 注册 + [measured-template.mjs](../module/measured-template.mjs) | 整文件 | 删除 |
+| `CONFIG.MeasuredTemplate.objectClass` 注册 + `module/measured-template.mjs` | 整文件 | 删除 |
 
 > 摘除动作（静态 import、CONFIG 注册、`scene.templates` 相关钩子与 AOE 创建调用）已在 M1 完成：14.368 兼容层下旧代码仍可运行，摘除并非启动所必需，而是**不基于弃用 API 继续开发**（兼容层将在未来版本移除，届时再摘即为启动阻断）；本节的 Region 重建设计属于 M3。
 

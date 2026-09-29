@@ -11,7 +11,6 @@
 [![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q)
 [![联系作者](https://img.shields.io/badge/联系作者-273437679-12B7F5)](https://wpa.qq.com/msgrd?v=3&uin=273437679&site=qq&menu=yes)
 
-
 ## 视频教程
 
 如果希望通过实际操作了解系统的安装与使用，可以观看[系统使用说明/教程（哔哩哔哩）](https://www.bilibili.com/video/BV1KF8d61EiV/)。
@@ -24,13 +23,14 @@
 
 | 项目 | 说明 |
 |---|---|
-| Foundry VTT | 最低版本 13，已验证版本 13 |
+| Foundry VTT | 最低版本 14，已验证版本 14 |
 | 系统 ID | `xjzl-system` |
 | 界面语言 | 简体中文 |
 | 必需模组 | [socketlib](https://github.com/manuelVo/foundryvtt-socketlib) |
-| 当前版本 | 见 [`system.json`](system.json) 或 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) |
+| 源码版本 | 见 [`system.json`](system.json) |
+| 已发布版本 | 见 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) |
 
-系统仅面向 Foundry VTT V14（V13 升级迁移进行中，发布前须通过完整回归）。玩家使用权限代理、物资交易及部分自动结算功能时，需要至少一名 GM 在线。
+系统仅面向 Foundry VTT V14。玩家使用权限代理、物资交易及部分自动结算功能时，需要至少一名 GM 在线。
 
 ## 主要功能
 
@@ -45,7 +45,7 @@
 
 ## 界面预览
 
-以下截图来自当前版本，按常见使用流程分组展示系统界面。
+以下截图按常见使用流程展示系统界面。
 
 ### 角色创建与成长
 
@@ -89,9 +89,11 @@
 
 ## 安装
 
+本 README 描述当前分支源码；在线安装内容以对应发布清单的兼容声明为准。
+
 ### 使用 Manifest URL 安装
 
-这是推荐的安装方式，Foundry 可以据此检查后续更新。
+Manifest URL 指向 `master` 分支，Foundry 可以据此检查更新。安装前请核对该分支 `system.json` 中的兼容版本；测试未发布改动时使用下方的源码安装方式。
 
 1. 打开 Foundry VTT 的 **Setup** 页面，进入 **Game Systems**。
 2. 点击 **Install System**。
@@ -107,7 +109,7 @@
 <summary>手动安装发布包</summary>
 
 1. 打开项目的 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) 页面。
-2. 下载最新发布版本中的 `xjzl-system.zip`。
+2. 下载目标发布版本中的 `xjzl-system.zip`。
 3. 解压后确认系统目录名为 `xjzl-system`。
 4. 将目录放入 Foundry 用户数据目录下的 `Data/systems/`。
 5. 重启 Foundry VTT。
@@ -115,11 +117,11 @@
 </details>
 
 <details>
-<summary>安装 master 分支源码</summary>
+<summary>安装仓库源码</summary>
 
 源码安装仅适合测试尚未发布的改动。
 
-1. 下载仓库的 `master` 分支源码。
+1. 下载所需版本对应的仓库分支源码。
 2. 将解压后的目录重命名为 `xjzl-system`。
 3. 将目录放入 Foundry 用户数据目录下的 `Data/systems/`。
 4. 重启 Foundry VTT。
@@ -147,19 +149,19 @@ if (!args.isHit || !args.target) return;
 await game.xjzl.api.effects.addEffect(args.target, "dianxue");
 ```
 
-如果你是 GM、内容作者，或希望为物品制作自动化效果，请阅读[脚本引擎手册](docs/SCRIPT_ENGINE.md)。手册包含触发器、上下文变量、执行顺序和公共 API 的完整说明。
+GM 与内容作者可参阅[脚本引擎手册](docs/SCRIPT_ENGINE.md)，了解触发器、上下文变量、执行顺序和公共 API。
 
 ## 数据质量说明
 
-因规则书资源过多，完全依靠我个人手动录入将耗费大量时间，故合集包数据由 AI 辅助转换和录入。虽然数据会持续修正，但仍可能存在数值错误、字段遗漏、格式异常或描述偏差。跑团时请以规则原文为准；发现问题后可通过 [GitHub Issues](https://github.com/wdilb/fvtt-system-xjzl-system/issues) 或通过 [![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q) 反馈。
+合集包数据由 AI 辅助转换和录入，可能存在数值错误、字段遗漏、格式异常或描述偏差。跑团时请以规则原文为准；发现问题可通过下方渠道反馈。
 
 提交问题时，建议附上 Foundry 版本、系统版本、复现步骤，以及浏览器控制台中的 `XJZL |` 日志。
 
 ## 联系与反馈
 
 - GitHub Issues：[问题与功能建议](https://github.com/wdilb/fvtt-system-xjzl-system/issues)
-*   [![侠界交流群](https://img.shields.io/badge/侠界交流群-967477288-blue)](https://qm.qq.com/q/mJfeP61BwQ)
-*   [![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q)
+- [侠界交流群](https://qm.qq.com/q/mJfeP61BwQ)
+- [系统反馈](https://qm.qq.com/q/GOBpPre68q)
 
 ## 致谢
 
