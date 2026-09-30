@@ -2783,7 +2783,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>单臂托天，单掌震地，开启架招，同时在周围 2 米内扬起大片‘尘埃’，持续到脱战。</p><p><strong>尘埃：</strong>区域内所有人（包括友方和自己）陷入目盲；当你在尘埃范围内格挡成功时，尘埃替换为灰白的‘乱雾’区域，持续一回合后消散。</p><p><strong>乱雾：</strong>你处于区域中时，无法被选为目标。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "部分自动化：开启架招时自动扬起跟随自身的 2 米“尘埃”（持续到脱战），区域内所有人（含友方和己）自动陷入“目盲”。在尘埃中格挡成功时，尘埃自动替换为“乱雾”（原地 1 回合后消散）；“乱雾中无法被选为目标”需 GM 手动把关目标选取。",
+                    "automationNote": "部分自动化：开启架招时自动扬起跟随自身的 2 米“尘埃”（持续到脱战），区域内所有人（含友方和己）自动陷入“目盲”。在尘埃中格挡成功时，尘埃自动替换为“乱雾”（原地、1 回合后自动消散，不跟随）并发卡片提醒；“你处于乱雾中时无法被选为目标”需 GM 手动把关目标选取。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -2808,7 +2808,7 @@
                             "label": "格挡化乱雾",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "// 尘埃范围内格挡成功：尘埃替换为乱雾（原地 2 米、1 回合）；\n// \"乱雾中无法被选为目标\"超出框架（目标选取规则），由 GM 手动把关。\nif (!Macros.checkStance(actor, args)) return;\nconst lwDoc = actor.getActiveTokens?.()[0]?.document;\nif (!lwDoc) return;\nconst lwUnder = [...(lwDoc.regions ?? [])].some(r => (r.getFlag(\"xjzl-system\", \"aura\")?.label ?? \"\") === \"wuxue-chenai-\" + actor.id);\nif (!lwUnder) return;\nawait game.xjzl.aura.dismiss(\"wuxue-chenai-\" + actor.id);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-luanwu-\" + actor.id,\n    displayName: \"乱雾\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nui.notifications.info(\"尘埃已替换为乱雾（1 回合）：乱雾中无法被选为目标，请 GM 手动把关目标选取。\");\n"
+                            "script": "// 尘埃范围内格挡成功：尘埃替换为乱雾（原地 2 米、1 回合，不跟随，2026-09-30 用户定稿）；\n// \"乱雾中无法被选为目标\"超出框架（目标选取规则），由 GM 手动把关。\nif (!Macros.checkStance(actor, args)) return;\nconst lwDoc = actor.getActiveTokens?.()[0]?.document;\nif (!lwDoc) return;\nconst lwUnder = [...(lwDoc.regions ?? [])].some(r => (r.getFlag(\"xjzl-system\", \"aura\")?.label ?? \"\") === \"wuxue-chenai-\" + actor.id);\nif (!lwUnder) return;\nawait game.xjzl.aura.dismiss(\"wuxue-chenai-\" + actor.id);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-luanwu-\" + actor.id,\n    displayName: \"乱雾\",\n    follow: false,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: \"<div class='xjzl-chat-card'><b>幻雾蔽日·乱雾</b>：尘埃已替换为乱雾（1 回合）。你在乱雾中时无法被选为目标，请手动把关目标选取。</div>\"\n});\n"
                         }
                     ]
                 },

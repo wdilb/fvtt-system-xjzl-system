@@ -906,7 +906,7 @@
                             }
                         ]
                     },
-                    "automationNote": "部分自动化：获得【垂天】（格挡值加成）自动；自动生成跟随自身的 3 米光环，踏入的敌人招式伤害自动降低 10+5×升级（离开后恢复）。将左右目标击退 3 米需手动移动。脱战或卸下时光环消散。",
+                    "automationNote": "部分自动化：获得【垂天】（格挡值加成）自动；自动生成跟随自身的 3 米光环，踏入的敌人招式伤害自动降低 10+5×升级（离开后恢复）。将左右目标击退 3 米需手动移动。脱战时光环消散。",
                     "x-xjzl-aura": true,
                     "scripts": [
                         {
@@ -919,13 +919,7 @@
                             "label": "获垂天",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst blockBonus = 10 + (lvl - 1) * 5;\nconst effectData = {\n    name: \"垂天\",\n    img: \"icons/svg/castle.svg\",\n    origin: thisItem.uuid,\n    flags: { \"xjzl-system\": { slug: \"chuitian\", stackable: false } },\n    description: \"格挡+\" + blockBonus + \"；踏入你 3 米内的敌人招式伤害降低（由光环自动结算）\",\n    system: { changes: [\n        { key: \"system.combat.block\", type: \"add\", value: blockBonus }\n    ] }\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n"
-                        },
-                        {
-                            "label": "垂天光环",
-                            "trigger": "preAttack",
-                            "active": true,
-                            "script": "// 垂天光环：跟随施展者 3 米，踏入的敌方招式伤害降低（10+5×升级，payload 按施展者等级动态计算）。\n// 持续到脱战；击退超出框架保持手动。\nconst ctLvl2 = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-chuitian-\" + actor.id,\n    displayName: \"垂天\",\n    follow: true,\n    radius: 3,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"垂天-压制\",\n    enterEnabled: true,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst blockBonus = 10 + (lvl - 1) * 5;\nconst effectData = {\n    name: \"垂天\",\n    img: \"icons/svg/castle.svg\",\n    origin: thisItem.uuid,\n    flags: { \"xjzl-system\": { slug: \"chuitian\", stackable: false } },\n    description: \"格挡+\" + blockBonus + \"；踏入你 3 米内的敌人招式伤害降低（由光环自动结算）\",\n    system: { changes: [\n        { key: \"system.combat.block\", type: \"add\", value: blockBonus }\n    ] }\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n\n// 垂天压制光环：与自体【垂天】同在全部目标结算后建立（原挂在 preAttack，\n// 会在出招被中止/余额不足时残留，且早于规则'然后自身获得垂天'的时点）。\nconst ctAuraLvl = Math.max(1, args.move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-chuitian-\" + actor.id,\n    displayName: \"垂天\",\n    follow: true,\n    radius: 3,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"垂天-压制\",\n    enterEnabled: true,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }

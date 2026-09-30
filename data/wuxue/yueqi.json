@@ -394,40 +394,6 @@
                     ],
                     "x-xjzl-aura": true
                 }
-            ],
-            "effects": [
-                {
-                    "name": "惜别",
-                    "description": "远离施法者时移动消耗增加。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xibie",
-                            "stackable": false
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
-                },
-                {
-                    "name": "相思",
-                    "description": "周围敌人回合开始需过定力检定。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xiangsi",
-                            "stackable": false
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
-                }
             ]
         },
         "effects": [
@@ -457,6 +423,38 @@
                 "statuses": [],
                 "tint": null,
                 "origin": null
+            },
+            {
+                "name": "惜别",
+                "description": "远离施法者时移动消耗增加。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xibie",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            },
+            {
+                "name": "相思",
+                "description": "周围敌人回合开始需过定力检定。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xiangsi",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1353,7 +1351,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>曲终收拨当心画，对所有处于‘荻花秋瑟’内的敌人造成 0.7 内息点内功伤害。并使他们陷入“脱力”，持续三回合。</p><p><strong>脱力：</strong>你的虚招对抗-3，且具有劣势。</p><p>·你可以移除‘荻花秋瑟’，让此招必定命中。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "施加脱力自动。移除光环必中需手动确认。",
+                    "automationNote": "施加脱力自动。施展时弹窗询问是否移除自身【荻花秋瑟】光环：确认后光环消散（范围内敌人的荻花秋瑟随之解除）且本招必定命中，取消则保留光环正常施展；攻击目标由玩家自行选择。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1386,7 +1384,7 @@
                         {
                             "label": "消耗光环必中",
                             "trigger": "attack",
-                            "script": "const aura = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dihua_qiuse\");\nif (aura) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"无声胜有声\" },\n        content: \"<p>是否移除 [荻花秋瑟] 以获得 <b>必中</b> 效果？</p>\",\n        yes: { label: \"移除并必中\", icon: \"fas fa-check\" },\n        no: { label: \"保留光环\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"dihua_qiuse\", 999);\n        args.flags.forceHit = true;\n        ui.notifications.info(\"光环已移除，本招式必中！\");\n    }\n}",
+                            "script": "// 荻花秋瑟光环由[千呼万唤]格挡生成；本招伤害与脱力不依赖光环，目标是否身处光环内由玩家自行选目标。\n// 光环互动仅一项：出招时可选移除自身光环换必中。\nconst dhRegion = game.xjzl.aura.query(\"wuxue-dihua-\" + actor.id)[0];\nif (dhRegion) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"无声胜有声\" },\n        content: \"<p>是否移除 [荻花秋瑟] 以获得 <b>必中</b> 效果？</p>\",\n        yes: { label: \"移除并必中\", icon: \"fas fa-check\" },\n        no: { label: \"保留光环\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        const dhRemoved = await game.xjzl.aura.dismiss(\"wuxue-dihua-\" + actor.id);\n        if (dhRemoved > 0) {\n            args.flags.forceHit = true;\n            ui.notifications.info(\"荻花秋瑟已移除，本招式必中！\");\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2307,7 +2305,7 @@
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "zhiyin",
+                            "slug": "zhiyin_yueqi",
                             "stackable": false
                         }
                     },

@@ -162,31 +162,6 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "金乌",
-                    "description": "受到伤害时反弹火焰伤害。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "jinwu",
-                            "stackable": true,
-                            "maxStacks": 3,
-                            "tiedToStance": true,
-                            "scripts": [
-                                {
-                                    "label": "金乌反伤",
-                                    "trigger": "damaged",
-                                    "active": true,
-                                    "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nconst stacks = thisEffect.stacks || 1;\nconst dmg = stacks * 5;\n\nif (args.attacker.isReceivingReflection) return;\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({\n        amount: dmg,\n        type: \"fire\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n\n    const content = `<div class=\"xjzl-chat-card item-card\" style=\"margin-left: 6px;\">\n        <header class=\"card-header\" style=\"border-left: 4px solid #e74c3c;\">\n            <img src=\"${thisEffect.img}\" style=\"border:none;\" />\n            <h3 style=\"color: #e74c3c;\">${thisEffect.name}</h3>\n        </header>\n        <div class=\"card-content-wrapper\">\n            <div style=\"font-weight:bold; color:#c0392b; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 金乌反噬触发！</div>\n            <div style=\"font-size:0.9em;\">反噬目标: <b>${args.attacker.name}</b></div>\n            <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;\">\n                已反弹 <span style=\"color:red; font-weight:bold;\">${dmg}</span> 点火焰伤害。\n            </div>\n        </div>\n    </div>`;\n\n    ChatMessage.create({\n        author: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n} finally {\n    args.attacker.isReceivingReflection = false;\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "showIcon": 2
-                }
             ]
         },
         "effects": [
@@ -212,6 +187,29 @@
                 "system": {
                     "changes": []
                 },
+                "showIcon": 2
+            },
+            {
+                "name": "金乌",
+                "description": "受到伤害时反弹火焰伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jinwu",
+                        "stackable": true,
+                        "maxStacks": 3,
+                        "tiedToStance": true,
+                        "scripts": [
+                            {
+                                "label": "金乌反伤",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nconst stacks = thisEffect.stacks || 1;\nconst dmg = stacks * 5;\n\nif (args.attacker.isReceivingReflection) return;\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({\n        amount: dmg,\n        type: \"fire\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n\n    const content = `<div class=\"xjzl-chat-card item-card\" style=\"margin-left: 6px;\">\n        <header class=\"card-header\" style=\"border-left: 4px solid #e74c3c;\">\n            <img src=\"${thisEffect.img}\" style=\"border:none;\" />\n            <h3 style=\"color: #e74c3c;\">${thisEffect.name}</h3>\n        </header>\n        <div class=\"card-content-wrapper\">\n            <div style=\"font-weight:bold; color:#c0392b; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 金乌反噬触发！</div>\n            <div style=\"font-size:0.9em;\">反噬目标: <b>${args.attacker.name}</b></div>\n            <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;\">\n                已反弹 <span style=\"color:red; font-weight:bold;\">${dmg}</span> 点火焰伤害。\n            </div>\n        </div>\n    </div>`;\n\n    ChatMessage.create({\n        author: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n} finally {\n    args.attacker.isReceivingReflection = false;\n}"
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "showIcon": 2
             }
         ]
@@ -1036,7 +1034,7 @@
                             "label": "地宫光环",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 地宫：以自身为中心跟随 5 米（持续 3+升级 回合），区域内友方速度+1（payload 自动）；\n// 敌方视作困难地形超出框架，由 GM 手动裁定。\nconst dgLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-digong-\" + actor.id,\n    displayName: \"地宫\",\n    follow: true,\n    radius: 5,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"地宫-友方\",\n    enterEnabled: true,\n    durationRounds: 3 + (dgLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: \"<div class='xjzl-chat-card'><b>地宫</b> 已生成（3+\" + (dgLvl - 1) + \" 回合）：友方速度+1 已自动赋予；敌方处于困难地形请 GM 手动裁定。</div>\"\n});\n"
+                            "script": "// 地宫：以自身为中心跟随 5 米（持续 3+升级 回合），区域内友方速度+1（payload 自动）；\n// 敌方视作困难地形超出框架，由 GM 手动裁定。\nconst dgLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-digong-\" + actor.id,\n    displayName: \"地宫\",\n    follow: true,\n    radius: 5,\n    faction: \"ally\",\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"地宫-友方\",\n    enterEnabled: true,\n    durationRounds: 3 + (dgLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: \"<div class='xjzl-chat-card'><b>地宫</b> 已生成（3+\" + (dgLvl - 1) + \" 回合）：友方速度+1 已自动赋予；敌方处于困难地形请 GM 手动裁定。</div>\"\n});\n"
                         }
                     ]
                 },
@@ -1122,7 +1120,7 @@
                         {
                             "label": "开启阵法提示",
                             "trigger": "attack",
-                            "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2ecc71; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-yin-yang\"></i> 戴九履一 开启</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">如果你处于天宫或地宫，请手动挂载武学中的【戴九履一-天宫】或【戴九履一-地宫】AE以获取自动减伤/流失反伤效果。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
+                            "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2ecc71; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-yin-yang\"></i> 戴九履一 开启</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">如果你处于天宫或地宫，请手动挂载武学中的【戴九履一-天宫】或【戴九履一-地宫】AE以获取自动减伤/流失反伤效果。</div></div></div>`;\nawait ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
@@ -1209,7 +1207,7 @@
                         {
                             "label": "方位说明图",
                             "trigger": "attack",
-                            "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #d35400; background: rgba(211,84,0,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#a04000;\"><i class=\"fas fa-th\"></i> 九宫方位判图</div><div style=\"font-family:monospace; font-size:1.1em; color:#555; margin-top:3px; text-align:center;\">4 9 2<br>3 5 7<br>8 1 6</div><div style=\"font-size:0.85em; color:#666; margin-top:5px;\">请根据图示手动结算：1/9 获剑光，2/4 击飞，6/8 禁足，3/7 错骨。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
+                            "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #d35400; background: rgba(211,84,0,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#a04000;\"><i class=\"fas fa-th\"></i> 九宫方位判图</div><div style=\"font-family:monospace; font-size:1.1em; color:#555; margin-top:3px; text-align:center;\">4 9 2<br>3 5 7<br>8 1 6</div><div style=\"font-size:0.85em; color:#666; margin-top:5px;\">请根据图示手动结算：1/9 获剑光，2/4 击飞，6/8 禁足，3/7 错骨。</div></div></div>`;\nawait ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
