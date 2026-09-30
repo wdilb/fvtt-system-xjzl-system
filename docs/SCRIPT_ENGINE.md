@@ -12,6 +12,7 @@
 - 攻击卡、治疗卡和命中后流程：`module/managers/chat-manager.mjs`
 - 宏工具：`module/utils/macros.mjs`
 - 状态与枚举：`module/config.mjs`
+- 光环 API、Region 结算和快建入口：`module/region/xjzl-aura-manager.mjs`、`module/region/xjzl-aura-behavior.mjs`、`module/region/xjzl-aura-ledger.mjs`、`module/region/xjzl-aura-quick.mjs`
 
 `scripts` 中的代码是受系统注入变量约束的 JavaScript 字符串，不是安全隔离的权限沙盒。只运行可信数据中的脚本。
 
@@ -717,7 +718,29 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 | `await game.xjzl.aura.refreshAura(label, overrides, {scene})` | 用已有实例的参数和覆盖项重建光环，返回新 Region；标签不存在或源失效时返回 `null`。 |
 | `await game.xjzl.aura.queryTokens(source, opts)` | 按范围即时查询，返回命中的 `Actor[]`，不创建 Region。一个关联 Actor 有多个命中 Token 时可重复出现。 |
 
-`source` 可传 `TokenDocument`、画布 `Token`、在当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随 Token，`follow: false` 可固定在创建位置；坐标源始终固定。创建坐标源光环时，若需按阵营过滤，可在 `params` 中传 `sourceActorUuid`，该角色须在当前画布上有活动 Token。范围以网格格数计，圆形使用非负整数 `radius`（默认 `0`）；矩形设置 `shapeKind: "rect"`、`rectWidth`、`rectHeight`，可用 `anchorX`、`anchorY` 指定锚格。`quarterTurns` 为 90° 转数，传 `"auto"` 时按源 Token 朝向吸附。`displayName`、`color` 控制 Region 展示，`levelIds` 可指定楼层。`queryTokens` 还接受形状生成器输出的相对 `offsets`（`i` 为列、`j` 为行），此时无需创建光环。
+`source` 可传 `TokenDocument`、画布 `Token`、在当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随 Token，`follow: false` 可固定在创建位置；坐标源始终固定。创建坐标源光环时，若需按阵营过滤，可在 `params` 中传 `sourceActorUuid`，该角色须在当前画布上有活动 Token。
+
+范围以网格格数计，圆形使用非负整数 `radius`（默认 `0`），覆盖格始终按单段 1-2-2-2 计算，不随场景对角线规则或 `customDistanceRule` 开关变化。矩形设置 `shapeKind: "rect"`、`rectWidth`、`rectHeight`，可用 `anchorX`、`anchorY` 指定锚格。`quarterTurns` 为 90° 转数，传 `"auto"` 时按源 Token 朝向吸附。`displayName`、`color` 控制 Region 展示，`levelIds` 可指定楼层。
+
+`queryTokens` 还接受形状生成器输出的相对 `offsets`（`i` 为列、`j` 为行），此时无需创建光环；它仅按平面覆盖格查询，不按 `levelIds` 过滤。
+
+例如，在进行中的战斗内使用异步脚本创建跟随光环，使范围内的敌人获得系统状态，战斗结束时清理：
+
+```javascript
+const auraCombat = game.combat;
+if (!auraCombat?.round) return ui.notifications.warn("需要进行中的战斗。");
+const region = await game.xjzl.aura.create(actor, {
+  label: `blind-aura-${actor.id}`,
+  displayName: "目盲光环",
+  radius: 2,
+  faction: "enemy",
+  includeSelf: false,
+  payloadStatusId: "blind",
+  lifecycle: "combat",
+  combatId: auraCombat.id
+});
+if (!region) ui.notifications.warn("光环未创建，请检查场景和光环参数。");
+```
 
 `params.label` 必填。`faction` 可为 `"all"`、`"ally"` 或 `"enemy"`，`includeSelf` 控制是否包含源；按阵营过滤需要可解析的源 Token。`queryTokens` 使用坐标源时应采用 `"all"`，且无法识别自身；使用 Token/Actor 源时，`includeSelf: false` 按源 Actor 排除。持久光环的 `includeSelf: false` 同样按源 Actor 排除——同一 Actor 的多个关联 Token 都视为自身。
 
