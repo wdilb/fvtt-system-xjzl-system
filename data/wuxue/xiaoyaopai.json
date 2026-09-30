@@ -98,7 +98,7 @@
                         {
                             "label": "击破禁足",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    // 基础1回合，升级+1\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = lvl;\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'root'));\n    effectData.duration = { rounds: rounds };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}",
+                            "script": "if (args.isBroken) {\n    // 基础1回合，升级+1\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = lvl;\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}",
                             "active": true
                         }
                     ],
@@ -218,7 +218,7 @@
                         {
                             "label": "应用状态",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effects = [\n        foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\")),\n        foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"))\n    ];\n    \n    for (let e of effects) {\n        e.duration = { rounds: 2 };\n        e.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, e);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const effects = [\n        foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen')),\n        foundry.utils.deepClone(game.xjzl.api.effects.getStatus('cuogu'))\n    ];\n    \n    for (let e of effects) {\n        e.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        e.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, e);\n    }\n}",
                             "active": true
                         }
                     ],
@@ -281,7 +281,7 @@
                         {
                             "label": "反击错骨",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'cuogu'));\n    effectData.duration = { rounds: 1 };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n}",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('cuogu'));\n    effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n}",
                             "active": true
                         }
                     ],
@@ -439,7 +439,7 @@
                         {
                             "label": "击破状态",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effects = [\n        foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\")),\n        foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"))\n    ];\n    \n    for (let e of effects) {\n        if (e.id === \"root\") e.duration = { rounds: 2 };\n        e.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, e);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const effects = [\n        foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone')),\n        foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'))\n    ];\n    \n    for (let e of effects) {\n        if (e.id === \"root\") e.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        e.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, e);\n    }\n}",
                             "active": true
                         }
                     ],
@@ -489,29 +489,30 @@
                     ],
                     "weaponType": "unarmed"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "逍遥身法",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
-                    "description": "施展名字带有《逍遥》的武学套路招式时，招式暴击骰-1。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xiaoyao-shenfa",
-                            "scripts": [
-                                {
-                                    "label": "逍遥暴击修正",
-                                    "trigger": "attack",
-                                    "script": "const lvl = thisEffect.getFlag('xjzl-system', 'level') || 1;\nif (args.item && args.item.name.includes('逍遥')) {\n    args.flags.critThresholdMod += lvl;\n    ui.notifications.info(`逍遥身法生效：暴击阈值优化 ${lvl}`);\n}",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "逍遥身法",
+                "description": "施展名字带有《逍遥》的武学套路招式时，招式暴击骰-1。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xiaoyao-shenfa",
+                        "scripts": [
+                            {
+                                "label": "逍遥暴击修正",
+                                "trigger": "attack",
+                                "script": "const lvl = thisEffect.getFlag('xjzl-system', 'level') || 1;\nif (args.item && args.item.name.includes('逍遥')) {\n    args.flags.critThresholdMod += lvl;\n    ui.notifications.info(`逍遥身法生效：暴击阈值优化 ${lvl}`);\n}",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "逍遥剑法",
@@ -589,7 +590,7 @@
                         {
                             "label": "命中获养血",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    effectData.flags[\"xjzl-system\"].maxStacks = 3;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('yangxue'));\n    effectData.flags[\"xjzl-system\"].maxStacks = 3;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
                             "active": true
                         }
                     ]
@@ -627,7 +628,7 @@
                         {
                             "label": "击破缚身",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    effectData.duration = { rounds: 2 };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}",
+                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen'));\n    effectData.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}",
                             "active": true
                         }
                     ]
@@ -671,7 +672,7 @@
                         {
                             "label": "消耗剑势与缚身",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 应用缚身\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    effectData.duration = { rounds: 2 };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    \n    // 消耗剑势 (仅执行一次)\n    const effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'jianshi');\n    if (effect) {\n        const stacks = effect.getFlag('xjzl-system', 'stacks') || 1;\n        await game.xjzl.api.effects.removeEffect(actor, 'jianshi', stacks);\n        ui.notifications.info(\"剑势已消耗。\");\n    }\n}",
+                            "script": "if (args.isHit) {\n    // 应用缚身\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen'));\n    effectData.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    \n    // 消耗剑势 (仅执行一次)\n    const effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'jianshi');\n    if (effect) {\n        const stacks = effect.getFlag('xjzl-system', 'stacks') || 1;\n        await game.xjzl.api.effects.removeEffect(actor, 'jianshi', stacks);\n        ui.notifications.info(\"剑势已消耗。\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -720,31 +721,32 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "剑势",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
-                    "description": "每层使剑法命中+10。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "jianshi",
-                            "stackable": true,
-                            "maxStacks": 3,
-                            "scripts": [
-                                {
-                                    "label": "剑法命中修正",
-                                    "trigger": "check",
-                                    "script": "if (args.move.weaponType === 'sword') { args.flags.grantHit += (thisEffect.stacks * 10); }",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "剑势",
+                "description": "每层使剑法命中+10。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jianshi",
+                        "stackable": true,
+                        "maxStacks": 3,
+                        "scripts": [
+                            {
+                                "label": "剑法命中修正",
+                                "trigger": "check",
+                                "script": "if (args.move.weaponType === 'sword') { args.flags.grantHit += (thisEffect.stacks * 10); }",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "逍遥掌法",
@@ -790,7 +792,7 @@
                         {
                             "label": "击破连击",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
+                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('lianji'));\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
                             "active": true
                         }
                     ]
@@ -828,13 +830,13 @@
                         {
                             "label": "获乘风",
                             "trigger": "hit_once",
-                            "script": "if (args.hitCount > 0) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\n    effectData.flags['xjzl-system'].maxStacks = 3;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
+                            "script": "if (args.hitCount > 0) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('chengfeng'));\n    effectData.flags['xjzl-system'].maxStacks = 3;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
                             "active": true
                         },
                         {
                             "label": "禁足效果",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    effectData.duration = { rounds: 1 };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}",
                             "active": true
                         }
                     ]
@@ -904,25 +906,54 @@
                             }
                         ]
                     },
-                    "automationNote": "获【垂天】BUFF自动化。光环减伤与击退手动。",
+                    "automationNote": "部分自动化：获得【垂天】（格挡值加成）自动；自动生成跟随自身的 3 米光环，踏入的敌人招式伤害自动降低 10+5×升级（离开后恢复）。将左右目标击退 3 米需手动移动。脱战时光环消散。",
                     "x-xjzl-aura": true,
                     "scripts": [
-                        {
-                            "label": "获垂天",
-                            "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst blockBonus = 10 + (lvl - 1) * 5;\nconst debuffVal = 10 + (lvl - 1) * 5;\n\nconst effectData = {\n    name: \"垂天\",\n    icon: \"icons/svg/castle.svg\",\n    origin: thisItem.uuid,\n    flags: { \"xjzl-system\": { slug: \"chuitian\", stackable: false } },\n    description: `格挡+${blockBonus}，3米内敌人伤害-${debuffVal} (光环需手动)`,\n    changes: [\n        { key: \"system.combat.block\", mode: 2, value: blockBonus }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
-                            "active": true
-                        },
                         {
                             "label": "击退提示",
                             "trigger": "hit",
                             "script": "if (args.isHit) ui.notifications.info(`${args.target.name} 被击退 3 米。`);",
                             "active": true
+                        },
+                        {
+                            "label": "获垂天",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst blockBonus = 10 + (lvl - 1) * 5;\nconst effectData = {\n    name: \"垂天\",\n    img: \"icons/svg/castle.svg\",\n    origin: thisItem.uuid,\n    flags: { \"xjzl-system\": { slug: \"chuitian\", stackable: false } },\n    description: \"格挡+\" + blockBonus + \"；踏入你 3 米内的敌人招式伤害降低（由光环自动结算）\",\n    system: { changes: [\n        { key: \"system.combat.block\", type: \"add\", value: blockBonus }\n    ] }\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n\n// 垂天压制光环：与自体【垂天】同在全部目标结算后建立（原挂在 preAttack，\n// 会在出招被中止/余额不足时残留，且早于规则'然后自身获得垂天'的时点）。\nconst ctAuraLvl = Math.max(1, args.move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-chuitian-\" + actor.id,\n    displayName: \"垂天\",\n    follow: true,\n    radius: 3,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"垂天-压制\",\n    enterEnabled: true,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "垂天-压制",
+                "description": "垂天：招式伤害降低（按施展者势若垂天等级 10+5×升级 计算）。",
+                "transfer": false,
+                "showIcon": 2,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "chuitian_suppress",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "垂天·压制",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "// 垂天：招式伤害降低，数值按施展者的势若垂天等级动态计算（10+5×升级）。\nconst ctSrc = foundry.utils.fromUuidSync(thisEffect.origin);\nconst ctOwner = ctSrc?.parent?.parent;\nif (!ctOwner) return;\nconst ctMove = ctOwner.items?.find(i => i.name === \"逍遥掌法\")?.system?.moves?.find(m => m.name === \"势若垂天\");\nconst ctLvl = Math.max(1, ctMove?.computedLevel || 1);\nS.combat.damages.skill.mod -= 10 + 5 * (ctLvl - 1);"
+                            }
+                        ]
+                    }
+                },
+                "system": {
+                    "changes": []
+                },
+                "duration": {},
+                "statuses": [],
+                "tint": null,
+                "origin": null
+            }
+        ]
     },
     {
         "name": "摘星碧火手",
@@ -954,9 +985,16 @@
                             12
                         ]
                     },
-                    "automationNote": "‘碧火’生成需手动放置Token/Tile。",
+                    "automationNote": "部分自动化：施展时选择落点，自动点燃一团“碧火”（持续到脱战，可多团并存）。扑灭流程由玩家手动进行：站在碧火上消耗全回合动作作[角力]或[巧手]检定（难度 11+4×升级），成功后手动移除碧火区域（或由 GM 移除）。",
                     "x-xjzl-aura": true,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "碧火点燃",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const bhParams = {\n    displayName: \"碧火\",\n    color: \"#20d47b\",\n    radius: 0,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n};\n// 碧火：落点由玩家在画布选择，点燃一团碧火（持续到脱战，可多团并存）。\n// 站在碧火上的人需花费全回合动作进行[角力]或[巧手]检定，成功后手动移除该碧火区域。\nconst bhLvl = Math.max(1, move.computedLevel || 1);\nconst bhDC = 11 + 4 * (bhLvl - 1);\nconst bhRegion = await game.xjzl.auraQuick.place({...bhParams, label: \"wuxue-bihuo-\" + actor.id + \"-\" + foundry.utils.randomID(6)});\nif (!bhRegion) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消碧火落点选择，本次出招中止。\";\n    return;\n}\nui.notifications.info(\"碧火已点燃（扑灭检定难度 \" + bhDC + \"）：站在碧火上花全回合动作作[角力]或[巧手]检定，成功后请手动移除该碧火区域。\");\n"
+                        }
+                    ]
                 },
                 {
                     "name": "碧日炎炎",
@@ -1016,14 +1054,14 @@
                             }
                         ]
                     },
-                    "automationNote": "击破后请手动放置‘碧火’。",
+                    "automationNote": "完全自动化：击破目标架招时，在其所处格自动点燃一团“碧火”（持续到脱战）。扑灭碧火按【碧火照天】的手动检定流程处理。",
                     "x-xjzl-aura": true,
                     "scripts": [
                         {
-                            "label": "击破提示",
+                            "label": "击破点燃碧火",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"【绿蛇火舞】击破架招，请在目标脚下放置‘碧火’。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const bhParams = {\n    displayName: \"碧火\",\n    color: \"#20d47b\",\n    radius: 0,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n};\n// 击破架招：在目标所处格自动点燃一团碧火（持续到脱战）。\nif (!args.isBroken || !args.target) return;\nconst bhDoc2 = args.target.token?.document ?? args.target.getTokenDocuments?.()[0];\nconst bhTargetDoc = bhDoc2 ?? (args.target.getActiveTokens?.()[0]?.document);\nif (!bhTargetDoc) return;\nawait game.xjzl.aura.create({scene: bhTargetDoc.parent, x: bhTargetDoc.x, y: bhTargetDoc.y}, {\n    ...bhParams,\n    label: \"wuxue-bihuo-\" + actor.id + \"-\" + foundry.utils.randomID(6)\n});\nui.notifications.info(\"击破架招：已在目标所处格点燃一团碧火。\");\n"
                         }
                     ]
                 },
@@ -1061,9 +1099,22 @@
                             }
                         ]
                     },
-                    "automationNote": "手动处理爆炸增伤与碧火移除。",
+                    "automationNote": "部分自动化：施展必须先移除一团 10 米内的碧火（自动列出供选择并移除，无碧火则无法施展），由玩家正常选择目标。命中后自动在目标所处格点燃一团新碧火（持续到脱战）；也可选择让火球直接爆炸——对命中目标额外自动结算 50 点火焰伤害，且不再点燃新碧火。",
                     "x-xjzl-aura": true,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "碧火消耗与火球",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "// 碧焰追魂：施展前先选择并移除一团 10 米内的碧火；取消、无火、资源不足或竞态消耗失败均在扣费前中止。\n// 移除的碧火化作火球，后续选择直接爆炸或命中后点燃新碧火。\nconst bhCost = args.costConfig ?? {};\nconst bhRes = actor.system.resources ?? {};\nif ((bhRes.mp?.value ?? 0) < (bhCost.mp ?? 0)\n    || ((bhCost.rage ?? 0) > 0 && (bhRes.rage?.value ?? 0) < bhCost.rage)\n    || ((bhCost.hp ?? 0) > 0 && (bhRes.hp?.value ?? 0) <= bhCost.hp)) {\n    args.abort = true;\n    args.abortReason = \"当前资源不足，无法施展碧焰追魂。\";\n    return;\n}\nconst bhSelf = actor.getActiveTokens?.()[0];\nif (!bhSelf) {\n    args.abort = true;\n    args.abortReason = \"找不到施展者 Token，无法施展碧焰追魂。\";\n    return;\n}\nconst bhPrefix = \"wuxue-bihuo-\" + actor.id;\nconst bhChoices = [];\nfor (const bhLabel of game.xjzl.aura.queryLabels().filter(l => l.startsWith(bhPrefix))) {\n    const bhR = game.xjzl.aura.query(bhLabel)[0];\n    const bhO = bhR?.shapes?.[0]?.origin;\n    if (!bhO) continue;\n    const bhDist = canvas.grid.measurePath([bhSelf.center, bhO]).distance;\n    if (bhDist <= 10.5) bhChoices.push({label: bhLabel, dist: Math.round(bhDist)});\n}\nif (!bhChoices.length) {\n    args.abort = true;\n    args.abortReason = \"周围 10 米内没有可移除的碧火，无法施展碧焰追魂。\";\n    return;\n}\nconst bhPick = await foundry.applications.api.DialogV2.wait({\n    window: {title: \"碧焰追魂·选择碧火\"},\n    content: \"<p>选择一团 10 米内的碧火移除，化作火球射向目标：</p>\",\n    buttons: bhChoices.map(c => ({action: c.label, label: \"消耗碧火（\" + c.dist + \" 米处）\"}))\n});\nif (!bhPick) {\n    args.abort = true;\n    args.abortReason = \"已取消碧焰追魂，本次出招中止。\";\n    return;\n}\nconst bhRemoved = await game.xjzl.aura.dismiss(bhPick);\nif (!bhRemoved) {\n    args.abort = true;\n    args.abortReason = \"所选碧火已消失，碧焰追魂中止（本次消耗未生效）。\";\n    return;\n}\nconst bhBoom = await foundry.applications.api.DialogV2.confirm({\n    window: {title: \"碧焰追魂·结算方式\"},\n    content: \"<p>是否让火球直接爆炸？爆炸对命中目标额外结算 50 点火焰伤害，且不再点燃新碧火。</p>\",\n    yes: {label: \"直接爆炸\"},\n    no: {label: \"射出（命中后点燃新碧火）\"}\n});\nargs.scriptFlags.bihuoBoom = bhBoom;"
+                        },
+                        {
+                            "label": "落点点燃碧火",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const bhParams = {\n    displayName: \"碧火\",\n    color: \"#20d47b\",\n    radius: 0,\n    follow: false,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n};\n\n// 火球结算（均以命中为前提）：\n// 普通分支——在命中目标所处格点燃一团新碧火；\n// 直接爆炸分支——对命中目标独立结算 50 点火焰伤害（不点燃新碧火）。\nconst byT = args.targets?.[0];\nconst byActor = byT?.target ?? null;\nif (!byActor || !byT.isHit) return;\nif (args.scriptFlags?.bihuoBoom) {\n    await byActor.applyDamage({\n        amount: 50,\n        type: \"fire\",\n        attacker: args.attacker ?? actor,\n        item: thisItem instanceof Item ? thisItem : null,\n        source: \"extra\"\n    });\n    ui.notifications.info(\"碧焰追魂：火球直接爆炸，追加 50 点火焰伤害。\");\n    return;\n}\nconst byTok = byActor.getActiveTokens?.()[0] ?? byActor.token;\nconst byDoc = byTok?.document ?? byTok;\nif (!byDoc) return;\nawait game.xjzl.aura.create({scene: byDoc.parent, x: byDoc.x, y: byDoc.y}, {\n    ...bhParams,\n    label: \"wuxue-bihuo-\" + actor.id + \"-\" + foundry.utils.randomID(6)\n});\n"
+                        }
+                    ]
                 }
             ]
         }
@@ -1152,7 +1203,7 @@
                             6
                         ]
                     },
-                    "automationNote": "区域效果无法自动判定。请手动给区域内单位添加BUFF。",
+                    "automationNote": "部分自动化：无。三角形范围由施展者位置与两枚白子位置构成，超出框架的形状能力，区域效果请手动处理：给三角形范围内的友方添加格挡值加成（10+5×升级，可临时建 AE 或由 GM 记录），“黑子”单位不生效。",
                     "x-xjzl-aura": true,
                     "scripts": []
                 },
@@ -1175,7 +1226,7 @@
                             6
                         ]
                     },
-                    "automationNote": "区域效果无法自动判定。请手动处理。",
+                    "automationNote": "部分自动化：无。白子相连构成的“眼活”区域超出框架的形状能力，区域效果请手动处理：范围内友方命中具有优势且暴击骰-（1+升级），“黑子”目标命中具有劣势，由 GM 手动结算。",
                     "x-xjzl-aura": true,
                     "scripts": []
                 },
@@ -1223,22 +1274,23 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "黑子",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
-                    "description": "被标记为黑子。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "heizi",
-                            "scripts": []
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "黑子",
+                "description": "被标记为黑子。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "heizi",
+                        "scripts": []
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "平沙落雁",
@@ -1505,7 +1557,7 @@
                         {
                             "label": "击破点穴",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"dianxue\"));\n    effectData.duration = { rounds: 1 };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被点穴！`);\n}",
+                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('dianxue'));\n    effectData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被点穴！`);\n}",
                             "active": true
                         }
                     ],
@@ -1563,7 +1615,7 @@
                         {
                             "label": "获御风",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst speed = 6 + (lvl - 1) * 3;\n\nconst effectData = thisItem.effects.getName('御风').toObject();\ndelete effectData._id;\neffectData.description = `速度固定为 ${speed}，可滞空。`;\neffectData.changes = [\n    { key: \"system.combat.speed\", mode: 5, value: speed } \n];\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst speed = 6 + (lvl - 1) * 3;\n\nconst effectData = thisItem.effects.getName('御风').toObject();\ndelete effectData._id;\neffectData.description = `速度固定为 ${speed}，可滞空。`;\neffectData.system.changes = [\n    { key: \"system.combat.speed\", type: \"override\", value: speed } \n];\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
                             "active": true
                         }
                     ],
@@ -1601,7 +1653,7 @@
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -1616,22 +1668,23 @@
                     ],
                     "weaponType": "unarmed"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "御风",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
-                    "description": "速度固定，可滞空。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yufeng",
-                            "scripts": []
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "御风",
+                "description": "速度固定，可滞空。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yufeng",
+                        "scripts": []
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "白玉掌（人级散手）",
@@ -1691,11 +1744,12 @@
         "effects": [
             {
                 "name": "白玉",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
                 "description": "你对距离为 1 的目标施展的徒手武学招式必定命中，且暴击骰减少。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -1705,11 +1759,13 @@
                                 "label": "白玉效果",
                                 "trigger": "check",
                                 "active": true,
-                                "script": "if (args.move.weaponType !== 'unarmed') return;\n\nconst attackerToken = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nconst targetToken = args.target.token?.object || args.target.getActiveTokens()[0];\nif (!attackerToken || !targetToken) return;\n\nconst dist = canvas.grid.measureDistance(attackerToken, targetToken, {gridSpaces: true});\n\nif (dist <= 1.5) {\n    args.flags.alwaysHit = true; // 正确使用必定命中标记\n    const mod = thisEffect.getFlag(\"xjzl-system\", \"critMod\") || 1;\n    args.flags.critThresholdMod += mod;\n}"
+                                "script": "if (args.move.weaponType !== 'unarmed') return;\n\nconst attackerToken = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nconst targetToken = args.target.token?.object || args.target.getActiveTokens()[0];\nif (!attackerToken || !targetToken) return;\n\nconst dist = canvas.grid.measurePath([attackerToken.center, targetToken.center]).cost;\n\nif (dist <= 1.5) {\n    args.flags.alwaysHit = true; // 正确使用必定命中标记\n    const mod = thisEffect.getFlag(\"xjzl-system\", \"critMod\") || 1;\n    args.flags.critThresholdMod += mod;\n}"
                             }
                         ]
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "showIcon": 2
             }
         ]
     },
@@ -1771,14 +1827,16 @@
         "effects": [
             {
                 "name": "生死令",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
                 "description": "每日发作，奇痒剧痛，造成递增精神伤害。休整只回复一半的气血和内力。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "shengsisiling",
                         "stackable": false
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },
@@ -1881,14 +1939,16 @@
         "effects": [
             {
                 "name": "天鉴",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
                 "description": "消耗反应动作移除此状态，进行悟性检定（人5/地15/天25）以学习对方施展的招式。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "tianjian",
                         "stackable": false
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },
@@ -1951,10 +2011,11 @@
         "effects": [
             {
                 "name": "仙舞",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
                 "description": "移动速度+5；命中目标后，目标需进行[定力]检定，失败则陷入“禁实”。",
                 "duration": {
-                    "rounds": 2
+                    "value": 2,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -1969,13 +2030,18 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "transfer": false,
+                "showIcon": 2
             }
         ]
     },

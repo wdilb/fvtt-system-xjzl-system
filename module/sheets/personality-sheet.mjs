@@ -62,7 +62,6 @@ export class XJZLPersonalitySheet extends HandlebarsApplicationMixin(ItemSheetV2
         const attr = target.dataset.edit || "img";
         const current = foundry.utils.getProperty(this.document, attr);
 
-        // V13 标准写法：不再直接 new FilePicker
         const fp = new foundry.applications.apps.FilePicker({
             type: "image",
             current: current,

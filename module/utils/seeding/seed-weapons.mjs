@@ -103,12 +103,13 @@ export async function seedWeapons() {
             // 兵器的 AE 通常用于：被动属性加成(装备生效)、特殊状态(中毒/发光等)
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                icon: e.icon || d.img,
+                img: e.img || d.img, // 缺省回退物品图标
                 // 兵器特效通常随装备生效 (transfer: true)
                 // 除非是主动使用的消耗型技能 (transfer: false)
                 transfer: e.transfer ?? true,
+                showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                changes: e.changes || [],
+                system: { changes: e.system?.changes ?? [] },
                 // 关键：保留 flags (slug, stacking, scripts inside AE)
                 flags: e.flags || {},
                 description: e.description || "",

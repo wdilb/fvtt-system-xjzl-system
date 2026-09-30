@@ -28,7 +28,7 @@ export class EncounterManager {
     migrated.support = {
       groups: [{
         id: "legacy-support",
-        name: game.i18n.format("XJZL.Encounter.DefaultSupportGroup", { number: 1 }),
+        name: game.i18n.localize("XJZL.Encounter.DefaultSupportGroup", { number: 1 }),
         description: "",
         enabled: true,
         permission: legacySupport.permission ?? "gm",
@@ -108,7 +108,7 @@ export class EncounterManager {
           const groups = item?.system.support.groups ?? [];
           const npcCount = groups.reduce((total, group) => total + group.npcs.length, 0);
           preview.querySelector("div").textContent = item
-            ? game.i18n.format("XJZL.Encounter.BattlePlanStats", { fields: item.system.fieldEffects.length, groups: groups.length, npcs: npcCount })
+            ? game.i18n.localize("XJZL.Encounter.BattlePlanStats", { fields: item.system.fieldEffects.length, groups: groups.length, npcs: npcCount })
             : "";
         };
         select?.addEventListener("change", refresh);
@@ -134,7 +134,7 @@ export class EncounterManager {
     const snapshot = await this._buildSnapshot(combat, item);
     if (!snapshot) return false;
     await combat.setFlag(SYSTEM_ID, FLAG_KEY, snapshot);
-    ui.notifications.info(game.i18n.format("XJZL.Encounter.Linked", { name: item.name }));
+    ui.notifications.info(game.i18n.localize("XJZL.Encounter.Linked", { name: item.name }));
     return true;
   }
 
@@ -178,7 +178,7 @@ export class EncounterManager {
       for (const effect of customEffects) {
         effect.customTargetIds = selected.getAll(`target.${effect.id}`);
         if (!effect.customTargetIds.length) {
-          ui.notifications.error(game.i18n.format("XJZL.Encounter.CustomTargetRequired", { name: effect.name }));
+          ui.notifications.error(game.i18n.localize("XJZL.Encounter.CustomTargetRequired", { name: effect.name }));
           return null;
         }
       }
@@ -186,7 +186,7 @@ export class EncounterManager {
     const support = data.support;
     support.groups = support.groups.map((group, groupIndex) => ({
       ...group,
-      snapshotName: group.name || game.i18n.format("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
+      snapshotName: group.name || game.i18n.localize("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
       encounterRemaining: this._initialRemaining(group.encounterLimit),
       roundRemaining: this._initialRemaining(group.roundLimit),
       npcUsedThisRound: [],
@@ -254,7 +254,7 @@ export class EncounterManager {
         });
       } catch (error) {
         console.error(`XJZL | 战局场地效果执行失败 [${effect.name}]:`, error);
-        ui.notifications.warn(game.i18n.format("XJZL.Encounter.EffectFailed", { name: effect.name, reason: error.message }));
+        ui.notifications.warn(game.i18n.localize("XJZL.Encounter.EffectFailed", { name: effect.name, reason: error.message }));
       }
     }
   }
@@ -291,7 +291,7 @@ export class EncounterManager {
       const warningKey = `${combat.id}:${effect.id}:${(effect.customTargetIds || []).join(",")}`;
       if (missing > 0 && game.users.activeGM?.isSelf && !this.warnedMissingTargets.has(warningKey)) {
         this.warnedMissingTargets.add(warningKey);
-        ui.notifications.warn(game.i18n.format("XJZL.Encounter.TargetsMissing", { count: missing }));
+        ui.notifications.warn(game.i18n.localize("XJZL.Encounter.TargetsMissing", { count: missing }));
       }
     } else {
       const disposition = effect.targetMode === "friendly" ? CONST.TOKEN_DISPOSITIONS.FRIENDLY : CONST.TOKEN_DISPOSITIONS.HOSTILE;
@@ -339,7 +339,7 @@ export class EncounterManager {
     const results = [];
     for (const target of targets) {
       const actor = target.actor;
-      if (!actor) throw new Error(game.i18n.format("XJZL.Encounter.TargetInvalid", { name: target.name }));
+      if (!actor) throw new Error(game.i18n.localize("XJZL.Encounter.TargetInvalid", { name: target.name }));
       if (entry.automationType === "damage") {
         const result = await actor.applyDamage({ amount, type: entry.damageType, isHit: true, isCrit: false, source: "extra" });
         results.push(`${target.name}：-${result?.finalDamage ?? 0}`);
@@ -348,7 +348,7 @@ export class EncounterManager {
         results.push(`${target.name}：+${result?.actualHeal ?? 0}`);
       } else if (entry.automationType === "rage") {
         const resource = actor.system.resources?.rage;
-        if (!resource) throw new Error(game.i18n.format("XJZL.Encounter.NoRage", { name: target.name }));
+        if (!resource) throw new Error(game.i18n.localize("XJZL.Encounter.NoRage", { name: target.name }));
         const oldValue = Number(resource.value) || 0;
         const configuredMax = Number(resource.max);
         const max = Number.isFinite(configuredMax) ? Math.max(0, configuredMax) : 10;
@@ -450,13 +450,13 @@ export class EncounterManager {
     if (!group.enabled || !npc.enabled || !action.enabled) return game.i18n.localize("XJZL.Encounter.SupportDisabled");
     // 时间门槛优先于次数额度：未到解锁回合、或仍处于冷却期内，都先报时间原因。
     const minRound = Math.max(1, Math.trunc(Number(action.minRound) || 1));
-    if (round < minRound) return game.i18n.format("XJZL.Encounter.NotUnlockedYet", { round: minRound });
+    if (round < minRound) return game.i18n.localize("XJZL.Encounter.NotUnlockedYet", { round: minRound });
     const cooldownRounds = Math.max(0, Math.trunc(Number(action.cooldownRounds) || 0));
     const lastUsedRound = Number(action.lastUsedRound);
     if (cooldownRounds > 0 && action.lastUsedRound != null && Number.isFinite(lastUsedRound)) {
       // “冷却 X 回合”表示完整跳过后续 X 个回合，因此要到使用轮次 + X + 1 才恢复。
       const cooldownUntil = lastUsedRound + cooldownRounds + 1;
-      if (round < cooldownUntil) return game.i18n.format("XJZL.Encounter.CooldownUntil", { round: cooldownUntil });
+      if (round < cooldownUntil) return game.i18n.localize("XJZL.Encounter.CooldownUntil", { round: cooldownUntil });
     }
     if (group.encounterRemaining !== null && group.encounterRemaining <= 0) return game.i18n.localize("XJZL.Encounter.EncounterLimitReached");
     if (group.roundRemaining !== null && group.roundRemaining <= 0) return game.i18n.localize("XJZL.Encounter.RoundLimitReached");
@@ -486,7 +486,7 @@ export class EncounterManager {
     if (action.targetMode === "selected") {
       combatants = selectedIds.map(id => combat.combatants.get(id)).filter(Boolean);
       if (!combatants.length) throw new Error(game.i18n.localize("XJZL.Encounter.ErrorNoTargets"));
-      if (action.maxTargets > 0 && combatants.length > action.maxTargets) throw new Error(game.i18n.format("XJZL.Encounter.TooManyTargets", { max: action.maxTargets }));
+      if (action.maxTargets > 0 && combatants.length > action.maxTargets) throw new Error(game.i18n.localize("XJZL.Encounter.TooManyTargets", { max: action.maxTargets }));
     } else {
       const disposition = action.targetMode === "friendlyAll" ? CONST.TOKEN_DISPOSITIONS.FRIENDLY : CONST.TOKEN_DISPOSITIONS.HOSTILE;
       combatants = combat.combatants.filter(c => c.token?.disposition === disposition);
@@ -523,20 +523,20 @@ export class EncounterManager {
   static nextTriggerLabel(combat, effect) {
     const round = Math.max(1, combat.round || 1);
     if (effect.trigger === "combatStart") return combat.round > 0 ? game.i18n.localize("XJZL.Encounter.Triggered") : game.i18n.localize("XJZL.Encounter.AtCombatStart");
-    if (effect.trigger === "specificRoundStart") return game.i18n.format("XJZL.Encounter.OnlyRoundStart", { round: effect.triggerValue });
+    if (effect.trigger === "specificRoundStart") return game.i18n.localize("XJZL.Encounter.OnlyRoundStart", { round: effect.triggerValue });
     if (effect.trigger === "intervalRoundStart") {
       const interval = Math.max(1, Number(effect.triggerValue) || 1);
       const next = Math.ceil((round + (combat.round > 0 ? 1 : 0)) / interval) * interval;
-      return game.i18n.format("XJZL.Encounter.NextRoundStart", { round: next });
+      return game.i18n.localize("XJZL.Encounter.NextRoundStart", { round: next });
     }
-    if (effect.trigger === "roundStart") return game.i18n.format("XJZL.Encounter.NextRoundStart", { round: combat.round > 0 ? round + 1 : 1 });
-    if (effect.trigger === "roundEnd") return game.i18n.format("XJZL.Encounter.NextRoundEnd", { round });
+    if (effect.trigger === "roundStart") return game.i18n.localize("XJZL.Encounter.NextRoundStart", { round: combat.round > 0 ? round + 1 : 1 });
+    if (effect.trigger === "roundEnd") return game.i18n.localize("XJZL.Encounter.NextRoundEnd", { round });
     let current = combat.combatant?.name || game.i18n.localize("XJZL.Encounter.NextCombatant");
     if (effect.trigger === "combatantTurnStart" && combat.round > 0 && combat.turns.length) {
       const nextIndex = ((combat.turn ?? -1) + 1) % combat.turns.length;
       current = combat.turns[nextIndex]?.name || current;
     }
     const key = effect.trigger === "combatantTurnEnd" ? "XJZL.Encounter.NextTurnEnd" : "XJZL.Encounter.NextTurnStart";
-    return game.i18n.format(key, { name: current });
+    return game.i18n.localize(key, { name: current });
   }
 }

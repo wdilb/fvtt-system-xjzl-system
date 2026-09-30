@@ -42,10 +42,10 @@ export class XJZLManageXPDialog extends HandlebarsApplicationMixin(ApplicationV2
         
         // 构造选项列表，方便模板渲染
         const poolChoices = {
-            general: game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.General"), value: cult.general }),
-            neigong: game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Neigong"), value: cult.neigong }),
-            wuxue:   game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Wuxue"), value: cult.wuxue }),
-            arts:    game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Arts"), value: cult.arts })
+            general: game.i18n.localize("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.General"), value: cult.general }),
+            neigong: game.i18n.localize("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Neigong"), value: cult.neigong }),
+            wuxue:   game.i18n.localize("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Wuxue"), value: cult.wuxue }),
+            arts:    game.i18n.localize("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Arts"), value: cult.arts })
         };
 
         return {

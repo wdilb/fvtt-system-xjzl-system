@@ -92,7 +92,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             if (skillData) {
                 rows = skillData.rows;
                 totalValue = rows.reduce((acc, r) => acc + r.value, 0);
-                viewTitle = game.i18n.format("XJZL.UI.CombatMeter.ActorDetails", { name: skillData.actorName });
+                viewTitle = game.i18n.localize("XJZL.UI.CombatMeter.ActorDetails", { name: skillData.actorName });
             } else {
                 this.viewState.level = 1;
                 return this._prepareContext(options);
@@ -108,7 +108,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
                 skillDetails = details;
                 rows = details.targets;
                 totalValue = rows.reduce((acc, r) => acc + (r.displayVal || r.value), 0);
-                viewTitle = game.i18n.format("XJZL.UI.CombatMeter.SkillDetails", { name: details.skillName });
+                viewTitle = game.i18n.localize("XJZL.UI.CombatMeter.SkillDetails", { name: details.skillName });
             } else {
                 this.viewState.level = 2;
                 return this._prepareContext(options);
@@ -243,7 +243,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         // 根据当前层级获取数据
         if (this.viewState.level === 1) {
             rows = CombatStatsManager.getMeterData(this.currentMetric) || [];
-            title = game.i18n.format("XJZL.UI.CombatMeter.ReportTitle", { metric: metricLabel });
+            title = game.i18n.localize("XJZL.UI.CombatMeter.ReportTitle", { metric: metricLabel });
             total = rows.reduce((acc, r) => acc + r.value, 0);
         } else if (this.viewState.level === 2) {
             const skillData = CombatStatsManager.getActorSkillsData(this.viewState.actorUuid, this.currentMetric);

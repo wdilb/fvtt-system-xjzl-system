@@ -74,7 +74,7 @@
                             "label": "消耗刀气并禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nif (!daoqi) return;\nconst stacks = daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n\nconst use = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"风起云涌\" },\n    content: `<p>命中目标！是否消耗全部 <b>${stacks}</b> 层神风刀气以禁足目标 ${stacks} 回合？</p>`,\n    rejectClose: false\n});\n\nif (use) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shenfeng_daoqi\", stacks);\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootData) {\n        rootData.duration = { rounds: stacks };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n        ui.notifications.info(`${actor.name} 消耗 ${stacks} 层刀气，禁足 ${args.target.name} ${stacks} 回合！`);\n    }\n}"
+                            "script": "if (!args.isHit) return;\nconst daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nif (!daoqi) return;\nconst stacks = daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n\nconst use = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"风起云涌\" },\n    content: `<p>命中目标！是否消耗全部 <b>${stacks}</b> 层神风刀气以禁足目标 ${stacks} 回合？</p>`,\n    rejectClose: false\n});\n\nif (use) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shenfeng_daoqi\", stacks);\n    const rootData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (rootData) {\n        rootData.duration = { value: stacks, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n        ui.notifications.info(`${actor.name} 消耗 ${stacks} 层刀气，禁足 ${args.target.name} ${stacks} 回合！`);\n    }\n}"
                         }
                     ]
                 },
@@ -126,7 +126,7 @@
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
                     "description": "<p>刀刃环舞，三划一横，在正前方 3*3 区域内斩出‘刀气旋风’，持续@{1 + @up|一}回合。</p><p><strong>刀气旋风：</strong>在区域内开始回合的所有敌人和其他友方受到 40 点气血流失。</p><p>·刀气旋风区域视作‘大风’天气。</p><p>·每有一层神风刀气，刀气旋风额外持续一回合。</p><p><strong>升级：</strong>刀气旋风流失气血提升 10 点，持续回合数+1，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "施展时计算刀气并发送区域效果提示卡片。由于无地形模块，流失伤害需手动应用。",
+                    "automationNote": "部分自动化：施展后自动在正前方 3×3 生成“刀气旋风”（原地、按朝向吸附，持续 1+升级 回合，每层神风刀气额外+1 回合），区域内所有敌人和其他友方开始回合时自动流失 40+10×升级 点气血。旋风区域视作“大风”天气需 GM 手动标记。到期或脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -149,7 +149,13 @@
                             "label": "计算持续时间",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nconst bonusRounds = daoqi ? (daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseRounds = 1 + (lvl - 1);\nconst bleedDmg = 40 + (lvl - 1) * 10;\nconst totalRounds = baseRounds + bonusRounds;\n\nconst content = `\n<div class=\"xjzl-chat-card\">\n   <div style=\"font-weight:bold; border-bottom:1px solid #ccc;\">刀气旋风 (区域效果)</div>\n   <div style=\"font-size:0.9em; padding-top:5px;\">\n       <p>持续 <b>${totalRounds}</b> 回合 (含刀气加成)。</p>\n       <p>区域内开始回合的所有人流失 <b>${bleedDmg}</b> 点气血。</p>\n       <p style=\"color:#888;\">该区域视作[大风]天气。</p>\n   </div>\n</div>`;\nawait ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content: content });"
+                            "script": "const daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nconst bonusRounds = daoqi ? (daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseRounds = 1 + (lvl - 1);\nconst bleedDmg = 40 + (lvl - 1) * 10;\nconst totalRounds = baseRounds + bonusRounds;\n\nconst content = `\n<div class=\"xjzl-chat-card\">\n   <div style=\"font-weight:bold; border-bottom:1px solid #ccc;\">刀气旋风 (区域效果)</div>\n   <div style=\"font-size:0.9em; padding-top:5px;\">\n       <p>持续 <b>${totalRounds}</b> 回合 (含刀气加成)。</p>\n       <p>区域内开始回合的所有人流失 <b>${bleedDmg}</b> 点气血。</p>\n       <p style=\"color:#888;\">该区域视作[大风]天气。</p>\n   </div>\n</div>`;\nawait ChatMessage.create({ author: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content: content });"
+                        },
+                        {
+                            "label": "刀气旋风",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 刀气旋风：正前 3×3 原地放置（按朝向 90° 吸附），持续 1+升级+刀气层数 回合；\n// 区域内所有敌人和其他友方开始回合时受 40+10×升级 气血流失。\n// \"视作大风天气\"超出框架，由 GM 手动标记。\nconst dfLvl = Math.max(1, move.computedLevel || 1);\nconst dfDaoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nconst dfStacks = dfDaoqi ? (dfDaoqi.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst dfDmg = String(40 + 10 * (dfLvl - 1));\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-daoqixuanfeng-\" + actor.id,\n    displayName: \"刀气旋风\",\n    follow: false,\n    shapeKind: \"rect\",\n    rectWidth: 3,\n    rectHeight: 3,\n    anchorX: 1,\n    anchorY: 0,\n    quarterTurns: \"auto\",\n    faction: \"all\",\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: dfDmg, type: \"liushi\"},\n    durationRounds: 1 + (dfLvl - 1) + dfStacks,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nif (dfStacks > 0) {\n    ui.notifications.info(\"刀气旋风：每层神风刀气+1 回合，本次持续 \" + (1 + (dfLvl - 1) + dfStacks) + \" 回合。\");\n}\n"
                         }
                     ]
                 }
@@ -158,7 +164,6 @@
         "effects": [
             {
                 "name": "神风刀气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
                 "description": "每层使刀法的释放距离+1。",
                 "transfer": false,
                 "flags": {
@@ -167,7 +172,9 @@
                         "stackable": true,
                         "maxStacks": 3
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                "showIcon": 2
             }
         ]
     },
@@ -227,7 +234,7 @@
                             "label": "暴击获取/倒地应用",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.isCrit) {\n    const eff = thisItem.effects.getName(\"易水寒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
+                            "script": "if (args.isHit && args.isCrit) {\n    const eff = thisItem.effects.getName(\"易水寒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
                         }
                     ]
                 },
@@ -307,7 +314,7 @@
                             "label": "击破/易水寒效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    const lianji = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    await game.xjzl.api.effects.addEffect(actor, lianji);\n    ui.notifications.info(\"图穷匕见！击倒目标并获得连击。\");\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    const lianji = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('lianji'));\n    await game.xjzl.api.effects.addEffect(actor, lianji);\n    ui.notifications.info(\"图穷匕见！击倒目标并获得连击。\");\n}\nif (args.scriptFlags?.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
                         }
                     ]
                 },
@@ -360,22 +367,23 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "易水寒",
-                    "icon": "icons/svg/ice-aura.svg",
-                    "description": "下一次施展《易水诀》招式时，可以消耗此状态生效特殊效果。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yishui_han",
-                            "stackable": false
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "易水寒",
+                "description": "下一次施展《易水诀》招式时，可以消耗此状态生效特殊效果。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yishui_han",
+                        "stackable": false
+                    }
+                },
+                "img": "icons/svg/ice-aura.svg",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "回风诀",
@@ -507,7 +515,7 @@
                             "label": "击破效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const chizhi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\n    if (chizhi) {\n        chizhi.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, chizhi);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const chizhi = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('chizhi'));\n    if (chizhi) {\n        chizhi.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, chizhi);\n    }\n}"
                         }
                     ]
                 },
@@ -560,23 +568,24 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "回风",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
-                    "description": "每层使施展带有“风”字的招式暴击骰-1。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "huifeng",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "回风",
+                "description": "每层使施展带有“风”字的招式暴击骰-1。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huifeng",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "风息刀法",
@@ -622,7 +631,7 @@
                             "label": "命中倒地",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
                         },
                         {
                             "label": "获得刀意",
@@ -745,7 +754,7 @@
                             "label": "流失与状态应用",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const stacks = args.scriptFlags?.shenfeng_stacks || 0;\n    if (stacks > 0) {\n        await args.target.applyDamage({\n            amount: stacks * 20,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            item: args.item,\n            move: args.move,\n            source: \"extra\"\n        });\n        if (stacks >= 3) {\n            const jinjue = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinjue\"));\n            if (jinjue) {\n                jinjue.duration = { rounds: 3 };\n                await game.xjzl.api.effects.addEffect(args.target, jinjue);\n            }\n        }\n    }\n}"
+                            "script": "if (args.isHit) {\n    const stacks = args.scriptFlags?.shenfeng_stacks || 0;\n    if (stacks > 0) {\n        await args.target.applyDamage({\n            amount: stacks * 20,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            item: args.item,\n            move: args.move,\n            source: \"extra\"\n        });\n        if (stacks >= 3) {\n            const jinjue = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jinjue'));\n            if (jinjue) {\n                jinjue.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n                await game.xjzl.api.effects.addEffect(args.target, jinjue);\n            }\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -754,7 +763,6 @@
         "effects": [
             {
                 "name": "刀意",
-                "icon": "icons/svg/sword.svg",
                 "description": "每层使刀法伤害+10。",
                 "transfer": false,
                 "flags": {
@@ -764,17 +772,20 @@
                         "maxStacks": 3
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.weaponTypes.blade.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "icons/svg/sword.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.weaponTypes.blade.mod",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "神风刀气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
                 "description": "每层使刀法的释放距离+1。",
                 "transfer": false,
                 "flags": {
@@ -783,7 +794,9 @@
                         "stackable": true,
                         "maxStacks": 3
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                "showIcon": 2
             }
         ]
     },
@@ -848,14 +861,14 @@
                             20
                         ]
                     },
-                    "automationNote": "完全手动。区域/困难地形/远程伤害修正均由GM手动处理。",
+                    "automationNote": "施展后自动生成 3+升级 米跟随大风范围显示，持续 10 回合后自动消散（每名施展者独立）并发一次说明卡。区域内敌人移动视作困难地形、远程投射伤害修正（敌-10/我+10），均需 GM 手动结算。",
                     "x-xjzl-aura": true,
                     "scripts": [
                         {
-                            "label": "大风提示",
+                            "label": "大风区域",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst radius = 3 + (lvl - 1);\nconst content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px;\"><h3>大风起</h3><p>在自身周围${radius}米形成大风区域，持续10回合。</p><p>远程伤害 敌方-10 / 我方+10</p></div>`;\nawait ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content: content });"
+                            "script": "// 大风（仅标记）：周身 3+升级 米标记光环，持续 10 回合（单实例）。\n// 困难地形与远程投射修正（G1/G4）超出光环框架，创建时发说明卡由 GM 手动结算。\nconst dfLvl = Math.max(1, move.computedLevel || 1);\nconst dfRadius = 3 + (dfLvl - 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-dafeng-\" + actor.id,\n    displayName: \"大风\",\n    follow: true,\n    radius: dfRadius,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 10,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nawait ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>大风</b>已起（\" + dfRadius + \" 米，10 回合）：区域内敌人移动视作困难地形；敌方投掷/射击类招式在区域内或经过后内外功伤害-10，我方+10（G1/G4 请 GM 手动结算）。</div>\"});"
                         }
                     ],
                     "actionCost": "@{max(1, 5 - @up)|全回合动作}"
@@ -902,41 +915,44 @@
                             "label": "添加杀念Buff",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effectData = thisItem.effects.getName(\"杀念\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 10 + (lvl - 1) * 10;\n\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n    <div style=\"border-left: 4px solid #8b0000; background: rgba(139, 0, 0, 0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#8b0000; margin-bottom: 4px;\"><i class=\"fas fa-skull\"></i> 杀意凝练完成</div>\n        <div style=\"font-size: 0.9em; color: #555;\">\n            请手动将 <b>杀戮值</b> 增加 <span style=\"color:red; font-weight:bold;\">${gain}</span> 点。<br>\n            <span style=\"font-size: 0.85em; color: #888;\">（注：上限加至 90，不可因此增长杀孽）</span>\n        </div>\n    </div>\n</div>`;\nawait ChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
+                            "script": "const effectData = thisItem.effects.getName(\"杀念\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 10 + (lvl - 1) * 10;\n\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n    <div style=\"border-left: 4px solid #8b0000; background: rgba(139, 0, 0, 0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#8b0000; margin-bottom: 4px;\"><i class=\"fas fa-skull\"></i> 杀意凝练完成</div>\n        <div style=\"font-size: 0.9em; color: #555;\">\n            请手动将 <b>杀戮值</b> 增加 <span style=\"color:red; font-weight:bold;\">${gain}</span> 点。<br>\n            <span style=\"font-size: 0.85em; color: #888;\">（注：上限加至 90，不可因此增长杀孽）</span>\n        </div>\n    </div>\n</div>`;\nawait ChatMessage.create({\n    author: game.user.id,\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "杀念",
-                    "icon": "icons/svg/skull.svg",
-                    "description": "出招时可消耗20杀戮值增伤。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "shanian",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "杀念预览",
-                                    "trigger": "calc",
-                                    "active": true,
-                                    "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack')) return;\n\nconst shanie = actor.system.resources.shanie || 0;\nconst wuxueItem = actor.itemTypes.wuxue.find(w => w.name === \"杀意动\");\nconst moveData = wuxueItem?.system.moves.find(m => m.name === \"杀意动\");\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst maxExtra = 10 + (lvl - 1) * 10;\nconst extra = Math.min(maxExtra, shanie);\nconst bonus = 10 + extra;\n\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`杀念: +${bonus} (需消耗20杀戮)`);"
-                                },
-                                {
-                                    "label": "消耗杀戮增伤",
-                                    "trigger": "attack",
-                                    "active": true,
-                                    "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack')) return;\n\nconst shalu = actor.system.resources.shalu.value;\nconst shanie = actor.system.resources.shanie || 0;\n\nconst wuxueItem = actor.itemTypes.wuxue.find(w => w.name === \"杀意动\");\nconst moveData = wuxueItem?.system.moves.find(m => m.name === \"杀意动\");\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst maxExtra = 10 + (lvl - 1) * 10;\nconst extra = Math.min(maxExtra, shanie);\nconst bonus = 10 + extra;\n\nif (shalu >= 20) {\n    const use = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '杀念', icon: 'fas fa-skull' },\n        content: `<p>预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗 20 点杀戮值以生效此加成？</p>`,\n        yes: { label: \"消耗 (保留加成)\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗 (移除加成)\", icon: \"fas fa-times\" }\n    });\n    if (use) {\n        await actor.update({ 'system.resources.shalu.value': shalu - 20 });\n        \n        const content = `\n        <div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n            <div style=\"border-left: 4px solid #8b0000; background: rgba(139, 0, 0, 0.05); padding: 5px;\">\n                <span style=\"color:#8b0000; font-weight:bold;\"><i class=\"fas fa-tint\"></i> 杀意涌动！伤害+${bonus}</span>\n            </div>\n        </div>`;\n        await ChatMessage.create({\n            user: game.user.id,\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: content\n        });\n    } else {\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗：移除杀念加成 (-${bonus})`;\n    }\n} else {\n    args.flags.damageResult.damage -= bonus;\n    args.flags.damageResult.breakdown += `\\n- 未消耗：杀戮值不足 (-${bonus})`;\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "杀念",
+                "description": "出招时可消耗20杀戮值增伤。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shanian",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "杀念预览",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack')) return;\n\nconst shanie = actor.system.resources.shanie || 0;\nconst wuxueItem = actor.itemTypes.wuxue.find(w => w.name === \"杀意动\");\nconst moveData = wuxueItem?.system.moves.find(m => m.name === \"杀意动\");\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst maxExtra = 10 + (lvl - 1) * 10;\nconst extra = Math.min(maxExtra, shanie);\nconst bonus = 10 + extra;\n\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`杀念: +${bonus} (需消耗20杀戮)`);"
+                            },
+                            {
+                                "label": "消耗杀戮增伤",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack')) return;\n\nconst shalu = actor.system.resources.shalu.value;\nconst shanie = actor.system.resources.shanie || 0;\n\nconst wuxueItem = actor.itemTypes.wuxue.find(w => w.name === \"杀意动\");\nconst moveData = wuxueItem?.system.moves.find(m => m.name === \"杀意动\");\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst maxExtra = 10 + (lvl - 1) * 10;\nconst extra = Math.min(maxExtra, shanie);\nconst bonus = 10 + extra;\n\nif (shalu >= 20) {\n    const use = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '杀念', icon: 'fas fa-skull' },\n        content: `<p>预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗 20 点杀戮值以生效此加成？</p>`,\n        yes: { label: \"消耗 (保留加成)\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗 (移除加成)\", icon: \"fas fa-times\" }\n    });\n    if (use) {\n        await actor.update({ 'system.resources.shalu.value': shalu - 20 });\n        \n        const content = `\n        <div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n            <div style=\"border-left: 4px solid #8b0000; background: rgba(139, 0, 0, 0.05); padding: 5px;\">\n                <span style=\"color:#8b0000; font-weight:bold;\"><i class=\"fas fa-tint\"></i> 杀意涌动！伤害+${bonus}</span>\n            </div>\n        </div>`;\n        await ChatMessage.create({\n            author: game.user.id,\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: content\n        });\n    } else {\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗：移除杀念加成 (-${bonus})`;\n    }\n} else {\n    args.flags.damageResult.damage -= bonus;\n    args.flags.damageResult.breakdown += `\\n- 未消耗：杀戮值不足 (-${bonus})`;\n}"
+                            }
+                        ]
+                    }
+                },
+                "img": "icons/svg/skull.svg",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "不定风",
@@ -975,20 +991,21 @@
                     ],
                     "actionCost": "无"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "不定风",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
-                    "description": "定无风：可自由切换名称中带有'风'字的武学套路，不必遵循武学切换规则。由GM在移动计数达标时手动添加，持续一回合。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "budingfeng"
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "不定风",
+                "description": "定无风：可自由切换名称中带有'风'字的武学套路，不必遵循武学切换规则。由GM在移动计数达标时手动添加，持续一回合。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "budingfeng"
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                "showIcon": 2
+            }
+        ]
     }
 ]

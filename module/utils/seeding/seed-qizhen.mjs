@@ -109,10 +109,11 @@ export async function seedQizhen() {
             // 3. 处理 Active Effects
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                icon: e.icon || d.img,
+                img: e.img || d.img,
                 transfer: e.transfer ?? true, // 奇珍默认为被动传输
+                showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                changes: e.changes || [],
+                system: { changes: e.system?.changes ?? [] },
                 flags: e.flags || {},
                 description: e.description || "",
                 // 补上 duration

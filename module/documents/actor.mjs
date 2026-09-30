@@ -4,6 +4,7 @@
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { DEFAULT_CONTAINER_IMAGES } from "../data/actor/container.mjs";
@@ -842,8 +843,8 @@ export class XJZLActor extends Actor {
       if (e.disabled) return false;
 
       // 2. 扫描 Changes：看有没有针对目标 Flag 的修改
-      // 注意：e.changes 是一个数组对象
-      return e.changes.some(change => change.key === targetFlagKey);
+      // 注意：V14 起变更数组在 system.changes 下
+      return e.system.changes.some(change => change.key === targetFlagKey);
     });
   }
 
@@ -928,7 +929,7 @@ export class XJZLActor extends Actor {
 
   /**
    * 准备用于骰子检定的数据 (Roll Data)
-   * 这决定了你在公式里可以用 @ 什么属性
+   * 这决定了骰点公式中可通过 @ 引用的属性
    */
   getRollData() {
     // --- 容器直接返回基础数据，不进行属性映射 ---
@@ -948,14 +949,19 @@ export class XJZLActor extends Actor {
 
     // 2. 将资源添加到顶层
     // 例如: @hp, @mp, @rage
+    // 【V14 升级 S1.16】V14 的 applyActiveEffects 与 TokenDocument._getReplacementData 会在
+    // 数据准备中途（prepareEmbeddedDocuments 阶段，早于 prepareDerivedData）调用 getRollData
+    // 解析变更里的 @ 引用；此时 creature 的鸭子类型资源尚未补建，直接读取会中断数据准备。
+    // hp 缺失时映射 creature 的真实体力 tili.value（保持鸭子类型语义，避免初始阶段 @hp 取 0），
+    // mp/rage 缺失按 mock 语义兜底 0。当前无任何脚本使用 @resources.hp.value，不做二级支持。
     if (sys.resources) {
-      data.hp = sys.resources.hp.value;
-      data.mp = sys.resources.mp.value;
-      data.rage = sys.resources.rage.value;
+      data.hp = sys.resources.hp?.value ?? sys.resources.tili?.value ?? 0;
+      data.mp = sys.resources.mp?.value ?? 0;
+      data.rage = sys.resources.rage?.value ?? 0;
     }
 
     // 3. 创建战斗属性的快捷方式 (Combat Shortcuts)
-    // 你的计算代码把结果存为了 xxxTotal，我们可以做一些简化映射
+    // 派生结果以 xxxTotal 形式存储，此处映射为顶层快捷键供公式引用
     if (sys.combat) {
       // 先攻 (Initiative)
       // 映射后，公式里可以用 @init 或 @combat.initiativeTotal
@@ -2339,7 +2345,7 @@ export class XJZLActor extends Actor {
 
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: false });
           ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: this }),
             content: content,
             flags: { "xjzl-system": { type: "death-card" } }
@@ -2357,7 +2363,7 @@ export class XJZLActor extends Actor {
           await this.toggleStatusEffect("dead", { overlay: true, active: true });
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: true });
           ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: this }),
             content: content,
             flags: { "xjzl-system": { type: "death-card" } }
@@ -2475,7 +2481,7 @@ export class XJZLActor extends Actor {
 
         // 发送给所有玩家看 (type: OTHER)
         ChatMessage.create({
-          user: game.user.id,
+          author: game.user.id,
           speaker: ChatMessage.getSpeaker({ actor: this }),
           content: cardContent,
           style: CONST.CHAT_MESSAGE_STYLES.OTHER
@@ -2959,7 +2965,7 @@ export class XJZLActor extends Actor {
               renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: true })
                 .then(content => {
                   ChatMessage.create({
-                    user: game.user.id,
+                    author: game.user.id,
                     speaker: ChatMessage.getSpeaker({ actor: this }),
                     content: content,
                     flags: { "xjzl-system": { type: "death-card" } }
@@ -3473,7 +3479,7 @@ export class XJZLActor extends Actor {
     );
 
     const chatData = {
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       flavor: `${isCreatureAttack ? ("发起" + label) : "发起普通攻击"} ${flavorSuffix}`,
       content: content,
@@ -3529,7 +3535,7 @@ export class XJZLActor extends Actor {
       }
     };
 
-    ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+    ChatMessage.applyMode(chatData, game.settings.get("core", "messageMode"));
     const message = await ChatMessage.create(chatData);
 
     if (attackRoll && game.dice3d) {
@@ -3927,6 +3933,9 @@ export class XJZLActor extends Actor {
     // 4. 清理绑定特效 (只清理标记了 tiedToStance 标签的AE)
     await this.clearStanceTiedEffects();
 
+    // 解除架招时同步销毁其光环；关招、被破和濒死均走此入口。
+    await AuraManager.dismissBySource({sourceActorUuid: this.uuid, lifecycle: "stance"});
+
     // 5. 视觉反馈
     this.showFloatyText("解除架招", {
       direction: 1,
@@ -4100,7 +4109,7 @@ export class XJZLActor extends Actor {
     `;
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: content,
       style: CONST.CHAT_MESSAGE_STYLES.OTHER
@@ -4170,7 +4179,7 @@ export class XJZLActor extends Actor {
     `;
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: content,
       style: CONST.CHAT_MESSAGE_STYLES.OTHER

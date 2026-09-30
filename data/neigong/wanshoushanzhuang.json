@@ -261,7 +261,6 @@
         "effects": [
             {
                 "name": "伏气充盈(小成)",
-                "icon": "systems/xjzl-system/assets/icons/neigong/万兽.png",
                 "transfer": false,
                 "description": "下次出招不消耗内力，并恢复 10 点内力。",
                 "flags": {
@@ -278,17 +277,20 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.costs.neili.mod",
-                        "mode": 2,
-                        "value": "999"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/neigong/万兽.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.costs.neili.mod",
+                            "value": "999",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "伏气充盈(圆满)",
-                "icon": "systems/xjzl-system/assets/icons/neigong/万兽.png",
                 "transfer": false,
                 "description": "下次出招不消耗内力，并恢复 20 点内力。",
                 "flags": {
@@ -305,13 +307,17 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.costs.neili.mod",
-                        "mode": 2,
-                        "value": "999"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/neigong/万兽.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.costs.neili.mod",
+                            "value": "999",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -325,7 +331,7 @@
             "sect": "wanshoushanzhuang",
             "description": "<p>传上古有恶龙，兴风作浪，造生灵涂炭。上苍震怒，派仙人一怒斩龙，龙首坠于渤海。为防止再生事端，仙人传下口诀，名伏龙。万兽山庄以此研习出顶级法门，练至大成，气盖八方，威震寰宇，可赦天下万兽，不在话下。</p>",
             "requirement": "悟性需求: 11",
-            "automationNote": "重伤回血完全自动化。<br>圆满威压半自动：进战时会发送卡片提醒玩家给范围内敌人手动挂上【伏龙威压】AE。",
+            "automationNote": "完全自动化：受到重伤后自动在攻击者回合末为其标记回血（领悟 200/小成 150/圆满 100 档，回复 10/10/20 气血，一回合一次）。圆满进战未濒死时自动生成 20 米跟随光环，范围内敌人自动获得【伏龙威压】（看破/虚招-2）；切换运功或脱战时光环消散。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -343,7 +349,7 @@
                             "label": "伏龙回生 (200档)",
                             "trigger": "preDefense",
                             "active": true,
-                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nlet rawDmg = args.baseDamage || 0;\nif (args.config.isCrit && args.config.applyCritDamage) rawDmg = Math.floor(rawDmg * 2);\nif (rawDmg <= 200) return;\nconst markSlug = \"fulong_mark_\" + actor.id;\nif (args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === markSlug)) return;\nconst innerScript = \"const originItem = await fromUuid(thisEffect.origin);\\nconst wearer = originItem?.parent;\\nif (wearer) {\\n    await wearer.applyHealing({ healer: actor,  amount: 10, type: 'hp', showScrolling: true });\\n    const msg = '<div class=\\\"xjzl-chat-card\\\" style=\\\"margin-left: 6px;\\\"><div style=\\\"padding:5px; border-left: 4px solid #27ae60; background: rgba(39, 174, 96, 0.05);\\\"><div style=\\\"font-weight:bold; color:#27ae60;\\\"><i class=\\\"fas fa-heart\\\"></i> 伏龙诀 - 伤后回生</div><div style=\\\"font-size:0.9em; margin-top:4px;\\\"><b>' + actor.name + '</b> 的回合结束，<b>' + wearer.name + '</b> 回复了 <span style=\\\"color:green; font-weight:bold;\\\">10</span> 点气血。</div></div></div>';\\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: wearer}), content: msg });\\n}\\nawait thisEffect.delete();\";\nconst effectData = {\n    name: \"伏龙回生印记\",\n    icon: \"systems/xjzl-system/assets/icons/neigong/万兽.png\",\n    description: \"在你的回合结束时，将为 \" + actor.name + \" 回复气血。\",\n    flags: {\n        \"xjzl-system\": {\n            slug: markSlug,\n            scripts: [\n                {\n                    trigger: \"turnEnd\",\n                    label: \"伏龙回血\",\n                    active: true,\n                    script: innerScript\n                }\n            ]\n        }\n    },\n    origin: thisItem.uuid,\n    duration: { rounds: 1 }\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"伏龙锁定！\", { fill: \"#27ae60\" });"
+                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nlet rawDmg = args.baseDamage || 0;\nif (args.config.isCrit && args.config.applyCritDamage) rawDmg = Math.floor(rawDmg * 2);\nif (rawDmg <= 200) return;\nconst markSlug = \"fulong_mark_\" + actor.id;\nif (args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === markSlug)) return;\nconst innerScript = \"const originItem = await fromUuid(thisEffect.origin);\\nconst wearer = originItem?.parent;\\nif (wearer) {\\n    await wearer.applyHealing({ healer: actor,  amount: 10, type: 'hp', showScrolling: true });\\n    const msg = '<div class=\\\"xjzl-chat-card\\\" style=\\\"margin-left: 6px;\\\"><div style=\\\"padding:5px; border-left: 4px solid #27ae60; background: rgba(39, 174, 96, 0.05);\\\"><div style=\\\"font-weight:bold; color:#27ae60;\\\"><i class=\\\"fas fa-heart\\\"></i> 伏龙诀 - 伤后回生</div><div style=\\\"font-size:0.9em; margin-top:4px;\\\"><b>' + actor.name + '</b> 的回合结束，<b>' + wearer.name + '</b> 回复了 <span style=\\\"color:green; font-weight:bold;\\\">10</span> 点气血。</div></div></div>';\\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: wearer}), content: msg });\\n}\\nawait thisEffect.delete();\";\nconst effectData = {\n    name: \"伏龙回生印记\",\n    img: \"systems/xjzl-system/assets/icons/neigong/万兽.png\",\n    description: \"在你的回合结束时，将为 \" + actor.name + \" 回复气血。\",\n    flags: {\n        \"xjzl-system\": {\n            slug: markSlug,\n            scripts: [\n                {\n                    trigger: \"turnEnd\",\n                    label: \"伏龙回血\",\n                    active: true,\n                    script: innerScript\n                }\n            ]\n        }\n    },\n    origin: thisItem.uuid,\n    duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"}\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"伏龙锁定！\", { fill: \"#27ae60\" });"
                         }
                     ]
                 },
@@ -363,7 +369,7 @@
                             "label": "伏龙回生 (150档)",
                             "trigger": "preDefense",
                             "active": true,
-                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nlet rawDmg = args.baseDamage || 0;\nif (args.config.isCrit && args.config.applyCritDamage) rawDmg = Math.floor(rawDmg * 2);\nif (rawDmg <= 150) return;\nconst markSlug = \"fulong_mark_\" + actor.id;\nif (args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === markSlug)) return;\nconst innerScript = \"const originItem = await fromUuid(thisEffect.origin);\\nconst wearer = originItem?.parent;\\nif (wearer) {\\n    await wearer.applyHealing({ healer: actor,  amount: 10, type: 'hp', showScrolling: true });\\n    const msg = '<div class=\\\"xjzl-chat-card\\\" style=\\\"margin-left: 6px;\\\"><div style=\\\"padding:5px; border-left: 4px solid #27ae60; background: rgba(39, 174, 96, 0.05);\\\"><div style=\\\"font-weight:bold; color:#27ae60;\\\"><i class=\\\"fas fa-heart\\\"></i> 伏龙诀 - 伤后回生</div><div style=\\\"font-size:0.9em; margin-top:4px;\\\"><b>' + actor.name + '</b> 的回合结束，<b>' + wearer.name + '</b> 回复了 <span style=\\\"color:green; font-weight:bold;\\\">10</span> 点气血。</div></div></div>';\\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: wearer}), content: msg });\\n}\\nawait thisEffect.delete();\";\nconst effectData = {\n    name: \"伏龙回生印记\",\n    icon: \"systems/xjzl-system/assets/icons/neigong/万兽.png\",\n    description: \"在你的回合结束时，将为 \" + actor.name + \" 回复气血。\",\n    flags: {\n        \"xjzl-system\": {\n            slug: markSlug,\n            scripts: [\n                {\n                    trigger: \"turnEnd\",\n                    label: \"伏龙回血\",\n                    active: true,\n                    script: innerScript\n                }\n            ]\n        }\n    },\n    origin: thisItem.uuid,\n    duration: { rounds: 1 }\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"伏龙锁定！\", { fill: \"#27ae60\" });"
+                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nlet rawDmg = args.baseDamage || 0;\nif (args.config.isCrit && args.config.applyCritDamage) rawDmg = Math.floor(rawDmg * 2);\nif (rawDmg <= 150) return;\nconst markSlug = \"fulong_mark_\" + actor.id;\nif (args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === markSlug)) return;\nconst innerScript = \"const originItem = await fromUuid(thisEffect.origin);\\nconst wearer = originItem?.parent;\\nif (wearer) {\\n    await wearer.applyHealing({ healer: actor,  amount: 10, type: 'hp', showScrolling: true });\\n    const msg = '<div class=\\\"xjzl-chat-card\\\" style=\\\"margin-left: 6px;\\\"><div style=\\\"padding:5px; border-left: 4px solid #27ae60; background: rgba(39, 174, 96, 0.05);\\\"><div style=\\\"font-weight:bold; color:#27ae60;\\\"><i class=\\\"fas fa-heart\\\"></i> 伏龙诀 - 伤后回生</div><div style=\\\"font-size:0.9em; margin-top:4px;\\\"><b>' + actor.name + '</b> 的回合结束，<b>' + wearer.name + '</b> 回复了 <span style=\\\"color:green; font-weight:bold;\\\">10</span> 点气血。</div></div></div>';\\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: wearer}), content: msg });\\n}\\nawait thisEffect.delete();\";\nconst effectData = {\n    name: \"伏龙回生印记\",\n    img: \"systems/xjzl-system/assets/icons/neigong/万兽.png\",\n    description: \"在你的回合结束时，将为 \" + actor.name + \" 回复气血。\",\n    flags: {\n        \"xjzl-system\": {\n            slug: markSlug,\n            scripts: [\n                {\n                    trigger: \"turnEnd\",\n                    label: \"伏龙回血\",\n                    active: true,\n                    script: innerScript\n                }\n            ]\n        }\n    },\n    origin: thisItem.uuid,\n    duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"}\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"伏龙锁定！\", { fill: \"#27ae60\" });"
                         }
                     ]
                 },
@@ -383,13 +389,13 @@
                             "label": "伏龙回生 (100档)",
                             "trigger": "preDefense",
                             "active": true,
-                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nlet rawDmg = args.baseDamage || 0;\nif (args.config.isCrit && args.config.applyCritDamage) rawDmg = Math.floor(rawDmg * 2);\nif (rawDmg <= 100) return;\nconst markSlug = \"fulong_mark_\" + actor.id;\nif (args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === markSlug)) return;\nconst innerScript = \"const originItem = await fromUuid(thisEffect.origin);\\nconst wearer = originItem?.parent;\\nif (wearer) {\\n    await wearer.applyHealing({ healer: actor,  amount: 20, type: 'hp', showScrolling: true });\\n    const msg = '<div class=\\\"xjzl-chat-card\\\" style=\\\"margin-left: 6px;\\\"><div style=\\\"padding:5px; border-left: 4px solid #27ae60; background: rgba(39, 174, 96, 0.05);\\\"><div style=\\\"font-weight:bold; color:#27ae60;\\\"><i class=\\\"fas fa-heart\\\"></i> 伏龙诀 - 伤后回生</div><div style=\\\"font-size:0.9em; margin-top:4px;\\\"><b>' + actor.name + '</b> 的回合结束，<b>' + wearer.name + '</b> 回复了 <span style=\\\"color:green; font-weight:bold;\\\">20</span> 点气血。</div></div></div>';\\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: wearer}), content: msg });\\n}\\nawait thisEffect.delete();\";\nconst effectData = {\n    name: \"伏龙回生印记\",\n    icon: \"systems/xjzl-system/assets/icons/neigong/万兽.png\",\n    description: \"在你的回合结束时，将为 \" + actor.name + \" 回复气血。\",\n    flags: {\n        \"xjzl-system\": {\n            slug: markSlug,\n            scripts: [\n                {\n                    trigger: \"turnEnd\",\n                    label: \"伏龙回血\",\n                    active: true,\n                    script: innerScript\n                }\n            ]\n        }\n    },\n    origin: thisItem.uuid,\n    duration: { rounds: 1 }\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"伏龙锁定！\", { fill: \"#27ae60\" });"
+                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nlet rawDmg = args.baseDamage || 0;\nif (args.config.isCrit && args.config.applyCritDamage) rawDmg = Math.floor(rawDmg * 2);\nif (rawDmg <= 100) return;\nconst markSlug = \"fulong_mark_\" + actor.id;\nif (args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === markSlug)) return;\nconst innerScript = \"const originItem = await fromUuid(thisEffect.origin);\\nconst wearer = originItem?.parent;\\nif (wearer) {\\n    await wearer.applyHealing({ healer: actor,  amount: 20, type: 'hp', showScrolling: true });\\n    const msg = '<div class=\\\"xjzl-chat-card\\\" style=\\\"margin-left: 6px;\\\"><div style=\\\"padding:5px; border-left: 4px solid #27ae60; background: rgba(39, 174, 96, 0.05);\\\"><div style=\\\"font-weight:bold; color:#27ae60;\\\"><i class=\\\"fas fa-heart\\\"></i> 伏龙诀 - 伤后回生</div><div style=\\\"font-size:0.9em; margin-top:4px;\\\"><b>' + actor.name + '</b> 的回合结束，<b>' + wearer.name + '</b> 回复了 <span style=\\\"color:green; font-weight:bold;\\\">20</span> 点气血。</div></div></div>';\\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: wearer}), content: msg });\\n}\\nawait thisEffect.delete();\";\nconst effectData = {\n    name: \"伏龙回生印记\",\n    img: \"systems/xjzl-system/assets/icons/neigong/万兽.png\",\n    description: \"在你的回合结束时，将为 \" + actor.name + \" 回复气血。\",\n    flags: {\n        \"xjzl-system\": {\n            slug: markSlug,\n            scripts: [\n                {\n                    trigger: \"turnEnd\",\n                    label: \"伏龙回血\",\n                    active: true,\n                    script: innerScript\n                }\n            ]\n        }\n    },\n    origin: thisItem.uuid,\n    duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"}\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nactor.showFloatyText(\"伏龙锁定！\", { fill: \"#27ae60\" });"
                         },
                         {
-                            "label": "伏龙威压光环提示",
+                            "label": "伏龙威压光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "if (actor.system.resources.hp.value > 0) {\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #d35400; background: rgba(211, 84, 0, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#c0392b;'><i class='fas fa-eye'></i> 伏龙诀 - 圆满威压</div><div style='font-size:0.9em; color:#555; margin-top:3px;'>进入战斗！请手动给 20 米内的所有敌人添加 <b>[伏龙威压]</b> 状态。</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                            "script": "// 伏龙威压光环：进战未濒死时生成 20 米跟随光环，范围内敌人自动获得【伏龙威压】（看破/虚招-2）。\n// 切换运功或脱战时消散。\nif (actor.system.resources.hp.value > 0) {\n    await game.xjzl.aura.create(actor, {\n        label: \"neigong-fulong-\" + actor.id,\n        displayName: \"伏龙威压\",\n        follow: true,\n        radius: 20,\n        faction: \"enemy\",\n        includeSelf: false,\n        payloadItemUuid: thisItem.uuid,\n        payloadEffectName: \"伏龙威压\",\n        lifecycle: \"yungong\",\n        combatId: game.combat?.id ?? null,\n        cleanupOnExit: true\n    });\n}"
                         }
                     ]
                 }
@@ -420,7 +426,6 @@
         "effects": [
             {
                 "name": "伏龙威压",
-                "icon": "systems/xjzl-system/assets/icons/neigong/万兽.png",
                 "transfer": false,
                 "description": "被伏龙诀内力震慑，虚招对抗检定-2。",
                 "flags": {
@@ -429,18 +434,22 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.kanpo",
-                        "mode": 2,
-                        "value": "-2"
-                    },
-                    {
-                        "key": "system.combat.xuzhao",
-                        "mode": 2,
-                        "value": "-2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/neigong/万兽.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.kanpo",
+                            "value": "-2",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.xuzhao",
+                            "value": "-2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     }

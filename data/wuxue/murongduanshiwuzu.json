@@ -206,7 +206,7 @@
                             "label": "效果应用",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    // 敌方封招：传入对象配置持续时间\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fengzhao\", duration: { rounds: 1 } });\n    \n    // 自身凌虚\n    const lingxu = thisItem.effects.getName(\"凌虚\").toObject();\n    delete lingxu._id;\n    lingxu.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, lingxu);\n}"
+                            "script": "if (args.isHit) {\n    // 敌方封招：传入对象配置持续时间\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fengzhao\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} });\n    \n    // 自身凌虚\n    const lingxu = thisItem.effects.getName(\"凌虚\").toObject();\n    delete lingxu._id;\n    lingxu.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, lingxu);\n}"
                         }
                     ]
                 }
@@ -215,7 +215,6 @@
         "effects": [
             {
                 "name": "凌虚",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                 "description": "《凌虚指》释放距离+4。招式伤害提升。",
                 "transfer": false,
                 "flags": {
@@ -225,7 +224,11 @@
                         "tiedToStance": true
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -405,7 +408,7 @@
                             "label": "格挡获气脉",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effData = thisItem.effects.getName(\"气脉\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 补充持续时间\neffData.duration = { rounds: 1 };\n\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst costMod = 5 + (lvl - 1) * 5;\nconst hitMod = 5 + (lvl - 1) * 5;\nconst dmgMod = 10 + (lvl - 1) * 10;\n\neffData.flags[\"xjzl-system\"].qimai = { cost: costMod, hit: hitMod, dmg: dmgMod };\neffData.description += ` (消耗+${costMod}, 命中-${hitMod}, 伤害+${dmgMod})`;\n\nawait game.xjzl.api.effects.addEffect(actor, effData);"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effData = thisItem.effects.getName(\"气脉\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 补充持续时间\neffData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst costMod = 5 + (lvl - 1) * 5;\nconst hitMod = 5 + (lvl - 1) * 5;\nconst dmgMod = 10 + (lvl - 1) * 10;\n\neffData.flags[\"xjzl-system\"].qimai = { cost: costMod, hit: hitMod, dmg: dmgMod };\neffData.description += ` (消耗+${costMod}, 命中-${hitMod}, 伤害+${dmgMod})`;\n\nawait game.xjzl.api.effects.addEffect(actor, effData);"
                         }
                     ]
                 },
@@ -484,7 +487,7 @@
                         {
                             "label": "获六脉贯通",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst rangeBonus = 5 + (lvl - 1) * 5;\nconst eff = thisItem.effects.getName(\"六脉贯通\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\neff.description += ` (射程+${rangeBonus}米)`;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst rangeBonus = 5 + (lvl - 1) * 5;\nconst eff = thisItem.effects.getName(\"六脉贯通\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\neff.description += ` (射程+${rangeBonus}米)`;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -540,7 +543,6 @@
         "effects": [
             {
                 "name": "气脉",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "六脉神指消耗增加，命中降低，伤害提升。",
                 "transfer": false,
                 "flags": {
@@ -575,15 +577,20 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "凝气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "六脉神指不消耗内力。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 1
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -599,11 +606,14 @@
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "六脉贯通",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                 "description": "射程增加，主要与反应动作互换，选中目标失去反应。",
                 "transfer": false,
                 "flags": {
@@ -612,7 +622,11 @@
                         "stackable": false
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -730,7 +744,6 @@
         "effects": [
             {
                 "name": "护灵",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "降低 50 点内力上限，免疫毒素伤害和毒素效果。",
                 "transfer": false,
                 "flags": {
@@ -739,18 +752,22 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": "-50"
-                    },
-                    {
-                        "key": "system.combat.resistances.poison.mod",
-                        "mode": 2,
-                        "value": "999"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": "-50",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.resistances.poison.mod",
+                            "value": "999",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -859,7 +876,6 @@
         "effects": [
             {
                 "name": "巫纹 (铅丹·熊)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "招式伤害+5",
                 "transfer": false,
                 "flags": {
@@ -868,17 +884,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (铅丹·虎)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "招式伤害+2",
                 "transfer": false,
                 "flags": {
@@ -887,17 +906,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (铅丹·狼)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "招式伤害+2",
                 "transfer": false,
                 "flags": {
@@ -906,17 +928,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (铅丹·蛇)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "内外功防御+2",
                 "transfer": false,
                 "flags": {
@@ -925,22 +950,25 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "2"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "2",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (铅丹·鹰)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "招式伤害+2",
                 "transfer": false,
                 "flags": {
@@ -949,17 +977,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (苗绿·熊)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "气血上限+10",
                 "transfer": false,
                 "flags": {
@@ -968,17 +999,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.resources.hp.bonus",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.resources.hp.bonus",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (苗绿·虎)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "气血上限+5",
                 "transfer": false,
                 "flags": {
@@ -987,17 +1021,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.resources.hp.bonus",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.resources.hp.bonus",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (苗绿·狼)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "格挡值+4",
                 "transfer": false,
                 "flags": {
@@ -1006,17 +1043,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.block",
-                        "mode": 2,
-                        "value": "4"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "value": "4",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (苗绿·蛇)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "毒素抗性+5 (毒伤-5)",
                 "transfer": false,
                 "flags": {
@@ -1025,17 +1065,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.resistances.poison.mod",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.resistances.poison.mod",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (苗绿·鹰)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "内外功防御+2",
                 "transfer": false,
                 "flags": {
@@ -1044,22 +1087,25 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "2"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "2",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (牙银·熊)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "暴击骰-1",
                 "transfer": false,
                 "flags": {
@@ -1068,22 +1114,25 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.crit_waigong",
-                        "mode": 2,
-                        "value": "-1"
-                    },
-                    {
-                        "key": "system.combat.crit_neigong",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "value": "-1",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "value": "-1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (牙银·虎)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "虚招值+2",
                 "transfer": false,
                 "flags": {
@@ -1092,17 +1141,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.xuzhao",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.xuzhao",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (牙银·狼)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "暴击骰-2",
                 "transfer": false,
                 "flags": {
@@ -1111,22 +1163,25 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.crit_waigong",
-                        "mode": 2,
-                        "value": "-2"
-                    },
-                    {
-                        "key": "system.combat.crit_neigong",
-                        "mode": 2,
-                        "value": "-2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "value": "-2",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "value": "-2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (牙银·蛇)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "先攻+2",
                 "transfer": false,
                 "flags": {
@@ -1135,17 +1190,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.initiative",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.initiative",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (牙银·鹰)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "先攻+5",
                 "transfer": false,
                 "flags": {
@@ -1154,17 +1212,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.initiative",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.initiative",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (绀青·熊)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "格挡值+2",
                 "transfer": false,
                 "flags": {
@@ -1173,17 +1234,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.block",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (绀青·虎)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "内力+5",
                 "transfer": false,
                 "flags": {
@@ -1192,17 +1256,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (绀青·狼)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "虚招值+1",
                 "transfer": false,
                 "flags": {
@@ -1211,17 +1278,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.xuzhao",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.xuzhao",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (绀青·蛇)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "内力+10",
                 "transfer": false,
                 "flags": {
@@ -1230,17 +1300,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (绀青·鹰)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "看破值+1",
                 "transfer": false,
                 "flags": {
@@ -1249,17 +1322,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.kanpo",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.kanpo",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (炭黑·熊)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "内外功防御+5",
                 "transfer": false,
                 "flags": {
@@ -1268,22 +1344,25 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "5"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "5",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (炭黑·虎)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "看破值+2",
                 "transfer": false,
                 "flags": {
@@ -1292,17 +1371,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.kanpo",
-                        "mode": 2,
-                        "value": "2"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.kanpo",
+                            "value": "2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (炭黑·狼)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "移动速度+1",
                 "transfer": false,
                 "flags": {
@@ -1311,17 +1393,20 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (炭黑·蛇)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "暴击骰-1",
                 "transfer": false,
                 "flags": {
@@ -1330,22 +1415,25 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.crit_waigong",
-                        "mode": 2,
-                        "value": "-1"
-                    },
-                    {
-                        "key": "system.combat.crit_neigong",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "value": "-1",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "value": "-1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "巫纹 (炭黑·鹰)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                 "description": "移动速度+3",
                 "transfer": false,
                 "flags": {
@@ -1354,13 +1442,17 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "3"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "3",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     }

@@ -1,6 +1,7 @@
 // module/applications/effect-selection-dialog.mjs
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { promptEffectDuration } from "../sheets/behaviors/effect-interactions.mjs";
+import { resolveTargetPortrait } from "../utils/portrait.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -64,6 +65,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
     };
 
+    // 首次渲染登记前暂存实例，供连续打开时复用。
+    static #pendingInstance = null;
+
     constructor(options = {}) {
         super(options);
         // 目标 Actor：从角色卡打开状态盘时直接传入；为 null 时由 _getTargetActors 取当前选中的 Token
@@ -118,9 +122,86 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * @returns {Promise<EffectSelectionDialog>} Foundry 的关闭结果。
      */
     async close(options = {}) {
+        if (EffectSelectionDialog.#pendingInstance === this) EffectSelectionDialog.#pendingInstance = null;
+        // 核心完成关闭动画后才移除实例；此期间保留监听器，避免关闭与渲染交错时失效。
+        const result = await super.close(options);
         for (const [hook, id] of this._hookIds) Hooks.off(hook, id);
         this._hookIds = [];
-        return super.close(options);
+        return result;
+    }
+
+    /**
+     * 枚举注册表中全部状态盘实例（含正在关闭的）。
+     * @returns {EffectSelectionDialog[]}
+     */
+    static #registered() {
+        const registry = foundry.applications?.instances;
+        if (!registry) return [];
+        const apps = registry instanceof Map ? registry.values() : Object.values(registry);
+        return [...apps].filter(app => app?.options?.id === "xjzl-effect-picker");
+    }
+
+    /**
+     * 查找 V14 注册表中可复用的状态盘实例；关闭中的实例不可复用。
+     * 首次渲染登记前的实例由 #pendingInstance 保存。
+     * @returns {EffectSelectionDialog|undefined} 渲染中或已渲染的实例。
+     */
+    static findInstance() {
+        const states = ApplicationV2.RENDER_STATES;
+        for (const app of EffectSelectionDialog.#registered()) {
+            if (app.state >= states.RENDERING) return app;
+        }
+        return undefined;
+    }
+
+    /**
+     * 统一打开状态盘，复用已登记或首次渲染中的实例。
+     * 首次渲染前暂存实例，避免连续调用创建同 ID 窗口和多余的 Hooks。
+     * @param {Actor|null} [actor] 绑定目标 Actor；null 表示按画布选中动态取目标。
+     * @returns {Promise<EffectSelectionDialog|undefined>} 实例（首次渲染异步进行）；旧窗口关闭失败时返回 undefined。
+     */
+    static async #open({ actor = null } = {}) {
+        // 关闭中的实例仍占用 ID；等待其注销，失败时中止打开。
+        const states = ApplicationV2.RENDER_STATES;
+        for (const app of EffectSelectionDialog.#registered()) {
+            if (app.state <= states.CLOSING) {
+                try {
+                    await app.close();
+                } catch (error) {
+                    console.error("XJZL | 状态盘旧窗口关闭失败，本次打开中止:", error);
+                    ui.notifications.error(game.i18n.localize("XJZL.UI.EffectPicker.OpenFailedOldClose"));
+                    return undefined;
+                }
+            }
+        }
+        const existing = EffectSelectionDialog.findInstance() ?? EffectSelectionDialog.#pendingInstance;
+        if (existing) {
+            existing.actor = actor;
+            // 核心按实例串行处理渲染，首次渲染期间的再次调用会排队。
+            existing.render(true, { focus: true });
+            return existing;
+        }
+        const app = new EffectSelectionDialog({ actor });
+        EffectSelectionDialog.#pendingInstance = app;
+        app.render(true).then(
+            () => {
+                if (EffectSelectionDialog.#pendingInstance === app) EffectSelectionDialog.#pendingInstance = null;
+            },
+            error => {
+                if (EffectSelectionDialog.#pendingInstance === app) EffectSelectionDialog.#pendingInstance = null;
+                console.error("XJZL | 状态盘打开失败:", error);
+                // 渲染失败不会触发 close，需清理构造时注册的 Hooks。
+                app.close().catch(closeError => console.error("XJZL | 状态盘关闭失败:", closeError));
+            }
+        );
+        return app;
+    }
+
+    /**
+     * 静态入口：打开不绑定角色卡的状态盘（工具栏按钮等画布目标场景）
+     */
+    static open() {
+        return EffectSelectionDialog.#open({ actor: null });
     }
 
     /**
@@ -128,23 +209,21 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * 窗口已存在则复用并切换目标（避免重复弹窗），否则新建实例
      */
     static openForActor(actor) {
-        const existingApp = Object.values(ui.windows).find(app => app.options.id === "xjzl-effect-picker");
-        if (existingApp) {
-            existingApp.actor = actor;
-            existingApp.render(true, { focus: true });
-            return existingApp;
-        }
-        return new EffectSelectionDialog({ actor }).render(true);
+        return EffectSelectionDialog.#open({ actor: actor ?? null });
     }
 
     /**
-     * 准备渲染数据 - 扫描全场景
+     * 准备状态选取器模板数据，目标头像与操作目标来自同一快照。
+     * @param {object} options ApplicationV2 渲染选项。
+     * @returns {Promise<object>} 状态、目标及头像的模板数据。
      */
     async _prepareContext(options) {
-        const targetActors = this._getTargetActors();
+        const targets = this._collectTargets();
+        const targetActors = targets.map(target => target.actor);
         const targetMode = targetActors.length === 0 ? "none" : (targetActors.length === 1 ? "single" : "multiple");
         const targetActor = targetMode === "single" ? targetActors[0] : null;
-        const targetAvatarInfo = targetMode === "multiple" ? this._buildTargetAvatars(targetActors) : null;
+        const targetPortrait = targetMode === "single" ? targets[0]?.img : null;
+        const targetAvatarInfo = targetMode === "multiple" ? this._buildTargetAvatars(targets) : null;
         const currentEffects = targetActor ? this._prepareCurrentEffects(targetActor) : [];
         const activeEffectSlugs = new Set(currentEffects.map(e => e.slug).filter(Boolean));
         const recentIds = await this._getRecentStatusIds();
@@ -155,7 +234,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         // ===========================================
         // 1. 通用状态 (Universal)
         // ===========================================
-        const statusEffects = CONFIG.statusEffects.map(e => {
+        const statusEffects = Object.values(CONFIG.statusEffects).map(e => {
             const name = game.i18n.localize(e.name);
             const descKey = e.description || ""; // 获取配置里的 description key
             const desc = descKey ? game.i18n.localize(descKey) : "无详细描述";
@@ -266,6 +345,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         return {
             targetMode,
             targetActor,
+            targetPortrait,
             targetActors,
             currentEffects,
             hasTarget: targetActors.length > 0,
@@ -284,12 +364,12 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
-     * 构建多目标模式下头部展示的头像列表；入参已由 _getTargetActors 按 Actor UUID 去重。
-     * @param {Actor[]} actors 当前目标 Actor 列表（去重后）。
+     * 构建多目标模式下头部展示的头像列表；入参已由 _collectTargets 按 Actor UUID 去重。
+     * @param {Array<{actor: Actor, img: string}>} targets 当前目标列表（去重后，img 为目标头像）。
      * @returns {{avatars: Array<{img: string, name: string}>, total: number}}
      */
-    _buildTargetAvatars(actors) {
-        const avatars = actors.map(actor => ({ img: actor.img, name: actor.name, uuid: actor.uuid }));
+    _buildTargetAvatars(targets) {
+        const avatars = targets.map(({ actor, img }) => ({ img, name: actor.name, uuid: actor.uuid }));
         return { avatars, total: avatars.length };
     }
 
@@ -305,17 +385,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                 let source = e.sourceName;
                 if (source === "Unknown" || !source) source = e.parent instanceof Item ? e.parent.name : "未知来源";
 
-                let durationLabel = "";
-                const d = e.duration;
-                if (d?.rounds) {
-                    if (game.combat?.round) {
-                        const elapsed = game.combat.round - (d.startRound || game.combat.round);
-                        const remaining = Math.max(0, d.rounds - elapsed);
-                        durationLabel = remaining === 0 ? "即将结束" : `${remaining} 回合`;
-                    } else {
-                        durationLabel = `${d.rounds} 回合`;
-                    }
-                }
+                // V14：剩余时长统一走管理器的派生数据标签
+                const durationLabel = ActiveEffectManager.getDurationLabel(e) || "";
 
                 return {
                     id: e.id,
@@ -365,7 +436,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * 读取用户最近使用过的通用状态 id（存在 user flag，按使用时间倒序，过滤已失效的配置）
      */
     async _getRecentStatusIds() {
-        const existingIds = new Set(CONFIG.statusEffects.map(e => e.id));
+        const existingIds = new Set(Object.keys(CONFIG.statusEffects));
         const savedIds = await game.user.getFlag("xjzl-system", "recentStatusPickerIds") || [];
         return savedIds.filter(id => existingIds.has(id)).slice(0, RECENT_STATUS_LIMIT);
     }
@@ -383,19 +454,20 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * 读取用户收藏的「常用」状态 id；从未设置时回退到默认列表 DEFAULT_FAVORITE_STATUS_IDS
      */
     async _getFavoriteStatusIds() {
-        const existingIds = new Set(CONFIG.statusEffects.map(e => e.id));
+        const existingIds = new Set(Object.keys(CONFIG.statusEffects));
         const savedIds = await game.user.getFlag("xjzl-system", "favoriteStatusPickerIds");
         const sourceIds = Array.isArray(savedIds) ? savedIds : DEFAULT_FAVORITE_STATUS_IDS;
         return sourceIds.filter(id => existingIds.has(id)).slice(0, FAVORITE_STATUS_LIMIT);
     }
 
     /**
-     * 辅助：获取当前选中的目标
-     * 若从角色卡打开（this.actor 已指定）则固定为该角色；否则按当前目标模式读取框选或瞄准的 Token。
-     * 统一按 Actor UUID 去重，让头部头像、目标计数与各项操作共用同一列表（同一 Actor 的多个 Token 只算一次）。
+     * 汇总角色卡或画布目标及可用于图片元素的头像，画布目标按 Actor UUID 去重。
+     * @param {{notify?: boolean}} [options] 无目标时是否显示提示。
+     * @returns {Array<{actor: Actor, img: string}>} 目标 Actor 与对应头像。
      */
-    _getTargetActors({ notify = false } = {}) {
-        if (this.actor) return [this.actor].filter(Boolean);
+    _collectTargets({ notify = false } = {}) {
+        // 合成 Actor 的 token 保留所属 Token 贴图；链接 Actor 回退角色卡立绘。
+        if (this.actor) return [{ actor: this.actor, img: resolveTargetPortrait(this.actor.token, this.actor) }];
 
         const tokens = this._targetMode === "targeted"
             ? Array.from(game.user.targets || [])
@@ -406,13 +478,22 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             const actor = token.actor;
             if (!actor?.uuid || seen.has(actor.uuid)) continue;
             seen.add(actor.uuid);
-            targets.push(actor);
+            targets.push({ actor, img: resolveTargetPortrait(token.document, actor) });
         }
         if (targets.length === 0) {
             if (notify) ui.notifications.warn(game.i18n.localize("XJZL.UI.EffectPicker.NoTargetSelected"));
             return [];
         }
         return targets;
+    }
+
+    /**
+     * 获取当前目标 Actor，供操作入口复用。
+     * @param {{notify?: boolean}} [options] 无目标时是否显示提示。
+     * @returns {Actor[]} 按 UUID 去重的目标 Actor。
+     */
+    _getTargetActors({ notify = false } = {}) {
+        return this._collectTargets({ notify }).map(target => target.actor);
     }
 
     /**
@@ -484,7 +565,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const slug = target.dataset.slug;
 
         // 从 CONFIG 中查找数据模板
-        const statusData = CONFIG.statusEffects.find(e => e.id === slug);
+        const statusData = CONFIG.statusEffects[slug];
         if (!statusData) return;
 
         for (const actor of actors) {
@@ -494,7 +575,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
 
         await this._rememberStatus(statusData.id);
-        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.AppliedToTargets", {
             count: actors.length,
             name: game.i18n.localize(statusData.name)
         }));
@@ -527,7 +608,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
 
         await this._rememberSceneEffect(uuid);
-        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.AppliedToTargets", {
             count: actors.length,
             name: sourceEffect.name
         }));
@@ -562,7 +643,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         if (!effect) return;
 
         await effect.delete();
-        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.RemovedStatus", { name: effect.name }));
+        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.RemovedStatus", { name: effect.name }));
         this.render();
     }
 
@@ -781,7 +862,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                     if (!effect.isStackable) return;
                     const currentStacks = effect.stacks || 1;
                     if (currentStacks > 1) await ActiveEffectManager.removeEffect(actors[0], effect.id, 1);
-                    else ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.OneStackLeft", { name: effect.name }));
+                    else ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.OneStackLeft", { name: effect.name }));
                     this.render();
                 }
             });

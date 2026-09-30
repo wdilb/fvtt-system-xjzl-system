@@ -101,7 +101,7 @@
                             "label": "击破施加缚身",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const fushen = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    fushen.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, fushen);\n    actor.showFloatyText(\"缚身！\", { fill: \"#ff0000\" });\n}"
+                            "script": "if (args.isBroken) {\n    const fushen = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen'));\n    fushen.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, fushen);\n    actor.showFloatyText(\"缚身！\", { fill: \"#ff0000\" });\n}"
                         }
                     ]
                 },
@@ -132,7 +132,7 @@
                             "label": "格挡禁足",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args) || !args.attacker) return;\n\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nlet inRange = false;\n\nif (t1 && t2) {\n    const measure = canvas.grid.measurePath([t1.center, t2.center]);\n    if (measure.distance <= 1.1) inRange = true;\n}\n\nif (inRange) {\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    root.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, root);\n    actor.showFloatyText(\"蛇身缠绕！\", { fill: \"#FFA500\" });\n}"
+                            "script": "if (!Macros.checkStance(actor, args) || !args.attacker) return;\n\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nlet inRange = false;\n\nif (t1 && t2) {\n    const measure = canvas.grid.measurePath([t1.center, t2.center]);\n    if (measure.distance <= 1.1) inRange = true;\n}\n\nif (inRange) {\n    const root = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    root.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.attacker, root);\n    actor.showFloatyText(\"蛇身缠绕！\", { fill: \"#FFA500\" });\n}"
                         }
                     ]
                 },
@@ -212,7 +212,7 @@
                             "label": "附加剧痛",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const pain = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pain\"));\n    pain.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, pain);\n}"
+                            "script": "if (args.isHit) {\n    const pain = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('pain'));\n    pain.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, pain);\n}"
                         }
                     ]
                 },
@@ -286,7 +286,7 @@
                             "label": "击倒",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
+                            "script": "if (args.isHit) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
                         }
                     ]
                 },
@@ -329,7 +329,7 @@
                             "label": "倒地追击",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    root.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, root);\n    \n    const pain = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pain\"));\n    pain.duration = { rounds: 5 };\n    await game.xjzl.api.effects.addEffect(args.target, pain);\n    \n    actor.showFloatyText(\"双钩重创！\", { fill: \"#ff0000\" });\n}"
+                            "script": "if (args.isHit && args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n    const root = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    root.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, root);\n    \n    const pain = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('pain'));\n    pain.duration = { value: 5, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, pain);\n    \n    actor.showFloatyText(\"双钩重创！\", { fill: \"#ff0000\" });\n}"
                         }
                     ]
                 }
@@ -453,7 +453,7 @@
                         {
                             "label": "叠加磐石",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const panshi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"panshi\"));\n    panshi.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(actor, panshi);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const panshi = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('panshi'));\n    panshi.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(actor, panshi);\n}",
                             "active": true
                         }
                     ]
@@ -501,36 +501,42 @@
                         {
                             "label": "附加迟滞",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const effect = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\n    effect.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, effect);\n}",
+                            "script": "if (args.isHit) {\n    const effect = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('chizhi'));\n    effect.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, effect);\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "寻踪",
-                    "icon": "icons/svg/eye.svg",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuxue_wanshou_xunzong",
-                            "stackable": false
-                        }
-                    },
-                    "description": "看破值+5。 (持续到该回合结束)",
-                    "duration": {
-                        "turns": 1
-                    },
+            ]
+        },
+        "effects": [
+            {
+                "name": "寻踪",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_wanshou_xunzong",
+                        "stackable": false
+                    }
+                },
+                "description": "看破值+5。 (持续到该回合结束)",
+                "duration": {
+                    "value": 1,
+                    "units": "turns",
+                    "expiry": "turnStart"
+                },
+                "img": "icons/svg/eye.svg",
+                "system": {
                     "changes": [
                         {
                             "key": "system.combat.kanpo",
-                            "mode": 2,
-                            "value": "5"
+                            "value": "5",
+                            "type": "add"
                         }
                     ]
-                }
-            ]
-        }
+                },
+                "transfer": false,
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "兽王拳",
@@ -769,7 +775,6 @@
         "effects": [
             {
                 "name": "捕食",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
                 "description": "每层提高《兽王拳》招式伤害 5 点。",
                 "transfer": false,
                 "flags": {
@@ -779,11 +784,14 @@
                         "maxStacks": 3
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "化龙",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
                 "description": "【苍龙震天】提供的格挡值翻倍。",
                 "transfer": false,
                 "flags": {
@@ -792,11 +800,14 @@
                         "stackable": false
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "阻脉",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
                 "description": "每层使出招内力消耗提升一倍。",
                 "transfer": false,
                 "flags": {
@@ -806,17 +817,20 @@
                         "maxStacks": 3
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.mpCostMultiplier",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.mpCostMultiplier",
+                            "value": "1",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "兽王降世",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
                 "description": "免疫击飞、击退、击倒、下盘不稳、禁足和任意降低移动速度的效果。(需手动免疫)",
                 "transfer": false,
                 "flags": {
@@ -825,18 +839,22 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.forceSpeedZero",
-                        "mode": 5,
-                        "value": "false"
-                    },
-                    {
-                        "key": "flags.xjzl-system.unstable",
-                        "mode": 5,
-                        "value": "false"
-                    }
-                ]
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.forceSpeedZero",
+                            "value": "false",
+                            "type": "override"
+                        },
+                        {
+                            "key": "flags.xjzl-system.unstable",
+                            "value": "false",
+                            "type": "override"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -908,7 +926,7 @@
                     "targetInfo": "周围敌人",
                     "description": "蓄力动作，笔走狼势，移步戳笔，对周围敌人造成 0.4 力量点内功伤害，之后为自身添加“走兽”，持续@{1 + @up|一}回合。\n走兽：回合结束时，周围范围内的敌人流失 10 点气血。\n·此招可移动释放，对移动路径上周围 1 米范围内的敌人造成伤害。（不会重复造成伤害）\n升级：招式伤害+10，走兽持续回合+1，消耗+4。",
                     "actionCost": "蓄力动作",
-                    "automationNote": "移动路径伤害需手动。走兽光环伤害需回合末手动。",
+                    "automationNote": "部分自动化（战斗内）：施展后自动获得“走兽”（1+升级 回合），并生成跟随自身的 1 米走兽光环：范围内敌人每回合结束自动流失 10 点气血；光环随走兽到期消散。移动释放的路径伤害随本招结算（路径留痕超出框架，由 GM 把握）。",
                     "x-xjzl-aura": true,
                     "costs": {
                         "mp": [
@@ -941,8 +959,14 @@
                         {
                             "label": "获得走兽",
                             "trigger": "attack",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"走兽\").toObject();\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"走兽\").toObject();\neffectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
                             "active": true
+                        },
+                        {
+                            "label": "走兽光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 走兽：跟随自身 1 米光环（与走兽状态同寿命），范围内敌人回合结束时流失 10 点气血。\n// 移动路径伤害仍随本招结算（路径留痕超出框架，手动把握）。\nconst zlLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-zoushou-\" + actor.id,\n    displayName: \"走兽\",\n    follow: true,\n    radius: 1,\n    faction: \"enemy\",\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: \"tokenRoundEnd\",\n    roundAction: {kind: \"damage\", amount: \"10\", type: \"liushi\"},\n    durationRounds: 1 + (zlLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 },
@@ -1029,69 +1053,79 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "飞禽",
-                    "icon": "icons/svg/wing.svg",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuxue_wanshou_bird"
-                        }
-                    },
-                    "description": "移动时不受《趁虚而入》攻击。"
+            ]
+        },
+        "effects": [
+            {
+                "name": "飞禽",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_wanshou_bird"
+                    }
                 },
-                {
-                    "name": "走兽",
-                    "icon": "icons/svg/pawprint.svg",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuxue_wanshou_beast",
-                            "scripts": [
-                                {
-                                    "trigger": "turnEnd",
-                                    "script": "ChatMessage.create({ content: `${actor.name} 的【走兽】效果：请手动对周围敌人应用 10 点流失伤害。` });",
-                                    "label": "走兽光环提示"
-                                }
-                            ]
-                        }
-                    },
-                    "description": "回合结束时，周围范围内的敌人流失 10 点气血。"
+                "description": "移动时不受《趁虚而入》攻击。",
+                "img": "icons/svg/wing.svg",
+                "transfer": false,
+                "showIcon": 2
+            },
+            {
+                "name": "走兽",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_wanshou_beast",
+                        "scripts": [
+                            {
+                                "trigger": "turnEnd",
+                                "label": "走兽光环提示",
+                                "script": "// 光环源（自己已建走兽光环）回合末由光环自动结算，跳过提醒；\n// 被【物竞天择】复制走兽的友方没有光环，仍按原文手动结算。\nconst zlTok = actor.getActiveTokens?.()[0];\nconst zlDoc = zlTok?.document ?? zlTok;\nif (zlDoc && [...(zlDoc.regions ?? [])].some(r => (r.getFlag(\"xjzl-system\", \"aura\")?.label ?? \"\") === \"wuxue-zoushou-\" + actor.id)) return;\nawait ChatMessage.create({ content: `${actor.name} 的【走兽】效果：请手动对周围敌人应用 10 点流失伤害。` });"
+                            }
+                        ]
+                    }
                 },
-                {
-                    "name": "游鱼",
-                    "icon": "icons/svg/fish.svg",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuxue_wanshou_fish"
-                        }
-                    },
-                    "description": "不会陷入倒地状态。"
+                "description": "回合结束时，周围范围内的敌人流失 10 点气血。",
+                "img": "icons/svg/pawprint.svg",
+                "transfer": false,
+                "showIcon": 2
+            },
+            {
+                "name": "游鱼",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_wanshou_fish"
+                    }
                 },
-                {
-                    "name": "百兽",
-                    "icon": "icons/svg/king.svg",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuxue_wanshou_all"
-                        }
-                    },
-                    "description": "招式伤害提升 20 点，移动速度+5；你的兽宠造成的伤害翻倍，且在它的回合末回复 1 体力。",
+                "description": "不会陷入倒地状态。",
+                "img": "icons/svg/fish.svg",
+                "transfer": false,
+                "showIcon": 2
+            },
+            {
+                "name": "百兽",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_wanshou_all"
+                    }
+                },
+                "description": "招式伤害提升 20 点，移动速度+5；你的兽宠造成的伤害翻倍，且在它的回合末回复 1 体力。",
+                "img": "icons/svg/king.svg",
+                "system": {
                     "changes": [
                         {
                             "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": 20
+                            "value": 20,
+                            "type": "add"
                         },
                         {
                             "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": 5
+                            "value": 5,
+                            "type": "add"
                         }
                     ]
-                }
-            ]
-        }
+                },
+                "transfer": false,
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "驭兽要诀",
@@ -1190,25 +1224,27 @@
                         {
                             "label": "施加野性",
                             "trigger": "hit",
-                            "script": "if (!args.target || args.target.type !== \"creature\") {\n    ui.notifications.warn(\"野性勃发只能指定兽宠。\");\n    return;\n}\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = 10 + (lvl - 1) * 5;\nconst effectData = thisItem.effects.getName(\"野性\").toObject();\neffectData.description = `防护+${bonus}（自动），伤害+${bonus}（手动）。结束时体力上限-1（手动）。`;\neffectData.changes = [\n    { key: \"system.combat.protection\", mode: 2, value: bonus }\n];\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
+                            "script": "if (!args.target || args.target.type !== \"creature\") {\n    ui.notifications.warn(\"野性勃发只能指定兽宠。\");\n    return;\n}\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = 10 + (lvl - 1) * 5;\nconst effectData = thisItem.effects.getName(\"野性\").toObject();\neffectData.description = `防护+${bonus}（自动），伤害+${bonus}（手动）。结束时体力上限-1（手动）。`;\neffectData.system.changes = [\n    { key: \"system.combat.protection\", type: \"add\", value: bonus }\n];\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "野性",
-                    "icon": "icons/svg/blood.svg",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuxue_wanshou_wildness"
-                        }
-                    },
-                    "description": "防护提升，伤害提升，结束时体力上限-1。"
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "野性",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_wanshou_wildness"
+                    }
+                },
+                "description": "防护提升，伤害提升，结束时体力上限-1。",
+                "img": "icons/svg/blood.svg",
+                "transfer": false,
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "兽窍五通",
@@ -1257,110 +1293,125 @@
                     },
                     "scripts": []
                 }
-            ],
-            "effects": [
-                {
-                    "name": "兽窍·虎",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
-                    "disabled": true,
-                    "transfer": true,
-                    "description": "力量属性及其下属所有技能(角力、挣脱、抛掷、擒抱)的检定结果增加。",
-                    "changes": [],
-                    "flags": {
-                        "xjzl-system": {
-                            "scripts": [
-                                {
-                                    "label": "兽窍加成",
-                                    "trigger": "passive",
-                                    "active": true,
-                                    "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.liliang.checkMod += bonus;\nS.skills.jiaoli.checkMod += bonus;\nS.skills.zhengtuo.checkMod += bonus;\nS.skills.paozhi.checkMod += bonus;\nS.skills.qinbao.checkMod += bonus;"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "兽窍·鸟",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
-                    "disabled": true,
-                    "transfer": true,
-                    "description": "身法属性及其下属所有技能(潜行、巧手、轻功、马术)的检定结果增加。",
-                    "changes": [],
-                    "flags": {
-                        "xjzl-system": {
-                            "scripts": [
-                                {
-                                    "label": "兽窍加成",
-                                    "trigger": "passive",
-                                    "active": true,
-                                    "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.shenfa.checkMod += bonus;\nS.skills.qianxing.checkMod += bonus;\nS.skills.qiaoshou.checkMod += bonus;\nS.skills.qinggong.checkMod += bonus;\nS.skills.mashu.checkMod += bonus;"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "兽窍·熊",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
-                    "disabled": true,
-                    "transfer": true,
-                    "description": "体魄属性及其下属所有技能(韧性、闭气、忍耐、凝血)的检定结果增加。",
-                    "changes": [],
-                    "flags": {
-                        "xjzl-system": {
-                            "scripts": [
-                                {
-                                    "label": "兽窍加成",
-                                    "trigger": "passive",
-                                    "active": true,
-                                    "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.tipo.checkMod += bonus;\nS.skills.renxing.checkMod += bonus;\nS.skills.biqi.checkMod += bonus;\nS.skills.rennai.checkMod += bonus;\nS.skills.ningxue.checkMod += bonus;"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "兽窍·鹿",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
-                    "disabled": true,
-                    "transfer": true,
-                    "description": "内息属性及其下属所有技能(疗伤、冲穴、敛息、毒气)的检定结果增加。",
-                    "changes": [],
-                    "flags": {
-                        "xjzl-system": {
-                            "scripts": [
-                                {
-                                    "label": "兽窍加成",
-                                    "trigger": "passive",
-                                    "active": true,
-                                    "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.neixi.checkMod += bonus;\nS.skills.liaoshang.checkMod += bonus;\nS.skills.chongxue.checkMod += bonus;\nS.skills.lianxi.checkMod += bonus;\nS.skills.duqi.checkMod += bonus;"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "兽窍·猿",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
-                    "disabled": true,
-                    "transfer": true,
-                    "description": "气感属性及其下属所有技能(点穴、追踪、探查、洞察)的检定结果增加。",
-                    "changes": [],
-                    "flags": {
-                        "xjzl-system": {
-                            "scripts": [
-                                {
-                                    "label": "兽窍加成",
-                                    "trigger": "passive",
-                                    "active": true,
-                                    "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.qigan.checkMod += bonus;\nS.skills.dianxue.checkMod += bonus;\nS.skills.zhuizong.checkMod += bonus;\nS.skills.tancha.checkMod += bonus;\nS.skills.dongcha.checkMod += bonus;"
-                                }
-                            ]
-                        }
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "兽窍·虎",
+                "disabled": true,
+                "transfer": true,
+                "description": "力量属性及其下属所有技能(角力、挣脱、抛掷、擒抱)的检定结果增加。",
+                "flags": {
+                    "xjzl-system": {
+                        "scripts": [
+                            {
+                                "label": "兽窍加成",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.liliang.checkMod += bonus;\nS.skills.jiaoli.checkMod += bonus;\nS.skills.zhengtuo.checkMod += bonus;\nS.skills.paozhi.checkMod += bonus;\nS.skills.qinbao.checkMod += bonus;"
+                            }
+                        ],
+                        "slug": "shouqiao_hu"
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": []
+                }
+            },
+            {
+                "name": "兽窍·鸟",
+                "disabled": true,
+                "transfer": true,
+                "description": "身法属性及其下属所有技能(潜行、巧手、轻功、马术)的检定结果增加。",
+                "flags": {
+                    "xjzl-system": {
+                        "scripts": [
+                            {
+                                "label": "兽窍加成",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.shenfa.checkMod += bonus;\nS.skills.qianxing.checkMod += bonus;\nS.skills.qiaoshou.checkMod += bonus;\nS.skills.qinggong.checkMod += bonus;\nS.skills.mashu.checkMod += bonus;"
+                            }
+                        ],
+                        "slug": "shouqiao_niao"
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": []
+                }
+            },
+            {
+                "name": "兽窍·熊",
+                "disabled": true,
+                "transfer": true,
+                "description": "体魄属性及其下属所有技能(韧性、闭气、忍耐、凝血)的检定结果增加。",
+                "flags": {
+                    "xjzl-system": {
+                        "scripts": [
+                            {
+                                "label": "兽窍加成",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.tipo.checkMod += bonus;\nS.skills.renxing.checkMod += bonus;\nS.skills.biqi.checkMod += bonus;\nS.skills.rennai.checkMod += bonus;\nS.skills.ningxue.checkMod += bonus;"
+                            }
+                        ],
+                        "slug": "shouqiao_xiong"
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": []
+                }
+            },
+            {
+                "name": "兽窍·鹿",
+                "disabled": true,
+                "transfer": true,
+                "description": "内息属性及其下属所有技能(疗伤、冲穴、敛息、毒气)的检定结果增加。",
+                "flags": {
+                    "xjzl-system": {
+                        "scripts": [
+                            {
+                                "label": "兽窍加成",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.neixi.checkMod += bonus;\nS.skills.liaoshang.checkMod += bonus;\nS.skills.chongxue.checkMod += bonus;\nS.skills.lianxi.checkMod += bonus;\nS.skills.duqi.checkMod += bonus;"
+                            }
+                        ],
+                        "slug": "shouqiao_lu"
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": []
+                }
+            },
+            {
+                "name": "兽窍·猿",
+                "disabled": true,
+                "transfer": true,
+                "description": "气感属性及其下属所有技能(点穴、追踪、探查、洞察)的检定结果增加。",
+                "flags": {
+                    "xjzl-system": {
+                        "scripts": [
+                            {
+                                "label": "兽窍加成",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "const wuxue = actor.itemTypes.wuxue.find(w => w.name === \"兽窍五通\");\nconst lvl = wuxue ? (wuxue.system.moves.find(m => m.name === \"兽窍五通\")?.computedLevel || 0) : 0;\nif (lvl <= 0) return;\nconst bonus = 2 + lvl;\nS.stats.qigan.checkMod += bonus;\nS.skills.dianxue.checkMod += bonus;\nS.skills.zhuizong.checkMod += bonus;\nS.skills.tancha.checkMod += bonus;\nS.skills.dongcha.checkMod += bonus;"
+                            }
+                        ],
+                        "slug": "shouqiao_yuan"
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "system": {
+                    "changes": []
+                }
+            }
+        ]
     },
     {
         "name": "骑猎无双",

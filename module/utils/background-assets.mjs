@@ -86,7 +86,7 @@ async function _buildNameIndex() {
         }
 
         const index = await pack.getIndex();
-        // V13 Collection: for...of 直接迭代值（entry），非 [id, entry]
+        // Collection: for...of 直接迭代值（entry），非 [id, entry]
         for (const entry of index) {
             const name = entry.name;
             if (!nameIndex.has(name)) {

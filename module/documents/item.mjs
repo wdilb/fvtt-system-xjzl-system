@@ -3,6 +3,7 @@ import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { createAutomaticDetailAccess } from "../utils/chat-detail-access.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
+import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -26,7 +27,8 @@ export class XJZLItem extends Item {
       const effectData = this.system.buildModifierEffectData();
 
       // 初始 chosen 不会触发 _onUpdate，因此必须在创建事务中直接嵌入 AE。
-      if (effectData?.changes.length > 0) {
+      // V14：变更数组由 buildModifierEffectData 输出在 system.changes 下
+      if (effectData?.system?.changes.length > 0) {
         const effectSlug = effectData.flags["xjzl-system"].slug;
         const hasModifier = this.effects.some(
           effect => effect.getFlag("xjzl-system", "slug") === effectSlug
@@ -347,7 +349,7 @@ export class XJZLItem extends Item {
       : `${owner.name} 对 ${target.name} 使用了 ${this.name}`;
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: speaker,
       flavor: flavorText,
       content: content,
@@ -381,9 +383,10 @@ export class XJZLItem extends Item {
     }
     if (!targetItem) return ui.notifications.error("目标物品不存在。");
 
-    // 优先检查 sourceId，如果没有 sourceId，则检查 name
+    // 优先检查 compendiumSource（V14 官方来源字段，替代已移除的 flags.core.sourceId），
+    // 没有来源记录时退回 name+type 比对（覆盖旧世界数据）
     const alreadyLearned = this.actor.items.find(i =>
-      (i.flags.core?.sourceId === targetUuid) ||
+      (i._stats?.compendiumSource === targetUuid) ||
       (i.name === targetItem.name && i.type === targetItem.type)
     );
     if (alreadyLearned) {
@@ -395,8 +398,8 @@ export class XJZLItem extends Item {
     delete itemData._id;
     delete itemData.folder;
     delete itemData.ownership;
-    // 记录来源，以便下次查重
-    foundry.utils.setProperty(itemData, "flags.core.sourceId", targetUuid);
+    // 记录官方来源字段，以便下次查重（V14：flags.core.sourceId 已移除）
+    foundry.utils.setProperty(itemData, "_stats.compendiumSource", targetUuid);
 
     await this.actor.createEmbeddedDocuments("Item", [itemData]);
 
@@ -412,7 +415,7 @@ export class XJZLItem extends Item {
     });
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: speaker,
       flavor: `${this.actor.name} 阅读了 ${this.name}`,
       content: content,
@@ -2008,8 +2011,11 @@ export class XJZLItem extends Item {
       // 架招招式：在新架招 attack 脚本执行前清理其他武学遗留的绑定特效（tiedToStance），
       // 避免旧绑定 AE 参与本次出招。豁免 origin 指向当前武学的特效：
       // 同武学切换/重开架招时由 addEffect 按 slug 复用刷新，不做删除。
+      // 切换架招不经 stopStance（该入口只服务主动解除/被破/濒死），旧 stance 生命周期
+      // 光环须在此一并销毁；必须先于新架招 attack 脚本建环，否则会误删新建的区域。
       if (move.type === "stance") {
         await actor.clearStanceTiedEffects(this.uuid);
+        await AuraManager.dismissBySource({sourceActorUuid: actor.uuid, lifecycle: "stance"});
       }
 
       const attackContext = {
@@ -2096,7 +2102,7 @@ export class XJZLItem extends Item {
 
         // 3. 发送卡片
         ChatMessage.create({
-          user: game.user.id,
+          author: game.user.id,
           speaker: speaker,
           flavor: `开启架招: ${move.name}`,
           content: content,
@@ -2471,7 +2477,7 @@ export class XJZLItem extends Item {
 
       // 发送消息
       const chatData = {
-        user: game.user.id,
+        author: game.user.id,
         speaker: speaker,
         flavor: flavorText || `施展了招式: ${move.name}`,
         content: content,
@@ -2548,7 +2554,7 @@ export class XJZLItem extends Item {
 
       // 如果配置了骰子声音
       if (attackRoll) {
-        ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+        ChatMessage.applyMode(chatData, game.settings.get("core", "messageMode"));
       }
       const message = await ChatMessage.create(chatData);
 

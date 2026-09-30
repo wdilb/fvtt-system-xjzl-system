@@ -3,6 +3,7 @@
  * 目标读取支持两种模式（工具内可切换）：框选 = 画布当前选中的 Token；瞄准 = Alt+左键 瞄准的 Token。
  * 窗口保持打开时会实时同步目标变化，并按 Actor UUID 去重结算。
  */
+import { resolveTargetPortrait } from "../utils/portrait.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -99,7 +100,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       app._fixedTargets.push({
         actor: actor?.applyDamage && actor?.applyHealing ? actor : null,
         name: targetData.name || document?.name || actor?.name || targetData.uuid,
-        img: document?.texture?.src || actor?.img || "icons/svg/mystery-man.svg"
+        img: resolveTargetPortrait(document, actor)
       });
     }
 
@@ -162,8 +163,10 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
    * @returns {Promise<GenericDamageTool>} Foundry 的关闭结果。
    */
   async close(options = {}) {
+    // 核心完成关闭动画后才移除实例；此期间保留监听器，避免关闭与渲染交错时失效。
+    const result = await super.close(options);
     this._teardown();
-    return super.close(options);
+    return result;
   }
 
   /** 注销实例级监听器；无界面宏执行也用它释放构造时注册的画布 Hook。 */
@@ -238,7 +241,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       isApplying: this._isApplying,
       canApply: resolved.targets.length > 0 && !this._isApplying,
       typeLabel,
-      actionSummary: game.i18n.format(mode === "damage"
+      actionSummary: game.i18n.localize(mode === "damage"
         ? "XJZL.UI.DamageTool.ApplyDamageSummary"
         : "XJZL.UI.DamageTool.ApplyHealingSummary", {
         count: resolved.targets.length,
@@ -293,7 +296,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         token,
         actor: token.actor,
         name: token.name || token.actor.name,
-        img: token.document?.texture?.src || token.actor.img
+        img: resolveTargetPortrait(token.document, token.actor)
       });
     }
 
@@ -442,7 +445,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
 
     try {
       await game.clipboard.copyPlainText(command);
-      ui.notifications.info(game.i18n.format("XJZL.UI.DamageTool.MacroCopied", { count: preset.targets.length }));
+      ui.notifications.info(game.i18n.localize("XJZL.UI.DamageTool.MacroCopied", { count: preset.targets.length }));
       return command;
     } catch (error) {
       console.error("XJZL | 复制伤害工具宏代码失败:", error);
@@ -490,7 +493,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     const typeLabel = mode === "damage"
       ? game.i18n.localize(CONFIG.XJZL.damageTypes[this._state.damageType])
       : game.i18n.localize(HEALING_TYPES[this._state.healingType].label);
-    summaryNode.textContent = game.i18n.format(mode === "damage"
+    summaryNode.textContent = game.i18n.localize(mode === "damage"
       ? "XJZL.UI.DamageTool.ApplyDamageSummary"
       : "XJZL.UI.DamageTool.ApplyHealingSummary", {
       count: this._getResolvedTargets().targets.length,
@@ -585,15 +588,15 @@ await game.xjzl.damageTool.executePreset(preset);`;
     };
 
     if (failures.length === 0) {
-      ui.notifications.info(game.i18n.format("XJZL.UI.DamageTool.BatchSuccess", { count: successCount }));
+      ui.notifications.info(game.i18n.localize("XJZL.UI.DamageTool.BatchSuccess", { count: successCount }));
     } else if (successCount > 0) {
-      ui.notifications.warn(game.i18n.format("XJZL.UI.DamageTool.BatchPartial", {
+      ui.notifications.warn(game.i18n.localize("XJZL.UI.DamageTool.BatchPartial", {
         success: successCount,
         failure: failures.length,
         names: failures.join("、")
       }));
     } else {
-      ui.notifications.error(game.i18n.format("XJZL.UI.DamageTool.BatchFailed", { names: failures.join("、") }));
+      ui.notifications.error(game.i18n.localize("XJZL.UI.DamageTool.BatchFailed", { names: failures.join("、") }));
     }
 
     if (this.rendered) this.render({ force: true });
@@ -643,7 +646,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     });
 
     await ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: target.actor }),
       flavor: this._buildFlavor(reason, typeLabel, attackerActor, "damage"),
       content,
@@ -715,7 +718,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     });
 
     await ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: target.actor }),
       flavor: this._buildFlavor(reason, typeLabel, healerActor, "healing"),
       content,
@@ -770,7 +773,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
   _buildFlavor(reason, typeLabel, sourceActor, mode) {
     const escape = value => foundry.utils.escapeHTML(String(value ?? ""));
     const source = sourceActor
-      ? game.i18n.format(mode === "damage" ? "XJZL.UI.DamageTool.FromDamage" : "XJZL.UI.DamageTool.FromHealing", {
+      ? game.i18n.localize(mode === "damage" ? "XJZL.UI.DamageTool.FromDamage" : "XJZL.UI.DamageTool.FromHealing", {
         name: escape(sourceActor.name)
       })
       : "";

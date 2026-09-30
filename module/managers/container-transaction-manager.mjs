@@ -864,13 +864,13 @@ export class XJZLContainerTransactionManager {
     static async #postNeedChat(content, rolls = [], variant = "event") {
         try {
             const chatData = {
-                user: game.user.id,
+                author: game.user.id,
                 speaker: { alias: "战利品需求" },
                 content: `<div class="xjzl-loot-roll-chat is-${variant}">${content}</div>`,
                 rolls
             };
             // 需求是队伍公共流程，不能受 GM 的私聊/盲骰默认设置影响。
-            ChatMessage.applyRollMode(chatData, "publicroll");
+            ChatMessage.applyMode(chatData, "public");
             await ChatMessage.create(chatData);
         } catch (err) {
             console.error("XJZL | 发布战利品需求聊天消息失败:", { err });

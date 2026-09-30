@@ -40,7 +40,7 @@
                             "label": "欺瞒判定与阴冷状态",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const dc = 17;\nconst qimanMod = Math.floor(actor.system.skills.qiman.total || 0);\nconst roll = await new Roll(\"1d20 + @mod\", {mod: qimanMod}).evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nawait roll.toMessage({ speaker: ChatMessage.getSpeaker({actor: actor}), flavor: `断舌诀(小成) - 欺瞒检定 (DC ${dc})` });\n\nif (roll.total >= dc) {\n    const eff = thisItem.effects.getName(\"断舌诀-阴冷\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 1 };\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.hitCount\", 0);\n    \n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"气息阴冷\", { fill: \"#8e44ad\" });\n}"
+                            "script": "const dc = 17;\nconst qimanMod = Math.floor(actor.system.skills.qiman.total || 0);\nconst roll = await new Roll(\"1d20 + @mod\", {mod: qimanMod}).evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nawait roll.toMessage({ speaker: ChatMessage.getSpeaker({actor: actor}), flavor: `断舌诀(小成) - 欺瞒检定 (DC ${dc})` });\n\nif (roll.total >= dc) {\n    const eff = thisItem.effects.getName(\"断舌诀-阴冷\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.hitCount\", 0);\n    \n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"气息阴冷\", { fill: \"#8e44ad\" });\n}"
                         }
                     ]
                 },
@@ -60,7 +60,7 @@
                             "label": "欺瞒判定与阴冷状态",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const dc = 13;\nconst qimanMod = Math.floor(actor.system.skills.qiman.total || 0);\nconst roll = await new Roll(\"1d20 + @mod\", {mod: qimanMod}).evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nawait roll.toMessage({ speaker: ChatMessage.getSpeaker({actor: actor}), flavor: `断舌诀(圆满) - 欺瞒检定 (DC ${dc})` });\n\nif (roll.total >= dc) {\n    const eff = thisItem.effects.getName(\"断舌诀-阴冷\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 1 };\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.hitCount\", 0);\n    \n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"气息阴冷\", { fill: \"#8e44ad\" });\n}"
+                            "script": "const dc = 13;\nconst qimanMod = Math.floor(actor.system.skills.qiman.total || 0);\nconst roll = await new Roll(\"1d20 + @mod\", {mod: qimanMod}).evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nawait roll.toMessage({ speaker: ChatMessage.getSpeaker({actor: actor}), flavor: `断舌诀(圆满) - 欺瞒检定 (DC ${dc})` });\n\nif (roll.total >= dc) {\n    const eff = thisItem.effects.getName(\"断舌诀-阴冷\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.hitCount\", 0);\n    \n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"气息阴冷\", { fill: \"#8e44ad\" });\n}"
                         }
                     ]
                 }
@@ -82,7 +82,6 @@
         "effects": [
             {
                 "name": "断舌诀-阴冷",
-                "icon": "icons/magic/death/hand-undead-skeleton-fire-green.webp",
                 "description": "本回合内：第一次出招命中添加犹豫，第二次愚钝，第三次疲劳。",
                 "transfer": false,
                 "flags": {
@@ -93,11 +92,13 @@
                             {
                                 "trigger": "hit",
                                 "active": true,
-                                "script": "if (!args.isHit || !args.target || args.actionType !== \"attack\") return;\n\nlet count = thisEffect.getFlag(\"xjzl-system\", \"hitCount\") || 0;\ncount += 1;\nawait thisEffect.setFlag(\"xjzl-system\", \"hitCount\", count);\n\nlet statusToApply = \"\";\nlet statusName = \"\";\n\nif (count === 1) { statusToApply = \"youyu\"; statusName = \"犹豫\"; }\nelse if (count === 2) { statusToApply = \"yudun\"; statusName = \"愚钝\"; }\nelse if (count === 3) { statusToApply = \"fatigue\"; statusName = \"疲劳\"; }\n\nif (statusToApply) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: statusToApply, duration: { rounds: 1 } });\n    actor.showFloatyText(`施加 ${statusName}`, { fill: \"#8e44ad\", fontSize: 28 });\n}"
+                                "script": "if (!args.isHit || !args.target || args.actionType !== \"attack\") return;\n\nlet count = thisEffect.getFlag(\"xjzl-system\", \"hitCount\") || 0;\ncount += 1;\nawait thisEffect.setFlag(\"xjzl-system\", \"hitCount\", count);\n\nlet statusToApply = \"\";\nlet statusName = \"\";\n\nif (count === 1) { statusToApply = \"youyu\"; statusName = \"犹豫\"; }\nelse if (count === 2) { statusToApply = \"yudun\"; statusName = \"愚钝\"; }\nelse if (count === 3) { statusToApply = \"fatigue\"; statusName = \"疲劳\"; }\n\nif (statusToApply) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: statusToApply, duration: { value: 1, units: \"rounds\", expiry: \"turnStart\"} });\n    actor.showFloatyText(`施加 ${statusName}`, { fill: \"#8e44ad\", fontSize: 28 });\n}"
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/magic/death/hand-undead-skeleton-fire-green.webp",
+                "showIcon": 2
             }
         ]
     },

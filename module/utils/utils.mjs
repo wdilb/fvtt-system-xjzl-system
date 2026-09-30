@@ -59,9 +59,9 @@ export async function rollDisabilityTable(actor) {
   </div>
   `;
 
-  // 4. 发送消息 (V13 标准写法)
+  // 4. 发送消息（author 标识发送者）
   const chatData = {
-    user: game.user.id,
+    author: game.user.id,
     speaker: actor ? ChatMessage.getSpeaker({ actor }) : { alias: "命运" },
     flavor: game.i18n.localize("XJZL.Disability.Flavor"),
     content: content,
@@ -70,7 +70,7 @@ export async function rollDisabilityTable(actor) {
     rolls: [roll]
   };
 
-  ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+  ChatMessage.applyMode(chatData, game.settings.get("core", "messageMode"));
 
   // 移除 game.dice3d.showForRoll(...)，防止双重播放
   await ChatMessage.create(chatData);

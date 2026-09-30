@@ -92,7 +92,7 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         collapseKey,
         collapsed: this.collapsedEntries.has(collapseKey),
         displayOrder: String(groupIndex + 1).padStart(2, "0"),
-        displayName: group.name || game.i18n.format("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
+        displayName: group.name || game.i18n.localize("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
         npcs: group.npcs.map((npc, npcIndex) => this._prepareNpc(npc, groupIndex, npcIndex))
       };
     });
@@ -271,7 +271,7 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
   _newGroup(number) {
     return {
       id: foundry.utils.randomID(),
-      name: game.i18n.format("XJZL.Encounter.DefaultSupportGroup", { number }),
+      name: game.i18n.localize("XJZL.Encounter.DefaultSupportGroup", { number }),
       description: "",
       enabled: true,
       permission: "gm",

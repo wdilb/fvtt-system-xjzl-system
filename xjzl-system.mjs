@@ -1,7 +1,7 @@
 /**
  * 侠界之旅 - 系统主入口
  * Author: Tiwelee
- * Tech Stack: Foundry V13, ESM, DataModels
+ * Tech Stack: Foundry V14, ESM, DataModels
  */
 
 // 导入 Document 类
@@ -56,16 +56,18 @@ import { EffectSelectionDialog } from "./module/applications/effect-selection-di
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 import { setupSocket } from "./module/socket.mjs";
-import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
-import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
-import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
 import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 import { xjzlSocket } from "./module/socket.mjs";
+import { registerAuraBehavior } from "./module/region/xjzl-aura-behavior.mjs";
+import { AuraManager } from "./module/region/xjzl-aura-manager.mjs";
+import { registerAuraQuick, openAuraQuick, placeAura } from "./module/region/xjzl-aura-quick.mjs";
+import { registerAuraFxSetting } from "./module/region/xjzl-aura-fx.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
+import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -82,16 +84,27 @@ Hooks.once("init", async function () {
   // 1. 将自定义配置挂载到全局 CONFIG
   CONFIG.XJZL = XJZL;
 
+  // 类型声明位于 system.json；客户端模型需在本地化扫描前注册。
+  registerAuraBehavior();
+  // 光环管理器钩子（来源生命周期、时限、维持）在此一并注册。
+  AuraManager.init();
+  // 快建工具：Region placeable 子类（自绘显示名标签）与工具栏按钮注册。
+  registerAuraQuick();
+  // 光环视觉增强（AURA-07）：圆轮廓随 Region 子类生效；粒子设置在此注册。
+  registerAuraFxSetting();
+
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
 
-  // 替换系统的当前战斗指示物
-  XJZLTurnMarkerManager.registerSettings();
+  // 原生回合标记未指定图片或图片加载失败时使用系统图；世界与 Token 均可配置专用图片。
+  CONFIG.Combat.fallbackTurnMarker = "systems/xjzl-system/assets/picture/pause-bg.png";
+
+  registerAEMigrationSetting();
 
   // 是否启用侠界自定义距离
   game.settings.register("xjzl-system", "customDistanceRule", {
     name: "启用侠界自定义距离规则 (1-2-2-2)",
-    hint: "开启后，移动和测量将遵循：直行1，第一步斜行1，后续斜行2的规则，并针对V13地形消耗进行了修正。\n如果关闭，将使用FVTT核心设置（如欧几里得或5-10-5）进行计算。建议开启以获得最佳体验。",
+    hint: "开启后，移动和测量将遵循：直行1，第一步斜行1，后续斜行2的规则，并按核心地形消耗倍率折算。仅对场景网格对角线规则为「等效 Equidistant (1)」的场景生效，其他对角线规则下沿用核心原生计算。\n如果关闭，将使用FVTT核心设置（如欧几里得或5-10-5）进行计算。建议开启以获得最佳体验。",
     scope: "world",      // 世界级设置，保持同步
     config: true,        // 显示在菜单里
     default: true,       // 默认开启
@@ -102,9 +115,6 @@ Hooks.once("init", async function () {
   const useCustomRule = game.settings.get("xjzl-system", "customDistanceRule");
   if (useCustomRule) {
 
-    // 替换系统的测量模板
-    CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
-
     // 替换FVTT自带的一定距离计算方式
     const SquareGrid = foundry.grid.SquareGrid;
 
@@ -114,18 +124,22 @@ Hooks.once("init", async function () {
     }
 
     // ==========================================
-    //  第一部分：Token 拖拽计算 (你完美的原始代码，原封不动)
+    // 第一部分：Token 拖拽计算
     // ==========================================
-    // 2. 保存原始方法 (说不定后面要用到)
+    // 保留核心测量，以取得路径段结构和原生地形成本。
     const originalMeasurePath = SquareGrid.prototype.measurePath;
 
-    // 3. 修改原型 (Prototype)，这会影响所有基于方形网格的场景
+    /**
+     * 等效对角方格按家规改写每段距离/成本与总距离；其他规则返回核心结果。
+     * 家规分支要求路径点含画布像素 x/y；总 cost 与路径点累计值保留核心语义。
+     */
     SquareGrid.prototype.measurePath = function (waypoints, options = {}) {
 
       // 调用原始方法获取 segments 结构
       const result = originalMeasurePath.call(this, waypoints, options);
 
       if (!result || !result.segments || result.segments.length === 0) return result;
+      if (this.diagonals !== CONST.GRID_DIAGONALS.EQUIDISTANT) return result;
 
       const d = canvas.dimensions;
       let globalDiagonalCount = 0; // 全局斜向计数 (跨越多个线段累加)
@@ -168,7 +182,8 @@ Hooks.once("init", async function () {
 
         // 计算距离数值
         const finalSegCost = segGridCost * terrainMultiplier;
-        const finalSegDistance = finalSegCost * d.distance;
+        // 核心 cost 已含每格单位距离，不能在地形倍率折算后再次相乘。
+        const finalSegDistance = finalSegCost;
 
         // 回写数据
         s.distance = finalSegDistance;
@@ -193,18 +208,22 @@ Hooks.once("init", async function () {
     // ==========================================
     //  第二部分：测量尺 (快捷键 R) 的表现层劫持补丁
     // ==========================================
-    // V13 中，独立的测量标尺 (Ruler) 被设计为测量纯物理距离，完全绕过了 measurePath
-    // 这导致它会产生 0.5 这样的小数，且不受 1-2-2-2 规则约束。
-    // 我们在此拦截标尺生成数字标签的函数，提取它的坐标，重新计算！
+    // 标尺会调用 measurePath（每段 distance/cost 已被劫持重写），但其标签
+    // 读取的路径点累计距离不随劫持改写，多段斜线路径下与家规值不一致。
+    // 在此拦截标签生成函数，按路径坐标以家规重新计算显示值。
     if (CONFIG.Canvas?.rulerClass?.prototype?._getWaypointLabelContext) {
       const originalGetLabel = CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext;
 
       CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext = function (waypoint, state) {
+        // 非等效对角设置下测量沿用核心原生值，标签同样不做家规覆写
+        if (canvas.grid?.diagonals !== CONST.GRID_DIAGONALS.EQUIDISTANT) {
+          return originalGetLabel.call(this, waypoint, state);
+        }
         // 先获取原生渲染上下文
         const context = originalGetLabel.call(this, waypoint, state);
         if (!context) return context;
 
-        // 提取测量尺画出的所有路径点 (V13 API 存在 this.path 中)
+        // 提取测量尺画出的所有路径点（核心存于 this.path 中）
         const points = this.path || [];
         if (points.length < 2) return context;
         const d = canvas.dimensions;
@@ -239,11 +258,11 @@ Hooks.once("init", async function () {
             if (context.distance && typeof context.distance === "object") {
               context.distance.total = String(finalDist); // 修改内部的值
             } else {
-              // 兼容兜底：万一它没生成对象，我们给它补上
+              // 核心未提供距离对象时补齐同一结构，确保标签仍显示家规值。
               context.distance = { total: String(finalDist) };
             }
 
-            // 同理，保留 text 和 label 的同步更新（如果有的话），防范其他插件读取
+            // 同步已有的 label/text 字段，避免读取者取得不同的显示值。
             if (context.label !== undefined) {
               const unit = canvas.grid.units ? ` ${canvas.grid.units}` : "";
               context.label = `${finalDist}${unit}`;
@@ -261,37 +280,43 @@ Hooks.once("init", async function () {
     console.log("XJZL | 已成功应用自定义距离移动计算。");
   }
 
-  // 注销默认表单
-  foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", "ActiveEffectConfig");
+  // unregisterSheet 须传表单类才能注销核心 AE 表；已保存的失效默认表设置在 ready 阶段修正。
+  foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", foundry.applications.sheets.ActiveEffectConfig);
 
-  // 注册我们的表单
   foundry.applications.apps.DocumentSheetConfig.registerSheet(ActiveEffect, "xjzl-system", XJZLActiveEffectConfig, {
     makeDefault: true,
     label: "XJZL Active Effect Config"
   });
 
-  // 替换系统核心的状态效果列表
-  CONFIG.statusEffects = CONFIG.XJZL.statusEffects;
+  // 保留核心状态表的数组迭代与 id 直查能力，清空默认条目后写入系统状态。
+  CONFIG.statusEffects.length = 0;
+  for (const status of CONFIG.XJZL.statusEffects) {
+    CONFIG.statusEffects[status.id] = status;
+  }
 
   // 修改世界时间配置
-  CONFIG.time.roundTime = 2; // 设置 1 轮 = 2 秒 (我们侠界是这么快的)
+  CONFIG.time.roundTime = 2; // 1 轮 = 2 秒（侠界时长规则）
+  // 1 轮次 = 1 秒：核心在战斗外靠该值把 turns 时长折算为秒；缺省 0 会导致
+  // turns 效果的 secondsRemaining 为 Infinity（弹窗误存为无限、标签显示异常）
+  CONFIG.time.turnTime = 1;
 
   // 1. 配置 Combat 先攻设置
   CONFIG.Combat.initiative = {
-    // 这里填你的先攻公式字符串
+    // 先攻公式（经 actor.getRollData() 解析 @ 引用）
     // @attributes.shenfa.value 必须能通过 actor.getRollData() 访问到
     formula: "1d20 + @init",
     decimals: 2 // 出现平局时保留2位小数
   };
 
   // 2. 注册自定义 Document 类 (逻辑层)
-  // 告诉 Foundry 使用我们需要扩展的类，而不是默认的 Actor/Item
   CONFIG.Actor.documentClass = XJZLActor;
   CONFIG.Item.documentClass = XJZLItem;
-  // 注册 ActiveEffect 类，用来处理装备的自动抑制和其他我们自定义的AE规则
+  // ActiveEffect 子类承接装备抑制及系统效果规则。
   CONFIG.ActiveEffect.documentClass = XJZLActiveEffect;
+  // 使用核心过期事件物理删除特效，避免与系统回合逻辑重复清理。
+  CONFIG.ActiveEffect.expiryAction = "delete";
 
-  // 3. 注册 DataModels (数据层) - V13 核心
+  // 3. 注册 DataModels (数据层)
   // 将 system.json 中定义的类型与 JS 类绑定
   CONFIG.Actor.dataModels = {
     character: XJZLCharacterData,
@@ -324,7 +349,7 @@ Hooks.once("init", async function () {
   // 注销默认 Sheet，注册我们需要用来渲染的 AppV2 Sheet
   Actors.unregisterSheet("core", ActorSheet);
 
-  // 注意：V13 中虽然推荐 AppV2，但注册方式仍需兼容 DocumentSheetConfig
+  // AppV2 Sheet 仍通过 DocumentSheetConfig 注册。
   Actors.registerSheet("xjzl-system", XJZLCharacterSheet, {
     types: ["character", "npc"],
     makeDefault: true,
@@ -648,10 +673,43 @@ Hooks.once("ready", async function () {
   // 等待系统完全加载后的操作，比如处理设置、欢迎弹窗等
   // 监听聊天消息渲染，绑定按钮事件
   Hooks.on("renderChatMessageHTML", ChatCardManager.onRenderChatMessage);
+
+  // 已保存的 core.ActiveEffectConfig 注销后不可解析，且会使注册时的 makeDefault 被忽略。
+  // 仅修正失效表单引用，保留有效选择；先修正内存默认标记，持久化失败不阻断初始化。
+  {
+    const ours = "xjzl-system.XJZLActiveEffectConfig";
+    const saved = game.settings.get("core", "sheetClasses");
+    const ae = saved?.ActiveEffect;
+    if (foundry.utils.isPlainObject(ae)) {
+      const correctedTypes = [];
+      for (const [type, id] of Object.entries(ae)) {
+        const registered = CONFIG.ActiveEffect.sheetClasses?.[type];
+        if (id === "core.ActiveEffectConfig" || (registered && !registered[id])) {
+          ae[type] = ours;
+          correctedTypes.push(type);
+        }
+      }
+      if (correctedTypes.length > 0) {
+        for (const type of correctedTypes) {
+          const group = CONFIG.ActiveEffect.sheetClasses?.[type];
+          if (group?.[ours]) Object.values(group).forEach(s => s.default = s.id === ours);
+        }
+        if (game.user.isGM) {
+          try {
+            await game.settings.set("core", "sheetClasses", saved);
+          } catch (err) {
+            console.error("XJZL | AE 默认表设置持久化失败，本次会话内存已修正，下次会话将重试：", err);
+          }
+        }
+        console.log(`XJZL | 已修正旧世界遗留的 AE 默认表设置（${correctedTypes.join(", ")}）。`);
+      }
+    }
+  }
+
   //目标选择管理器，修改为按下ALT后左键点击选择目标
   TargetManager.init();
 
-  //为了避免isGM没有初始化读取失败，把API容器的定义挪到这里
+  // ready 后 game.user 已就绪，再初始化公开 API 容器。
   // 1. 初始化全局 API 容器
   // 注意：防止重复定义，先判断是否存在
   if (!game.xjzl) game.xjzl = {};
@@ -689,6 +747,12 @@ Hooks.once("ready", async function () {
   };
 
   game.xjzl.Macros = XJZLMacros;
+
+  // 脚本和宏通过此入口创建、查询、重建或消除 Region 光环。
+  game.xjzl.aura = AuraManager;
+
+  // 区域工具栏和脚本共用快建入口；脚本可用 place 等待玩家选点。
+  game.xjzl.auraQuick = {open: openAuraQuick, place: placeAura};
 
   // 3. 挂载 GM 专用 API (生成器)
   // 此时 game.user 已经不是 null 了，可以安全检查权限
@@ -791,220 +855,125 @@ Hooks.once("ready", async function () {
 
   console.log("XJZL | 门派赠品自动化已就绪");
   console.log("XJZL | 背景赠品自动化已就绪");
+
+  await runAEMigrationsIfNeeded();
+
   console.log("侠界之旅系统 - 准备就绪");
 });
 
 //  在 getSceneControlButtons 阶段注入按钮
-Hooks.on('getSceneControlButtons', (controls) => {
+// 首次渲染登记前暂存伤害工具实例，供连续打开时复用。
+let damageToolPending = null;
 
-  // 检查权限
-  const isGM = game.user.isGM;
-  const allowPlayer = game.settings.get("xjzl-system", "allowPlayerDamageTool");
-
-  // 如果既不是GM，也没有开启玩家权限，直接退出
-  if (!isGM && !allowPlayer) return;
-
-  // 只有 GM，或者设置允许玩家使用时，才显示
-  const damageToolBtn = {
-    name: "damage-tool",
-    title: "XJZL.UI.DamageTool.Title",
-    icon: "fas fa-meteor",
-    visible: true,
-    button: true,
-    // V13 必须使用 onChange，废弃 onClick
-    onChange: () => {
-      // 单例模式：查找或新建
-      const existingApp = Object.values(ui.windows).find(
-        (app) => app.options.id === "xjzl-damage-tool"
-      );
-      if (existingApp) {
-        existingApp.render(true, { focus: true });
-      } else {
-        // 确保 GenericDamageTool 已被导入
-        new GenericDamageTool().render(true);
-      }
-    }
+/**
+ * 统一打开伤害工具，复用已登记或首次渲染中的实例。
+ * 关闭中的实例仍占用 ID，须等其注销后再打开。
+ * @returns {Promise<GenericDamageTool|undefined>} 实例或 undefined；渲染失败时会关闭实例。
+ */
+async function openDamageTool() {
+  const states = foundry.applications.api.ApplicationV2.RENDER_STATES;
+  // 等待关闭期间可能有其他调用打开窗口，复用前须重新读取注册表。
+  const readRegistered = () => {
+    const registry = foundry.applications?.instances;
+    return registry
+      ? [...(registry instanceof Map ? registry.values() : Object.values(registry))]
+          .filter((app) => app?.options?.id === "xjzl-damage-tool")
+      : [];
   };
-
-  // --- 步骤 1: 查找 Token 控制层级 (严格参考你的 QTE 代码逻辑) ---
-  let tokenLayer = null;
-
-  // V13 模式: controls 是对象，直接通过属性访问
-  if (controls.token) {
-    tokenLayer = controls.token; // 注意：V13 有时是 controls.token 而不是 controls.tokens，但你的参考代码用了 tokens，如果是 tokens 请看下一行
-  }
-  else if (controls.tokens) {
-    tokenLayer = controls.tokens; // 兼容 controls.tokens 的写法
-  }
-  // 兼容 Map 结构 (V13 的某些构建版本)
-  else if (controls instanceof Map && controls.has('token')) {
-    tokenLayer = controls.get('token');
-  }
-
-  // --- 步骤 2: 注入按钮到控制层 ---
-  if (tokenLayer) {
-    const tools = tokenLayer.tools;
-
-    // 情况 A: V13 Map/Object 结构
-    if (tools && !Array.isArray(tools)) {
-      // 如果是 Map 类型
-      if (tools instanceof Map) {
-        if (!tools.has('damage-tool')) {
-          tools.set('damage-tool', damageToolBtn);
-        }
-      }
-      // 如果是普通 Object 类型
-      else {
-        // 防止重复添加 (虽然 Object Key 本身就防重复，但为了逻辑严谨)
-        if (!tools['damage-tool']) {
-          tokenLayer.tools['damage-tool'] = damageToolBtn;
-        }
+  for (const app of readRegistered()) {
+    if (app.state <= states.CLOSING) {
+      try {
+        await app.close();
+      } catch (error) {
+        // 旧实例可能仍占用 ID；关闭失败时中止打开。
+        console.error("XJZL | 伤害工具旧窗口关闭失败，本次打开中止:", error);
+        ui.notifications.error(game.i18n.localize("XJZL.UI.DamageTool.OpenFailedOldClose"));
+        return undefined;
       }
     }
-    // 情况 B: 数组结构 (V12 或 V13 早期)
-    // 既然你的 QTE 代码里保留了这个分支且能运行，我们为了稳妥也保留它
-    else if (Array.isArray(tools)) {
-      if (!tools.some(t => t.name === 'damage-tool')) {
-        tools.push(damageToolBtn);
-      }
+  }
+  const existingApp = readRegistered().find((app) => app.state >= states.RENDERING) ?? damageToolPending;
+  if (existingApp) {
+    // 核心按实例串行处理渲染，首次渲染期间的再次调用会排队。
+    existingApp.render(true, { focus: true });
+    return existingApp;
+  }
+  const app = new GenericDamageTool();
+  damageToolPending = app;
+  // 渲染完成后由核心登记；失败时关闭实例以清理构造时注册的监听器。
+  return app.render(true).then(
+    () => {
+      if (damageToolPending === app) damageToolPending = null;
+      return app;
+    },
+    (error) => {
+      if (damageToolPending === app) damageToolPending = null;
+      console.error("XJZL | 伤害工具打开失败:", error);
+      return app.close().catch((closeError) => {
+        console.error("XJZL | 伤害工具关闭失败:", closeError);
+      });
     }
-  } else {
+  );
+}
+
+/** 向 Token 控制组添加系统工具；controls 须包含 tokens.tools，原有同名工具优先。 */
+Hooks.on('getSceneControlButtons', (controls) => {
+  const tools = controls.tokens?.tools;
+  if (!tools) {
     console.warn("XJZL | 无法找到 Token 控制层级，按钮添加失败。");
+    return;
   }
 
-  // 2. 状态选取器逻辑
-  const allowPicker = game.settings.get("xjzl-system", "allowPlayerEffectPicker");
+  // 工具权限分别受各自设置控制；保留先注册的同名工具。
+  const isGM = game.user.isGM;
 
-  if (isGM || allowPicker) {
-    const effectPickerBtn = {
-      name: "effect-picker",
-      title: game.i18n.localize("XJZL.UI.Toolbar.EffectPicker"),
-      icon: "fas fa-hand-sparkles", // 找一个好看的图标
-      visible: true,
-      button: true,
-      onChange: () => {
-        // 单例模式：查找或新建
-        const existingApp = Object.values(ui.windows).find(
-          (app) => app.options.id === "xjzl-effect-picker"
-        );
-
-        if (existingApp) {
-          existingApp.actor = null;
-          existingApp.render(true, { focus: true });
-        } else {
-          // 这里不再需要传 actor 参数，因为它是全局的
-          new EffectSelectionDialog().render(true);
-        }
-      }
-    };
-
-    // 注入逻辑 (复用你现有的稳健代码)
-    let tokenLayer = null;
-    if (controls.token) tokenLayer = controls.token;
-    else if (controls.tokens) tokenLayer = controls.tokens;
-    else if (controls instanceof Map && controls.has('token')) tokenLayer = controls.get('token');
-
-    if (tokenLayer) {
-      const tools = tokenLayer.tools;
-      if (tools instanceof Map) {
-        if (!tools.has('effect-picker')) tools.set('effect-picker', effectPickerBtn);
-      } else if (Array.isArray(tools)) {
-        if (!tools.some(t => t.name === 'effect-picker')) tools.push(effectPickerBtn);
-      } else if (tools && !tools['effect-picker']) {
-        tokenLayer.tools['effect-picker'] = effectPickerBtn;
-      }
+  if (isGM || game.settings.get("xjzl-system", "allowPlayerDamageTool")) {
+    if (!tools["damage-tool"]) {
+      tools["damage-tool"] = {
+        name: "damage-tool",
+        title: "XJZL.UI.DamageTool.Title",
+        icon: "fas fa-meteor",
+        visible: true,
+        button: true,
+        onChange: () => openDamageTool()
+      };
     }
   }
 
-  // 3·战斗统计面板
+  if (isGM || game.settings.get("xjzl-system", "allowPlayerEffectPicker")) {
+    if (!tools["effect-picker"]) {
+      tools["effect-picker"] = {
+        name: "effect-picker",
+        title: game.i18n.localize("XJZL.UI.Toolbar.EffectPicker"),
+        icon: "fas fa-hand-sparkles",
+        visible: true,
+        button: true,
+        onChange: () => {
+          EffectSelectionDialog.open();
+        }
+      };
+    }
+  }
+
   if (game.settings.get("xjzl-system", "enableCombatStats")) {
-    const meterBtn = {
-      name: "combat-meter",
-      title: game.i18n.localize("XJZL.UI.Toolbar.CombatMeter"),
-      icon: "fas fa-chart-bar", // 柱状图图标
-      visible: true,
-      button: true, // 点击型按钮
-      onChange: () => {
-        // 直接通过单例实例来控制开关
-        const app = CombatMeterUI.instance;
-        if (app) {
-          if (app.rendered) {
-            app.close();
-          } else {
-            app.render({ force: true });
+    if (!tools["combat-meter"]) {
+      tools["combat-meter"] = {
+        name: "combat-meter",
+        title: game.i18n.localize("XJZL.UI.Toolbar.CombatMeter"),
+        icon: "fas fa-chart-bar",
+        visible: true,
+        button: true,
+        onChange: () => {
+          const app = CombatMeterUI.instance;
+          if (app) {
+            if (app.rendered) {
+              app.close();
+            } else {
+              app.render({ force: true });
+            }
           }
         }
-      }
-    };
-
-    if (tokenLayer) {
-      const tools = tokenLayer.tools;
-      if (tools instanceof Map) {
-        if (!tools.has('combat-meter')) tools.set('combat-meter', meterBtn);
-      } else if (Array.isArray(tools)) {
-        if (!tools.some(t => t.name === 'combat-meter')) tools.push(meterBtn);
-      } else if (tools && !tools['combat-meter']) {
-        tokenLayer.tools['combat-meter'] = meterBtn;
-      }
-    }
-  }
-
-  // 4·注入 AOE Creator 按钮 
-  // 1. 查找 templates 层级 (测量工具在代码里叫 templates)
-  let templateLayer = null;
-
-  // 仿照你处理 tokenLayer 的方式
-  if (controls.templates) {
-    templateLayer = controls.templates;
-  }
-  else if (controls instanceof Map && controls.has('templates')) {
-    templateLayer = controls.get('templates');
-  }
-  else if (Array.isArray(controls)) {
-    templateLayer = controls.find(c => c.name === "templates");
-  }
-
-  // 2. 注入按钮
-  if (templateLayer) {
-    const aoeBtn = {
-      name: "xjzl-aoe",
-      title: game.i18n.localize("XJZL.UI.Toolbar.AoeCreator"),
-      icon: "fas fa-bullseye",
-      visible: true,
-      button: true, // 关键：这是点击型按钮
-      onChange: () => {
-        const existingApp = Object.values(ui.windows).find(
-          (app) => app.options.id === "xjzl-aoe-creator"
-        );
-        if (existingApp) {
-          existingApp.render(true, { focus: true });
-        } else {
-          new AOECreator().render(true);
-        }
-      }
-    };
-
-    const tools = templateLayer.tools;
-
-    // 3. 处理 tools 集合 (严格仿照你原本的 tools 处理逻辑)
-
-    // 情况 A: Map 结构
-    if (tools instanceof Map) {
-      if (!tools.has('xjzl-aoe')) {
-        tools.set('xjzl-aoe', aoeBtn);
-      }
-    }
-    // 情况 B: 数组结构
-    else if (Array.isArray(tools)) {
-      if (!tools.some(t => t.name === 'xjzl-aoe')) {
-        tools.push(aoeBtn);
-      }
-    }
-    // 情况 C: 普通对象结构 (Object)
-    else if (tools) {
-      if (!tools['xjzl-aoe']) {
-        templateLayer.tools['xjzl-aoe'] = aoeBtn;
-      }
+      };
     }
   }
 });
@@ -1021,7 +990,7 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
 
   statusIcons.forEach((icon) => {
     const slug = icon.dataset.statusId;
-    const statusData = CONFIG.statusEffects.find(e => e.id === slug);
+    const statusData = CONFIG.statusEffects[slug];
     if (!statusData) return;
 
     // 克隆节点移除旧事件
@@ -1052,7 +1021,7 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
  * 用于注入 "江湖万卷阁" 按钮
  */
 Hooks.on("renderItemDirectory", (app, html, data) => {
-  // 1. V13 兼容性处理：确保获取原生 DOM 元素
+  // 兼容原生 DOM 和 jQuery 包装形态，供下方 DOM 查询使用。
   const element = html instanceof HTMLElement ? html : html[0];
 
   // 2. 查找插入点 (.header-actions)
@@ -1063,14 +1032,14 @@ Hooks.on("renderItemDirectory", (app, html, data) => {
   const button = document.createElement("button");
   button.type = "button"; // 防止意外提交表单
   button.className = "xjzl-browser-btn";
-  // 直接写内联样式，或者你在 css 文件里写类名
+  // 使用内联样式，避免为单个入口按钮扩展全局样式表
   button.style.cssText = "min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;";
   button.innerHTML = `<i class="fas fa-book-open"></i> ${game.i18n.localize("XJZL.UI.Toolbar.Compendium")}`;
 
   // 4. 绑定点击事件
   button.addEventListener("click", (ev) => {
     ev.preventDefault();
-    // 调用我们在 ready 中挂载的单例
+    // 调用 ready 阶段挂载的单例
     if (game.xjzl?.compendiumBrowser) {
       game.xjzl.compendiumBrowser.render(true);
     } else {
@@ -1156,10 +1125,7 @@ Hooks.on("renderActorDirectory", (app, html, data) => {
  * 用于修复自定义 Loot Card 的拖拽功能
  */
 Hooks.on("renderChatMessageHTML", (message, html) => {
-  // html 参数现在直接就是 HTMLElement，不需要 jQuery 转换
-
-  // 使用事件委托
-  // 我们只给这一条消息的容器绑定一个监听器
+  // 在消息容器上委托拖拽事件，覆盖动态插入的战利品条目。
   html.addEventListener("dragstart", (event) => {
     // 检查被拖动的元素是不是我们的 loot-item
     const target = event.target.closest(".loot-item[draggable='true']");
@@ -1250,10 +1216,6 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
         await EncounterManager.runFieldTrigger(combat, "combatantTurnStart", { combatant: currCombatant, round: currentRound, turn: transition.currentTurn });
       }
     }
-
-    for (const combatant of combat.combatants) {
-      if (combatant.actor) await ActiveEffectManager.cleanExpiredEffects(combatant.actor);
-    }
   });
 });
 
@@ -1275,7 +1237,36 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
 });
 
 /**
- * 在 V13 战斗追踪器中同步紧凑入口：先移除上次插入的控件，再按当前状态判断是否重建。
+ * 将画布上的 ActiveEffect 拖放路由到特效门面。
+ * 必须同步返回 false 阻止核心直建；异步任务负责解析来源、查找 Token 并施加。
+ * @param {Canvas} canvas 目标画布
+ * @param {object} data 拖放数据，包含画布坐标
+ * @param {DragEvent} event 拖放事件
+ * @returns {boolean|undefined} ActiveEffect 拖放返回 false；其他类型交给核心处理
+ */
+Hooks.on("dropCanvasData", (canvas, data, event) => {
+  if (data?.type !== "ActiveEffect") return;
+  // 钩子无法等待异步施加；失败时须反馈，因为核心落点已被阻止。
+  (async () => {
+    try {
+      const effect = await foundry.documents.ActiveEffect.fromDropData(data);
+      if (!effect) return;
+      // 落点判定与核心 TokensLayer._onDropActiveEffect 相同：取命中 Token 中索引最靠前者
+      const collisionTest = ({ t: token }) => token.visible && token.renderable && token.interactive
+        && token.hitArea?.contains(data.x - token.x, data.y - token.y);
+      const target = Array.from(canvas.tokens.quadtree.getObjects(new PIXI.Rectangle(data.x, data.y, 0, 0), { collisionTest }))
+        .sort((a, b) => a._lastSortedIndex - b._lastSortedIndex).at(0);
+      if (target?.actor) await ActiveEffectManager.applyDraggedEffect(target.actor, effect);
+    } catch (err) {
+      console.error("XJZL | 画布拖放施加特效失败:", err);
+      ui.notifications.error(game.i18n.localize("XJZL.Effect.DropFailed"));
+    }
+  })();
+  return false;
+});
+
+/**
+ * 在战斗追踪器中同步紧凑入口：先移除上次插入的控件，再按当前状态判断是否重建。
  * 每次渲染幂等清理，保证删除战斗、解绑或删除源战局后旧按钮不会残留。
  */
 function renderEncounterTrackerControls(app, html) {
@@ -1318,8 +1309,8 @@ function renderEncounterTrackerControls(app, html) {
   else root.prepend(controls);
 }
 
+// 战斗追踪器按钮通过 V14 的 renderCombatTracker 钩子注入。
 Hooks.on("renderCombatTracker", renderEncounterTrackerControls);
-Hooks.on("renderCombatTrackerHTML", renderEncounterTrackerControls);
 // 删除战局 Item 时只清理“未关联”的失效按钮；已关联战斗持有独立快照副本，不受源 Item 删除影响。
 // 保留 linked 按钮是为了让已关联战斗的战局副本继续可访问、可运行。
 Hooks.on("deleteItem", item => {
@@ -1445,7 +1436,7 @@ async function _routeActorTurnScript(actor, trigger, regenTiming) {
 // });
 
 /**
- * 统一处理 Token 更新：名称/阵营变化刷新战局目标，位置变化同步“粘性”模板。
+ * 统一处理 Token 更新：名称/阵营变化刷新战局目标。
  */
 Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
   if (("name" in change) || ("disposition" in change)) {
@@ -1456,61 +1447,6 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
     }
   }
 
-  // 1. 没有位移、非当前用户、场景未准备好，直接退出
-  if (!canvas.ready) return;
-  if (!change.x && !change.y) return;
-  if (game.user.id !== userId) return;
-
-  const scene = tokenDoc.parent;
-  if (!scene) return;
-
-  // 2. 场景里根本没有模板，直接退出 (避免无意义遍历)
-  // V13 Collection 使用 .size
-  if (scene.templates.size === 0) return;
-
-  // 3. 预计算 Token 新中心点
-  const gridSize = canvas.grid.size;
-  // 使用 ?? 运算符处理 0 的情况
-  const newX = change.x ?? tokenDoc.x;
-  const newY = change.y ?? tokenDoc.y;
-
-  const targetCenterX = newX + (tokenDoc.width * gridSize) / 2;
-  const targetCenterY = newY + (tokenDoc.height * gridSize) / 2;
-
-  // 4. 单次遍历查找并构建更新数据
-  const directUpdates = [];
-
-  // V13 推荐直接遍历 Collection
-  for (const t of scene.templates) {
-    // 快速检查 Flag
-    const flags = t.flags["xjzl-system"]; // 直接访问属性比 getFlag 稍微快一点点
-    if (!flags || flags.sourceToken !== tokenDoc.id || flags.sticky !== true) continue;
-
-    // 检查是否真的需要更新
-    // 如果位置差异小于 1 像素，视为未移动，跳过数据库更新
-    if (Math.abs(t.x - targetCenterX) < 1 && Math.abs(t.y - targetCenterY) < 1) continue;
-
-    const updateData = { _id: t.id, x: targetCenterX, y: targetCenterY };
-
-    // ==========================================
-    // 🌟 如果玩家权限不足，则交给Socket 委托
-    // ==========================================
-    // t.canUserModify 是 Foundry 底层 API，判断当前玩家能否直接改它
-    if (t.canUserModify(game.user, "update")) {
-      // 自己建的，或者 GM 操作：直接改，零延迟！
-      directUpdates.push(updateData);
-    } else {
-      // 没权限（比如 GM 给玩家建的）：委托 Socket 让 GM 帮忙改，不报错！
-      if (xjzlSocket) {
-        xjzlSocket.executeAsGM("updateDocument", t.uuid, updateData);
-      }
-    }
-  }
-
-  // 5. 批量提交
-  if (directUpdates.length > 0) {
-    scene.updateEmbeddedDocuments("MeasuredTemplate", directUpdates);
-  }
 });
 
 /**
@@ -1553,34 +1489,11 @@ Hooks.on("deleteCombat", async (combat, options, userId) => {
 });
 
 /**
- * 处理 Token 删除
- */
-Hooks.on("deleteToken", (tokenDoc, options, userId) => {
-  if (game.user.id !== userId) return;
-
-  const scene = tokenDoc.parent;
-  if (!scene || scene.templates.size === 0) return;
-
-  const idsToDelete = [];
-
-  for (const t of scene.templates) {
-    const flags = t.flags["xjzl-system"];
-    if (flags && flags.sourceToken === tokenDoc.id && flags.autoDelete === true) {
-      idsToDelete.push(t.id);
-    }
-  }
-
-  if (idsToDelete.length > 0) {
-    scene.deleteEmbeddedDocuments("MeasuredTemplate", idsToDelete);
-  }
-});
-
-/**
  * 监听宏栏放置事件 (Hotbar Drop Hook)
  */
 /**
  * 1. 同步钩子：负责拦截
- * 只要是 Item，立刻告诉 Foundry "你不许动，放着我来"，然后调用异步处理函数。
+ * 只要是 Item，立即拦截 Foundry 的默认宏生成流程，转交给下方异步处理函数。
  */
 Hooks.on("hotbarDrop", (bar, data, slot) => {
 
@@ -1943,7 +1856,6 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/compendiumbrowser/card-list.hbs", // 合集浏览器卡片列表（含增量追加）
     "systems/xjzl-system/templates/apps/compendiumbrowser/random-dialog.hbs", // 合集浏览器随机抽取对话框
     "systems/xjzl-system/templates/apps/compendiumbrowser/draw-reveal.hbs", // 合集浏览器抽取演出
-    "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览
     "systems/xjzl-system/templates/apps/tone-tracker.hbs",//音阶计数器
     "systems/xjzl-system/templates/apps/action-tracker.hbs",//动作计数器
@@ -1957,6 +1869,6 @@ async function preloadHandlebarsTemplates() {
     //暂停按钮的界面
     "systems/xjzl-system/templates/system/pause.hbs",
   ];
-  // 严格 V13 写法：使用命名空间
+  // 使用命名空间访问，避免依赖全局 loadTemplates
   return foundry.applications.handlebars.loadTemplates(templatePaths);
 }

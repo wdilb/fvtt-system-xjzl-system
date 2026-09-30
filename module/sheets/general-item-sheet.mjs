@@ -11,7 +11,6 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
         classes: ["xjzl-window", "item", "general", "theme-dark"],
         position: { width: 800, height: 600 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -74,7 +73,7 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
 
         // 富文本增强
         // 这一步解决了 "<p>...</p>" 直接显示的问题，并激活 UUID 链接
-        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
             this.document.system.description,
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );
@@ -158,7 +157,6 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
    */
     async _onDropManualTarget(event) {
         event.preventDefault();
-        // 1. 解析拖拽数据 (V13 标准写法)
         let data;
         try {
             data = JSON.parse(event.dataTransfer.getData("text/plain"));
@@ -209,7 +207,7 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: "新状态",
-            icon: "icons/svg/aura.svg",
+            img: "icons/svg/aura.svg", // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             // 消耗品的特效通常不是 Transfer (被动)，而是使用时触发
             // 但也可以做成 Transfer (只要放在包里就生效？通常不是)

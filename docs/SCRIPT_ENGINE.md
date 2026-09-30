@@ -1,8 +1,8 @@
 # 脚本引擎手册
 
-本手册面向物品、招式、特性和 Active Effect（AE）脚本作者，描述当前系统公开的脚本契约。本手册只描述运行时脚本契约；源数据录入还需遵循项目内部的录入规范。下文明确列出的上下文字段、可写字段和公共方法才是可依赖接口，未列出的内部变量不要作为 API 使用。
+本手册面向物品、招式、特性和 Active Effect（AE）脚本作者，说明脚本触发器、上下文和公共 API。仅依赖本文列出的上下文字段、可写字段和公共方法；源数据录入规则由项目内部规范维护。
 
-## 事实源与兼容边界
+## 实现依据与安全边界
 
 文档与代码不一致时，以以下实现为准：
 
@@ -12,6 +12,7 @@
 - 攻击卡、治疗卡和命中后流程：`module/managers/chat-manager.mjs`
 - 宏工具：`module/utils/macros.mjs`
 - 状态与枚举：`module/config.mjs`
+- 光环 API、Region 结算和快建入口：`module/region/xjzl-aura-manager.mjs`、`module/region/xjzl-aura-behavior.mjs`、`module/region/xjzl-aura-ledger.mjs`、`module/region/xjzl-aura-quick.mjs`
 
 `scripts` 中的代码是受系统注入变量约束的 JavaScript 字符串，不是安全隔离的权限沙盒。只运行可信数据中的脚本。
 
@@ -42,7 +43,7 @@
 
 `trigger` 必须来自 `module/data/common.mjs#SCRIPT_TRIGGERS`。Item、招式和内功脚本受 Schema 选项约束；AE 脚本虽然存放在普通 flags 中，标准编辑界面也只提供这些选项。未知触发器不会在攻击、受伤或回合等标准时机执行，不应使用。
 
-## 参数：参数分为两层
+## 脚本参数
 
 每段脚本能看到两类参数：
 
@@ -65,12 +66,12 @@
 | `system` / `S` | `Actor.system` | 每个脚本开始执行时绑定为当前 `actor.system`；`S` 是便捷别名。脚本通过 `await` 更新 Actor 后，如需读取最新状态应使用 `actor.system`。 |
 | `args` | `Object` | 本次触发的阶段上下文。只有后文对应触发器列出的字段才是稳定公开契约。 |
 | `trigger` | `string` | 当前触发器名称。 |
-| `thisItem` | `Item` / `ActiveEffect` / `null` | 当前脚本来源。Item 脚本指向该 Item；AE 脚本为兼容也指向该 AE。 |
+| `thisItem` | `Item` / `ActiveEffect` / `null` | 当前脚本来源。Item 脚本指向该 Item；AE 脚本指向该 AE。 |
 | `thisEffect` | `ActiveEffect` / `null` | 当前脚本来自 AE 时指向该 AE，否则为 `null`。 |
 | `Macros` | `XJZLMacros` | 系统公开宏工具，例如 `requestSave()`、`requestContest()` 和 `checkStance()`。 |
 | `game` / `ui` / `console` | Foundry 全局对象 | 游戏对象、通知对象和控制台。 |
 
-脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 V13 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。
+脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 Foundry 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。生成随机 ID 时使用 `foundry.utils.randomID()`，不要依赖全局 `randomID`。
 
 ### `args` 与同名顶层变量
 
@@ -96,8 +97,8 @@
 
 | 类型 | 触发器 | 约束 |
 |---|---|---|
-| <span style="white-space: nowrap;">同步</span> | <span style="white-space: nowrap;"><code>passive</code>、<code>calc</code></span> | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
-| <span style="white-space: nowrap;">异步</span> | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
+| 同步 | `passive`、`calc` | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
+| 异步 | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
 
 同步脚本异常会写入控制台；异步脚本异常还会向操作者显示错误通知。单个脚本失败不会回滚此前脚本或数据库操作。
 
@@ -152,6 +153,8 @@ passive / calc（持续被动与面板计算）
 | 修改招式或普攻的面板数值与说明 | `calc` |
 | 扣除资源前调整消耗或阻止出招 | `preAttack` |
 | 修改整次动作的命中参数 | `attack` |
+| 扣费前可取消的选择或施展前提 | `preAttack` |
+| 不影响扣费的参数、落点选择或区域创建 | `attack` |
 | 针对单个目标修改命中或穿透 | `check` |
 | 攻击者在应用伤害前修改数值、类型或穿透 | `preDamage` |
 | 防御者响应未命中 | `avoided` |
@@ -233,6 +236,8 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `abort` | `boolean` | **可写** | 设为 `true` 会在扣除资源前中止出招。 |
 | `abortReason` | `string` | **可写** | 中止时向操作者显示的提示。 |
 
+内置余额检查在所有 `preAttack` 脚本之后执行。若此阶段必须先消耗场上区域等对象，应先核对 `costConfig` 与当前资源，并检查消耗 API 的返回值；`abort` 只能阻止后续扣费，不能撤销脚本已完成的文档操作。需要把选择传到命中后结算时，写入 `args.scriptFlags`。
+
 ### `attack`（异步）
 
 **时机：**资源已扣除、基础面板已计算，但尚未掷骰。攻击、治疗、Buff 和主动开启架招都可进入。
@@ -267,7 +272,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `target` | `Actor` | 只读 | 当前目标。 |
 | `attacker` | `Actor` | 只读 | 出招者。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；掷骰时与手动补算新目标时均提供。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；掷骰时与手动补算新目标时均提供。 |
 | `flags.grantLevel` / `flags.grantFeintLevel` | `number` | **可写** | 仅针对当前目标的命中/虚招优劣势计数。 |
 | `flags.targetKanpoLevel` | `number` | **可写** | 当前动作给予目标本次看破检定的优劣势计数；会随攻击卡固化，正数为优势，负数为劣势。 |
 | `flags.grantHit` / `flags.grantFeint` | `number` | **可写** | 仅针对当前目标的命中值/虚招值加成。 |
@@ -286,7 +291,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `targets` | `Actor[]` | 只读 | 本次实际结算的全部目标（自动与手动结算均提供）；需要跨目标统计（如按持有某状态的个数增伤）时使用。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张攻击卡独立。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张攻击卡独立。 |
 | `element` | `string` | 只读 | 招式原始属性。 |
 | `outcome.isHit` / `.isCrit` / `.isBroken` | `boolean` | 只读 | 攻击方已确定的命中、暴击和破架结果。 |
 | `config.amount` | `number` | **可写** | 即将传入伤害 API 的原始数值。 |
@@ -449,7 +454,7 @@ await actor.applyHealing({
 | `finalDamage` | `number` | 条件提供 | 进入目标资源分配前的最终伤害。 |
 | `isDying` / `isDead` | `boolean` | 条件提供 | 本次结算是否使目标进入濒死或死亡。 |
 | `damageResult` | `Object` | 只读 | `applyDamage()` 返回的原始结果对象。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张卡片独立。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张卡片独立。 |
 | `isAttack` / `isHeal` / `isBuff` | `boolean` | 条件提供 | 攻击结算（自动与手动）提供 `true/false/false`。 |
 | `isManual` | `boolean` | 条件提供 | 自动结算为 `false`，手动结算为 `true`。 |
 
@@ -484,7 +489,7 @@ await actor.applyHealing({
 | `isHeal` | `boolean` | 条件提供 | 治疗为 `true`，Buff 为 `false`。 |
 | `costConsumed` | `Object` | 条件提供 | 自动攻击和治疗/Buff 的实际消耗。 |
 | `isManual` | `boolean` | 条件提供 | 手动攻击结算时为 `true`。 |
-| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张卡片独立。 |
+| `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张卡片独立。 |
 
 `targets` 的元素结构：
 
@@ -609,7 +614,7 @@ await actor.changeResources({
 
 `changeResources(updates, context)` 的 `updates` 默认是 Foundry 更新路径到绝对值的对象；如果需要原子增减，可显式传入 `{ delta: n }`，例如 `{"system.resources.rage.value": { delta: 1 }}`。普通数字的绝对值语义保持不变。`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。返回底层 Actor 更新结果。它会串行提交同一 Actor 的事务，并按实际差值派发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
 
-这 6 类资源字段——`system.resources.hp.value`、`system.resources.mp.value`、`system.resources.rage.value`、`system.resources.huti`（旧世界兼容 `system.resources.huti.value`）、`system.resources.tili.value`、`system.resources.morale.value`——在脚本中必须通过 `changeResources`（或语义匹配的 `applyDamage` / `applyHealing`）写入，不要直接 `actor.update()` / `args.target.update()` 修改这些路径。直接 `update` 只有兼容兜底，新脚本统一使用资源事务入口，以保留非 owner 的 GM socket 委托和按实际差值触发的 `resourceChanged` 语义。
+这 6 类资源字段——`system.resources.hp.value`、`system.resources.mp.value`、`system.resources.rage.value`、`system.resources.huti`、`system.resources.tili.value`、`system.resources.morale.value`——在脚本中必须通过 `changeResources`（或语义匹配的 `applyDamage` / `applyHealing`）写入。不要直接 `actor.update()` / `args.target.update()` 修改这些路径，以保留非 owner 的 GM 委托和按实际差值触发的 `resourceChanged` 语义。
 
 ### 资源事务错误
 
@@ -634,6 +639,24 @@ await game.xjzl.api.effects.removeEffect(args.target, "prone", 1);
 
 `addEffect(actor, effectDataOrId, count = 1)` 接受系统状态 ID 或 AE 数据，负责权限委托、本地化、slug 匹配、叠层和刷新，返回 `Promise<ActiveEffect|undefined>`。`removeEffect(actor, effectIdOrSlug, amount = 1)` 按文档 ID 或 slug 移除/减层；成功删除时返回删除结果，减层时通常返回 `undefined`。对可叠层效果，`removeEffect` 的 `amount` 默认只减一层；需要整体移除时传入不小于当前层数的数值。
 
+限时效果的源数据使用 `duration: { value, units, expiry }`，例如持续 3 回合、在 `turnStart` 事件到期时设为 `{ value: 3, units: "rounds", expiry: "turnStart" }`。不限时设为 `{ value: null, expiry: null }`；新建效果不需要填写 `start`，由系统在施加时初始化。
+
+AE 数据使用 `img`、`system.changes` 和字符串变更类型 `type`（如 `"add"`、`"override"`）。自行构造非被动的施加型效果时，显式设置 `transfer: false` 和 `showIcon: 2`，使无时长效果的图标也能常显：
+
+```javascript
+await game.xjzl.api.effects.addEffect(args.target, {
+  name: "流注",
+  img: "icons/svg/regen.svg",
+  transfer: false,
+  showIcon: 2,
+  duration: { value: 3, units: "rounds", expiry: "turnStart" },
+  system: { changes: [{ key: "system.resources.hp.bonus", type: "add", value: 5 }] },
+  flags: { "xjzl-system": { slug: "liuzhu_example" } }
+});
+```
+
+系统预置数据与脚本使用上述结构。读取已有 AE 时使用 `effect.system.changes`、`effect.duration.value`、`effect.duration.units` 和 `effect.duration.expiry`。
+
 从来源 Item 复制 AE 时先转为普通对象并清除 `_id`：
 
 ```javascript
@@ -642,6 +665,18 @@ delete effectData._id;
 effectData.origin = thisItem.uuid;
 await game.xjzl.api.effects.addEffect(args.target, effectData);
 ```
+
+### 查询状态定义
+
+按 ID 查询系统状态定义（图标、描述、变更、flags 等）使用 `getStatus(id)`：
+
+```javascript
+const status = game.xjzl.api.effects.getStatus("pojia");
+if (!status) return; // 未命中返回 undefined
+const change = status.system.changes[0]; // 命中返回可安全修改的深拷贝
+```
+
+`getStatus(id)` 为同步查询，命中时返回状态定义的深拷贝，可随意修改而不影响系统配置；它只读定义，不负责创建或更新文档。需要施加时把副本（可按需改写）传给 `addEffect`。
 
 需要随架招解除的效果设置：
 
@@ -668,7 +703,64 @@ await game.xjzl.api.effects.addEffect(args.target, effectData);
 - 穿透与防御：`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`passiveBlock`、`brokenDefense`、`ignoreArmorEffects`。
 - 自动资源变化：`regenHp/Mp/Rage` 加 `TurnStart`、`TurnEnd` 或 `Attack` 后缀。
 
-数值计数器通常使用 AE mode `2`（`CONST.ACTIVE_EFFECT_MODES.ADD`）；布尔覆盖通常使用 mode `5`（`CONST.ACTIVE_EFFECT_MODES.OVERRIDE`）。新增键必须先进入 `CONFIG.XJZL.statusFlags`，不能只在数据中自创系统状态键。
+AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`，布尔覆盖通常使用 `type: "override"`。新增键必须先进入 `CONFIG.XJZL.statusFlags`，不能只在数据中自创系统状态键。
+
+## 光环 API
+
+`game.xjzl.aura` 在 `ready` 后提供 Region 光环管理。创建、重建和删除会写入场景文档，应在异步脚本时机调用并 `await`；`passive`、`calc` 不可使用。
+
+| 方法 | 用途与返回值 |
+|---|---|
+| `await game.xjzl.aura.create(source, params)` | 创建光环；同场景同 `label` 的旧光环先删除。返回 `RegionDocument`；缺少标签、源不可用、无网格或半径非法时返回 `null`。矩形尺寸、锚点非法时抛错。 |
+| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene})` | 按标签或 Region ID 删除光环，返回删除数量；返回 `0` 表示未删到。`scene` 默认当前画布场景。 |
+| `game.xjzl.aura.query(label, {scene})` | 查询同标签的 Region，返回数组。`scene` 默认当前画布场景。 |
+| `game.xjzl.aura.queryLabels({scene})` | 返回场景中去重后的光环标签数组。`scene` 默认当前画布场景。 |
+| `await game.xjzl.aura.refreshAura(label, overrides, {scene})` | 用已有实例的参数和覆盖项重建光环，返回新 Region；标签不存在或源失效时返回 `null`。 |
+| `await game.xjzl.aura.queryTokens(source, opts)` | 按范围即时查询，返回命中的 `Actor[]`，不创建 Region。一个关联 Actor 有多个命中 Token 时可重复出现。 |
+
+`source` 可传 `TokenDocument`、画布 `Token`、在当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随 Token，`follow: false` 可固定在创建位置；坐标源始终固定。创建坐标源光环时，若需按阵营过滤，可在 `params` 中传 `sourceActorUuid`，该角色须在当前画布上有活动 Token。
+
+范围以网格格数计，圆形使用非负整数 `radius`（默认 `0`），覆盖格始终按单段 1-2-2-2 计算，不随场景对角线规则或 `customDistanceRule` 开关变化。矩形设置 `shapeKind: "rect"`、`rectWidth`、`rectHeight`，可用 `anchorX`、`anchorY` 指定锚格。`quarterTurns` 为 90° 转数，传 `"auto"` 时按源 Token 朝向吸附。`displayName`、`color` 控制 Region 展示，`levelIds` 可指定楼层。
+
+`queryTokens` 还接受形状生成器输出的相对 `offsets`（`i` 为列、`j` 为行），此时无需创建光环；它仅按平面覆盖格查询，不按 `levelIds` 过滤。
+
+例如，在进行中的战斗内使用异步脚本创建跟随光环，使范围内的敌人获得系统状态，战斗结束时清理：
+
+```javascript
+const auraCombat = game.combat;
+if (!auraCombat?.round) return ui.notifications.warn("需要进行中的战斗。");
+const region = await game.xjzl.aura.create(actor, {
+  label: `blind-aura-${actor.id}`,
+  displayName: "目盲光环",
+  radius: 2,
+  faction: "enemy",
+  includeSelf: false,
+  payloadStatusId: "blind",
+  lifecycle: "combat",
+  combatId: auraCombat.id
+});
+if (!region) ui.notifications.warn("光环未创建，请检查场景和光环参数。");
+```
+
+`params.label` 必填。`faction` 可为 `"all"`、`"ally"` 或 `"enemy"`，`includeSelf` 控制是否包含源；按阵营过滤需要可解析的源 Token。`queryTokens` 使用坐标源时应采用 `"all"`，且无法识别自身；使用 Token/Actor 源时，`includeSelf: false` 按源 Actor 排除。持久光环的 `includeSelf: false` 同样按源 Actor 排除——同一 Actor 的多个关联 Token 都视为自身。
+
+`"all"` 包含中立单位；源角色位于范围内时，`includeSelf: false` 会排除其 Actor。`"ally"`、`"enemy"` 按源与目标 Token 的阵营过滤，其中 `"enemy"` 不包含中立目标。需要作用于场上所有其他角色、但没有空间范围的效果，不应创建 Region。
+
+`payloadItemUuid` 和 `payloadEffectName` 指向源物品中的 AE；`payloadStatusId` 可直接引用 `CONFIG.statusEffects` 中的系统通用状态 ID（如 `bleed_stack`）。同时配置时优先使用 `payloadStatusId`，录入时应只选一种来源。`enterEnabled` 默认开启：配置 payload 后，目标**每次进入范围**都会挂载一次 AE，可叠层 AE 逐次累加层数、非叠层 AE 走覆盖/刷新；`enterAction` 可直接结算伤害或治疗，`moveWithin` 使区域内移动复用该动作（不重复挂载 AE）。`roundEnabled` 默认关闭；开启后按 `roundTiming`（`tokenRoundStart`、`tokenRoundEnd`、`tokenTurnStart` 或 `tokenTurnEnd`）执行 `roundAction`。`enterAction.kind` 可为 `"none"`、`"damage"` 或 `"healing"`；`roundAction.kind` 还可为 `"effect"`：每个对应时机都对区域内目标执行一次挂载，可叠层 AE 每轮累加一层，非叠层 AE 每轮刷新（覆盖数值与时长）。只需在回合时机挂载时，应设置 `enterEnabled: false`。`amount` 为伤害/治疗数值或按源角色数据计算的公式，`type` 为伤害类型或资源键；`pierce` 仅用于伤害。`enterEnabled` 与 `roundEnabled` 均关闭且未启用 `moveWithin` 时，光环仅标记范围。
+
+`throttlePerRound` 将同一目标的进入结算限制为每战斗轮一次，战斗外不节流；节流命中的进入不施加、不执行动作。要让进入与所选回合时机二选一结算，须同时开启 `enterEnabled`、`roundEnabled` 和 `oncePerRound`：同一目标在每个战斗轮只响应先发生的事件。进入事件执行 `enterAction`，回合事件执行 `roundAction`；配置 payload 时，先发生的事件挂载一次。`cleanupOnExit` 默认开启：光环记录可叠层 AE 的实际贡献层数，以及不可叠层 AE 的清理归属；目标离开时只释放对应记录。首次挂载前已有的同 slug AE 会保留，多个光环维护同一不可叠层 AE 时，最后一条清理记录结束后才决定是否移除。关闭后仍正常施加，但不建立清理记录，目标离开或光环删除时保留效果。已有清理记录期间更改开关不会改变该记录的清理语义；退出并重新进入后采用新值，关闭期间未记录的效果不会被追溯清理。`durationRounds` 控制存活轮数，仅在创建时已有进行中的战斗轮次时生效。`maintain: {resource, amount, perTarget}` 在绑定战斗的源角色回合末消耗资源；`perTarget` 是每名覆盖敌人的追加消耗。未显式传 `combatId` 时，管理器使用创建时的当前战斗。`lifecycle` 默认为 `"manual"`；`"combat"` 在所属战斗结束时清理，`"equip"` 在对应 `sourceItemUuid` 物品卸下或删除时清理，`"yungong"` 在源角色运功切换时清理，`"stance"` 在源角色解除或切换架招时清理。按源清理需要正确设置 `sourceActorUuid` 或 `sourceItemUuid`；Token/Actor 源会自动记录源角色 UUID。
+
+使用 `oncePerRound` 时，进入路径须有 payload 或有效 `enterAction`，回合路径须有 payload 或有效 `roundAction`；空配置可能先占用本轮额度而不产生效果。
+
+删除或重建光环会触发区域退出清理；需要按标签更新半径、动作或效果时使用 `refreshAura`。直接修改 Region 行为配置中的范围字段也会重算形状。已有清理记录期间更换 payload 引用不会立即切换，该目标继续使用旧引用直至退出；需要立即切换时调用 `refreshAura` 重建。`cleanupOnExit: false` 产生的效果没有清理记录，修改引用或重建光环都不会移除既有效果，调用方须自行处理。
+
+把移除某个光环作为招式前提时，先查询可选实例，再按选中的 Region ID 调用 `dismiss` 并检查返回值；查询后实例仍可能消失，返回 `0` 时应停止后续结算。若还需在扣费前取消施展，应在 `preAttack` 完成选择并按该阶段的资源检查规则处理。
+
+监听型光环可将无数值、`showIcon: 0` 的 AE 作为 payload，利用被挂角色的现有触发器响应事件。模板 AE 位于角色持有的物品且未预设 `origin` 时，管理器把复制品的 `origin` 设为模板 AE 的 UUID；脚本可用 `fromUuid(thisEffect.origin)` 找回模板，再从所属物品定位主人。退出清理只管理光环直接挂载且已记账的 payload；监听脚本另行添加的 AE 不会自动纳入光环账本。脚本反查目标脚下的光环时使用 Token 文档的 `regions` 集合——它是集合不是数组，须先展开（`[...(tokenDoc.regions ?? [])]`）再 `filter`/`some`。
+
+区域工具栏的光环快建按钮和 `game.xjzl.auraQuick.open()` 会打开快建窗口。快建光环默认只标记范围；需要自动结算时，可编辑区域行为，或在异步脚本中使用 `game.xjzl.aura.create()` 传入结算参数。需要让玩家在画布选择固定光环落点时，使用 `await game.xjzl.auraQuick.place(params)`；参数为 `aura.create` 的 `params` 对象，落点由玩家点击决定，`follow` 固定为 `false`。成功时返回 `RegionDocument`，取消选点、无网格或创建失败时返回 `null`；坐标源按阵营过滤时应提供 `sourceActorUuid`。
+
+规则指定“在自身周围生成、留在原地”时，以角色为 `source` 调用 `game.xjzl.aura.create`，并设置 `follow: false`；只有规则允许自行决定落点时才使用 `auraQuick.place`。选点流程不校验施展距离或格子占用，玩家按规则选择。持续流失、挂载状态等进出或回合效果由 Region 行为配置结算；不随离区撤销的状态可设置 `cleanupOnExit: false`，若无独立到期或清理机制则需手动移除。
 
 ## Macros API
 
@@ -738,6 +830,8 @@ if (!Macros.checkStance(actor, args)) return;
 `checkStance()` 要求架招已开启、攻击未被判定为闪避、伤害类型为 `waigong` 或 `neigong`，且 `args.config.ignoreStance` 不为真。适用于 `preTake`、`damaged` 等防御侧脚本。
 
 ## 常用安全模式
+
+画布距离判定使用 `canvas.grid.measurePath(waypoints).distance`，路径点传画布像素坐标（如 Token 的 `center`）。开启自定义距离规则且方格场景的对角线规则为“等效”时，`.distance` 按 1-2-2-2 家规计算；其他场景使用核心结果。总 `cost` 保留核心累计成本，不能当作家规距离。
 
 ### 反伤
 
@@ -819,7 +913,7 @@ await actor.unsetFlag("xjzl-system", "example_last_hit");
 
 ### 玩家决策
 
-已有检定或对抗能力时使用 `Macros`。确实需要简单选择时使用 V13 命名空间：
+已有检定或对抗能力时使用 `Macros`。确实需要简单选择时使用 Foundry 的 `DialogV2`：
 
 ```javascript
 const confirmed = await foundry.applications.api.DialogV2.confirm({

@@ -10,7 +10,7 @@ export class EncounterFormulaError extends Error {
 
 function message(key, fallback, data = {}) {
   const i18n = globalThis.game?.i18n;
-  return i18n ? i18n.format(`XJZL.Encounter.FormulaErrors.${key}`, data) : fallback;
+  return i18n ? i18n.localize(`XJZL.Encounter.FormulaErrors.${key}`, data) : fallback;
 }
 
 /**

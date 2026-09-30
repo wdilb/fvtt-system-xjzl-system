@@ -1139,7 +1139,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         }
         await actor.unsetFlag("xjzl-system", "_wizardActive");
 
-        ui.notifications.success(game.i18n.format("XJZL.Wizard.Common.BirthSuccess", { name: actor.name }));
+        ui.notifications.success(game.i18n.localize("XJZL.Wizard.Common.BirthSuccess", { name: actor.name }));
         // 强制关闭，跳过确认弹窗
         this.close({ force: true });
         actor.sheet.render(true);

@@ -11,7 +11,6 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         classes: ["xjzl-window", "item", "equipment", "theme-dark"],
         position: { width: 800, height: 650 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -82,7 +81,7 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         }
 
         // 富文本增强 (放在 return 之前)
-        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
             this.document.system.description,
             {
                 secrets: this.document.isOwner,
@@ -168,7 +167,7 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: "装备属性",
-            icon: "icons/svg/aura.svg",
+            img: "icons/svg/aura.svg", // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             transfer: true // 【关键】装备的属性默认是被动生效的
         }, { parent: this.document });

@@ -10,6 +10,7 @@ import { XJZLAuditLog } from "../applications/audit-log.mjs";
 import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 import { XJZLManageXPDialog } from "../applications/manage-xp.mjs";
 import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } from "./behaviors/effect-interactions.mjs";
+import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { XJZLCharacterPreviewApp } from "../applications/character-preview.mjs";
 import { XJZLCharacterWizardApp } from "../applications/character-wizard.mjs";
@@ -24,7 +25,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         classes: ["xjzl-window", "actor", "character", "theme-dark"],
         position: { width: 1100, height: 750 },
         window: { resizable: true },
-        // 告诉 V13："请帮我监听 Input 变化，并且在重绘时保持滚动位置"
+        // 输入变更自动保存；提交后保持角色卡打开。
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -1174,7 +1175,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
         // =====================================================
         // Header 滚动条记忆修复 (Capture + Passive)
-        // 解决了 V13 原生 scrollable 无法监听 header滚动条的问题
+        // Header 滚动容器不由 AppV2 的 scrollable 管理，重绘后需自行恢复位置。
         // =====================================================
 
         // 1. RAF 确保在 CSS 布局计算完成后执行
@@ -1667,13 +1668,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         if (confirmed) {
             // 实例化并渲染向导，将当前 Actor 传进去
             new XJZLCharacterWizardApp({ actor: this.document }).render(true);
-            // 可选：把现在的角色卡先最小化或关掉，避免挡视野
+            // 关闭角色卡，避免遮挡建卡向导。
             this.close();
         }
     }
 
     /* -------------------------------------------- */
-    /*  Drag & Drop 核心逻辑 (修复版)               */
+    /*  Drag & Drop 核心逻辑                        */
     /* -------------------------------------------- */
 
     /**
@@ -1782,6 +1783,17 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 7. 整数重排：所有 sort = 新索引，一次性批量更新
         const updates = reordered.map((item, i) => ({ _id: item.id, sort: i }));
         return this.actor.updateEmbeddedDocuments("Item", updates);
+    }
+
+    /**
+     * @override
+     * 通过特效门面处理角色卡拖放，保留被动效果拦截、架招判定和叠层语义。
+     * @param {DragEvent} event 拖放事件
+     * @param {ActiveEffect} effect 来源特效
+     * @returns {Promise<ActiveEffect|undefined>} 施加结果；被拦截时返回 undefined
+     */
+    async _onDropActiveEffect(event, effect) {
+        return ActiveEffectManager.applyDraggedEffect(this.actor, effect);
     }
 
     /**
@@ -1943,8 +1955,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
         const itemId = el.dataset.itemId;
 
-        // 如果没有 ID，不管
-        if (!itemId) return;
+        // 非物品卡片由核心生成对应文档的拖拽数据。
+        if (!itemId) return super._onDragStart(event);
 
         const item = this.actor.items.get(itemId);
         if (!item) return;
@@ -2844,18 +2856,16 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-      * 查看审计日志 - [调用独立 App 类]
+      * 打开或聚焦当前角色的审计日志窗口。
       */
     _onViewHistory(event, target) {
-        // 防止重复打开
-        const existingApp = Object.values(ui.windows).find(w => w instanceof XJZLAuditLog && w.actor.id === this.document.id);
-        if (existingApp) {
-            existingApp.bringToTop();
-            return;
-        }
+        // 首次渲染中的窗口也需要参与单例判断。
+        if (XJZLAuditLog.focusActorWindow(this.document)) return;
 
-        // 实例化并渲染
-        new XJZLAuditLog({ actor: this.document }).render(true);
+        // 窗口清理和异常详情由 render 处理，此处提示用户打开失败。
+        new XJZLAuditLog({ actor: this.document }).render(true).catch(() => {
+            ui.notifications.error(game.i18n.localize("XJZL.History.OpenFailed"));
+        });
     }
     /**
      * 修炼工作区即时搜索（内功、武学/招式、技艺书、特性）

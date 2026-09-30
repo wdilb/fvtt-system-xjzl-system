@@ -149,10 +149,11 @@ export async function seedNeigong() {
             // 但如果有特殊效果（如持续性 Buff 模板），依然可以保留
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                icon: e.icon || d.img,
+                img: e.img || d.img,
                 transfer: e.transfer ?? false, // 内功特效通常不直接 transfer，而是通过脚本调用
+                showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                changes: e.changes || [],
+                system: { changes: e.system?.changes ?? [] },
                 flags: e.flags || {},
                 description: e.description || "",
                 // 补上 duration

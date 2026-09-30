@@ -1,3 +1,4 @@
+
 const PACK_NAME = "xjzl-system.consumables";
 
 /**
@@ -78,9 +79,10 @@ export async function seedConsumables() {
             // 准备 AE 数据
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                icon: e.icon,
+                img: e.img,
                 transfer: e.transfer ?? false, // 消耗品通常为 false
-                changes: e.changes,
+                showIcon: e.showIcon,
+                system: { changes: e.system?.changes ?? [] },
                 flags: e.flags,
                 description: e.description,
                 // 补上 duration

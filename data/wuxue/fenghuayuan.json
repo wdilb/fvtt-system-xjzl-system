@@ -115,7 +115,7 @@
                             "label": "反击特效",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    effectData.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen'));\n    effectData.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ],
                     "automationNote": "命中后自动施加缚身。",
@@ -175,33 +175,36 @@
         "effects": [
             {
                 "name": "残气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                 "transfer": false,
                 "description": "命中-2，闪避-2",
-                "changes": [
-                    {
-                        "key": "system.combat.hit_neigong",
-                        "mode": 2,
-                        "value": "-2"
-                    },
-                    {
-                        "key": "system.combat.hit_waigong",
-                        "mode": 2,
-                        "value": "-2"
-                    },
-                    {
-                        "key": "system.combat.dodge",
-                        "mode": 2,
-                        "value": "-2"
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "stackable": true,
                         "maxStacks": 5,
                         "slug": "canqi"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "value": "-2",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "value": "-2",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.dodge",
+                            "value": "-2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -268,7 +271,7 @@
                             "label": "格挡反制",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!args.attacker || !Macros.checkStance(actor, args)) return;\n\nlet stacks = 1;\nconst qiren = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qiren\");\n\nif (qiren) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"消耗气刃\" },\n        content: \"<p>格挡成功！是否消耗【气刃】为目标额外添加一层【失准】？</p>\",\n        yes: { label: \"消耗气刃\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"qiren\", 1);\n        stacks = 2;\n        actor.showFloatyText(\"气刃消散！\", {fill: \"#00ffff\"});\n    }\n}\n\nconst effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"shizhun\"));\nif (effectData) {\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData, stacks);\n}"
+                            "script": "if (!args.attacker || !Macros.checkStance(actor, args)) return;\n\nlet stacks = 1;\nconst qiren = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qiren\");\n\nif (qiren) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"消耗气刃\" },\n        content: \"<p>格挡成功！是否消耗【气刃】为目标额外添加一层【失准】？</p>\",\n        yes: { label: \"消耗气刃\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"qiren\", 1);\n        stacks = 2;\n        actor.showFloatyText(\"气刃消散！\", {fill: \"#00ffff\"});\n    }\n}\n\nconst effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('shizhun'));\nif (effectData) {\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData, stacks);\n}"
                         }
                     ],
                     "automationNote": "受击反制添加失准，若有气刃将弹窗询问是否消耗以加层。",
@@ -371,14 +374,15 @@
         "effects": [
             {
                 "name": "气刃",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                 "transfer": false,
                 "description": "需手动装备对应的气刃武器：装备后移动速度+2。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "qiren"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "showIcon": 2
             }
         ]
     },
@@ -452,7 +456,7 @@
                             "label": "施加红尘",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    let rounds = 1;\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fenghua_qizhi\")) rounds = 2;\n\n    const effectData = thisItem.effects.getName(\"红尘\").toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: rounds };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit) {\n    let rounds = 1;\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fenghua_qizhi\")) rounds = 2;\n\n    const effectData = thisItem.effects.getName(\"红尘\").toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ],
                     "automationNote": "命中施加红尘，回合初自动扣血。气枝增加持续时间已处理。",
@@ -533,7 +537,7 @@
                             "label": "走火入魔与自身红尘",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const hasDuan = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duanchen\");\n    const hasHong = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"hongchen\");\n    if (hasDuan && hasHong) {\n        // 系统状态模板无持续时间，直接传 id 会永久存在，需显式给一回合\n        const rageStatus = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"rage\"));\n        if (rageStatus) {\n            rageStatus.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, rageStatus);\n        }\n        ui.notifications.info(`${args.target.name} 走火入魔！`);\n    }\n}\n\nconst qizhi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fenghua_qizhi\");\nif (qizhi) {\n    await game.xjzl.api.effects.removeEffect(actor, \"fenghua_qizhi\", 1);\n    // 给自己加红尘\n    const effectData = thisItem.effects.getName(\"红尘\").toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"气枝化为红尘缠身。\");\n}"
+                            "script": "if (args.isHit) {\n    const hasDuan = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duanchen\");\n    const hasHong = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"hongchen\");\n    if (hasDuan && hasHong) {\n        // 系统状态模板无持续时间，直接传 id 会永久存在，需显式给一回合\n        const rageStatus = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('rage'));\n        if (rageStatus) {\n            rageStatus.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            await game.xjzl.api.effects.addEffect(args.target, rageStatus);\n        }\n        ui.notifications.info(`${args.target.name} 走火入魔！`);\n    }\n}\n\nconst qizhi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fenghua_qizhi\");\nif (qizhi) {\n    await game.xjzl.api.effects.removeEffect(actor, \"fenghua_qizhi\", 1);\n    // 给自己加红尘\n    const effectData = thisItem.effects.getName(\"红尘\").toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { value: 2, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"气枝化为红尘缠身。\");\n}"
                         }
                     ],
                     "automationNote": "条件检测施加走火入魔，以及自身的红尘转化。",
@@ -544,18 +548,18 @@
         "effects": [
             {
                 "name": "气枝",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                 "transfer": false,
                 "description": "距离+3",
                 "flags": {
                     "xjzl-system": {
                         "slug": "fenghua_qizhi"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "showIcon": 2
             },
             {
                 "name": "红尘",
-                "icon": "icons/svg/sand.svg",
                 "transfer": false,
                 "description": "回合初流失等同于体魄的气血",
                 "flags": {
@@ -570,18 +574,21 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/sand.svg",
+                "showIcon": 2
             },
             {
                 "name": "断尘",
-                "icon": "icons/svg/silenced.svg",
                 "transfer": false,
                 "description": "每回合只能出招一次",
                 "flags": {
                     "xjzl-system": {
                         "slug": "duanchen"
                     }
-                }
+                },
+                "img": "icons/svg/silenced.svg",
+                "showIcon": 2
             }
         ]
     },
@@ -648,7 +655,7 @@
                             "label": "格挡反制",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    // 正确获取当前架招的等级 (不能用 args.move)\n    const stanceId = actor.system.martial.stance;\n    const stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, stanceMove?.computedLevel || 1);\n    \n    const yanzou = args.attacker.system.arts?.yanzou?.total || 0;\n    const reqLevel = 1 + lvl; // 1级需2，2级需3\n\n    if (yanzou < reqLevel) {\n        // 1. 施加耳鸣\n        const deafData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"deaf\"));\n        if (deafData) {\n            deafData.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.attacker, deafData);\n        }\n\n        // 2. 构建基础聊天卡片内容 (增加 margin-left 和 padding-left 防止边框遮挡)\n        let cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; padding-left:8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.1); margin-left:2px;\">\n                <div style=\"font-weight:bold; color:#8e44ad;\">\n                    <i class=\"fas fa-music\"></i> 曲高和寡\n                </div>\n                <div style=\"font-size:0.9em; margin-top:4px; color:#555;\">\n                    <b>${args.attacker.name}</b> 演奏造诣不足 (当前${yanzou}，需${reqLevel})，陷入 <b>[耳鸣]</b> 1 回合。\n                </div>\n            </div>`;\n        \n        // 3. 追击判定 (气箫)\n        const qixiao = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qixiao\");\n        if (qixiao) {\n            cardContent += `\n            <div style=\"padding:5px; padding-left:8px; border-left:4px solid #d35400; background:rgba(211,84,0,0.1); margin-left:2px; margin-top:5px;\">\n                <div style=\"font-weight:bold; color:#d35400;\">\n                    <i class=\"fas fa-bolt\"></i> 气箫共鸣\n                </div>\n                <div style=\"font-size:0.9em; margin-top:4px; color:#555;\">\n                    触发追击！请手动<b>无消耗</b>施展【知音难觅】。\n                </div>\n            </div>`;\n            \n            // 移除气箫\n            await game.xjzl.api.effects.removeEffect(actor, \"qixiao\", 1);\n        }\n\n        cardContent += `</div>`;\n\n        // 4. 发送公共聊天卡片\n        await ChatMessage.create({\n            content: cardContent,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    // 正确获取当前架招的等级 (不能用 args.move)\n    const stanceId = actor.system.martial.stance;\n    const stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, stanceMove?.computedLevel || 1);\n    \n    const yanzou = args.attacker.system.arts?.yanzou?.total || 0;\n    const reqLevel = 1 + lvl; // 1级需2，2级需3\n\n    if (yanzou < reqLevel) {\n        // 1. 施加耳鸣\n        const deafData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('deaf'));\n        if (deafData) {\n            deafData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            await game.xjzl.api.effects.addEffect(args.attacker, deafData);\n        }\n\n        // 2. 构建基础聊天卡片内容 (增加 margin-left 和 padding-left 防止边框遮挡)\n        let cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; padding-left:8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.1); margin-left:2px;\">\n                <div style=\"font-weight:bold; color:#8e44ad;\">\n                    <i class=\"fas fa-music\"></i> 曲高和寡\n                </div>\n                <div style=\"font-size:0.9em; margin-top:4px; color:#555;\">\n                    <b>${args.attacker.name}</b> 演奏造诣不足 (当前${yanzou}，需${reqLevel})，陷入 <b>[耳鸣]</b> 1 回合。\n                </div>\n            </div>`;\n        \n        // 3. 追击判定 (气箫)\n        const qixiao = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qixiao\");\n        if (qixiao) {\n            cardContent += `\n            <div style=\"padding:5px; padding-left:8px; border-left:4px solid #d35400; background:rgba(211,84,0,0.1); margin-left:2px; margin-top:5px;\">\n                <div style=\"font-weight:bold; color:#d35400;\">\n                    <i class=\"fas fa-bolt\"></i> 气箫共鸣\n                </div>\n                <div style=\"font-size:0.9em; margin-top:4px; color:#555;\">\n                    触发追击！请手动<b>无消耗</b>施展【知音难觅】。\n                </div>\n            </div>`;\n            \n            // 移除气箫\n            await game.xjzl.api.effects.removeEffect(actor, \"qixiao\", 1);\n        }\n\n        cardContent += `</div>`;\n\n        // 4. 发送公共聊天卡片\n        await ChatMessage.create({\n            content: cardContent,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
                         }
                     ],
                     "automationNote": "完全自动化。格挡后自动检测对方演奏等级并施加耳鸣，若有气箫会自动扣除并发送追击卡片提示。",
@@ -746,25 +753,27 @@
         "effects": [
             {
                 "name": "气箫",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                 "transfer": false,
                 "description": "需手动装备对应的气箫武器：装备后演奏+2。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "qixiao"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "showIcon": 2
             },
             {
                 "name": "惭愧",
-                "icon": "icons/svg/daze.svg",
                 "transfer": false,
                 "description": "无法攻击施法者",
                 "flags": {
                     "xjzl-system": {
                         "slug": "cankui"
                     }
-                }
+                },
+                "img": "icons/svg/daze.svg",
+                "showIcon": 2
             }
         ]
     },
@@ -850,7 +859,7 @@
                             "label": "施加禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && actor._qimanQigongConsumed) {\n    const rootEff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootEff) {\n        rootEff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rootEff);\n    }\n}"
+                            "script": "if (args.isHit && actor._qimanQigongConsumed) {\n    const rootEff = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (rootEff) {\n        rootEff.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, rootEff);\n    }\n}"
                         }
                     ]
                 },
@@ -893,7 +902,7 @@
                             "label": "击破施加下盘不稳",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const effData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if (effData) {\n        effData.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const effData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('unstable'));\n    if (effData) {\n        effData.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n}"
                         }
                     ]
                 },
@@ -942,7 +951,7 @@
                             "label": "施加缚身",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    let rounds = 1;\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) {\n        rounds = 3;\n    }\n    \n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    if (effectData) {\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                            "script": "if (args.isHit) {\n    let rounds = 1;\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) {\n        rounds = 3;\n    }\n    \n    const effectData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('fushen'));\n    if (effectData) {\n        effectData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
                         }
                     ]
                 }
@@ -951,14 +960,15 @@
         "effects": [
             {
                 "name": "气弓",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                 "transfer": false,
                 "description": "需手动装备对应的气弓武器：装备后闪避+4。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "qigong"
                     }
-                }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "showIcon": 2
             }
         ]
     },
@@ -1000,7 +1010,7 @@
                             "label": "格挡悟情",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    // 仅喜怒哀乐授予的悟情绑定架招；模板本身不带该标志，避免影响幡然悔悟授予的脱战版\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.tiedToStance\", true);\n    \n    // 动态持续回合：1级1回合，2级2回合...\n    const lvl = Math.max(1, move.computedLevel || 1);\n    effectData.duration = { rounds: lvl };\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    // 仅喜怒哀乐授予的悟情绑定架招；模板本身不带该标志，避免影响幡然悔悟授予的脱战版\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.tiedToStance\", true);\n    \n    // 动态持续回合：1级1回合，2级2回合...\n    const lvl = Math.max(1, move.computedLevel || 1);\n    effectData.duration = { value: lvl, units: \"rounds\", expiry: \"turnStart\" };\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 },
@@ -1037,7 +1047,7 @@
                             "label": "性格共鸣判定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.target) {\n    // 修正后的性格获取函数：直接读性格物品的名字\n    const getP = (act) => {\n        if (!act) return \"\";\n        if (act.itemTypes?.personality?.length > 0) {\n            return act.itemTypes.personality[0].name;\n        }\n        return act.system?.info?.personality || \"\";\n    };\n\n    const targetP = getP(args.target);\n    const myP = getP(actor);\n\n    // 1. 发送窥探性格的提示卡片\n    const pName = targetP ? targetP : \"无明显性格\";\n    await ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; margin-left: 4px; border-left: 4px solid #2980b9; background: rgba(41, 128, 185, 0.1);\">\n            <div style=\"font-size: 0.9em; color: #2c3e50;\"><i class=\"fas fa-eye\"></i> 窥探到目标性格：<b>${pName}</b></div>\n        </div>`\n    });\n    \n    // 2. 校验共鸣 (确保两者都不为空且相等)\n    if (targetP && myP && targetP === myP) {\n        // 扣除怒气\n        const currentRage = args.target.system.resources.rage.value;\n        if (currentRage > 0) {\n            await args.target.changeResources({ \"system.resources.rage.value\": { delta: -1 } }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        }\n        \n        // 施加迟滞 1回合\n        const chizhiConfig = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n        if (chizhiConfig) {\n            const chizhiData = foundry.utils.deepClone(chizhiConfig);\n            chizhiData.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, chizhiData);\n        }\n        \n        actor.showFloatyText(\"性格共鸣！\", { fill: \"#e056fd\" });\n    }\n}"
+                            "script": "if (args.isHit && args.target) {\n    // 修正后的性格获取函数：直接读性格物品的名字\n    const getP = (act) => {\n        if (!act) return \"\";\n        if (act.itemTypes?.personality?.length > 0) {\n            return act.itemTypes.personality[0].name;\n        }\n        return act.system?.info?.personality || \"\";\n    };\n\n    const targetP = getP(args.target);\n    const myP = getP(actor);\n\n    // 1. 发送窥探性格的提示卡片\n    const pName = targetP ? targetP : \"无明显性格\";\n    await ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; margin-left: 4px; border-left: 4px solid #2980b9; background: rgba(41, 128, 185, 0.1);\">\n            <div style=\"font-size: 0.9em; color: #2c3e50;\"><i class=\"fas fa-eye\"></i> 窥探到目标性格：<b>${pName}</b></div>\n        </div>`\n    });\n    \n    // 2. 校验共鸣 (确保两者都不为空且相等)\n    if (targetP && myP && targetP === myP) {\n        // 扣除怒气\n        const currentRage = args.target.system.resources.rage.value;\n        if (currentRage > 0) {\n            await args.target.changeResources({ \"system.resources.rage.value\": { delta: -1 } }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        }\n        \n        // 施加迟滞 1回合\n        const chizhiConfig = game.xjzl.api.effects.getStatus('chizhi');\n        if (chizhiConfig) {\n            const chizhiData = foundry.utils.deepClone(chizhiConfig);\n            chizhiData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            await game.xjzl.api.effects.addEffect(args.target, chizhiData);\n        }\n        \n        actor.showFloatyText(\"性格共鸣！\", { fill: \"#e056fd\" });\n    }\n}"
                         }
                     ]
                 },
@@ -1112,7 +1122,7 @@
                             "label": "大彻大悟切换",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const wuqing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuqing\");\nconst lvl = Math.max(1, move.computedLevel || 1);\n\nif (wuqing) {\n    // 移除悟情\n    await game.xjzl.api.effects.removeEffect(actor, \"wuqing\", 1);\n    \n    // 获取并修改悟\n    const wuEffect = thisItem.effects.getName(\"悟\").toObject();\n    delete wuEffect._id;\n    wuEffect.origin = thisItem.uuid;\n    \n    // 动态计算悟性加成: 等级 * 5\n    const bonus = lvl * 5;\n    const wuxingChange = wuEffect.changes.find(c => c.key === \"system.stats.wuxing.mod\");\n    if (wuxingChange) {\n        wuxingChange.value = String(bonus);\n    }\n    wuEffect.description += ` (当前提供悟性 +${bonus})`;\n    \n    await game.xjzl.api.effects.addEffect(actor, wuEffect);\n    actor.showFloatyText(\"大彻大悟！\", { fill: \"#f1c40f\" });\n} else {\n    // 获得悟情\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"获得悟情\", { fill: \"#e74c3c\" });\n}\n\n// 瞬发处理\nargs.flags.autoApplied = true;"
+                            "script": "const wuqing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuqing\");\nconst lvl = Math.max(1, move.computedLevel || 1);\n\nif (wuqing) {\n    // 移除悟情\n    await game.xjzl.api.effects.removeEffect(actor, \"wuqing\", 1);\n    \n    // 获取并修改悟\n    const wuEffect = thisItem.effects.getName(\"悟\").toObject();\n    delete wuEffect._id;\n    wuEffect.origin = thisItem.uuid;\n    \n    // 动态计算悟性加成: 等级 * 5\n    const bonus = lvl * 5;\n    const wuxingChange = wuEffect.system.changes.find(c => c.key === \"system.stats.wuxing.mod\");\n    if (wuxingChange) {\n        wuxingChange.value = String(bonus);\n    }\n    wuEffect.description += ` (当前提供悟性 +${bonus})`;\n    \n    await game.xjzl.api.effects.addEffect(actor, wuEffect);\n    actor.showFloatyText(\"大彻大悟！\", { fill: \"#f1c40f\" });\n} else {\n    // 获得悟情\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"获得悟情\", { fill: \"#e74c3c\" });\n}\n\n// 瞬发处理\nargs.flags.autoApplied = true;"
                         }
                     ]
                 }
@@ -1121,7 +1131,6 @@
         "effects": [
             {
                 "name": "悟情",
-                "icon": "icons/svg/heart.svg",
                 "description": "在你的每个回合初，可以改变自身性格，在持续结束后，恢复原性格。",
                 "transfer": false,
                 "flags": {
@@ -1130,11 +1139,14 @@
                         "stackable": false
                     }
                 },
-                "changes": []
+                "img": "icons/svg/heart.svg",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
             },
             {
                 "name": "悟",
-                "icon": "icons/svg/sun.svg",
                 "description": "提高悟性上限及数值，同时你的招式命中和伤害获得等同于自身最终悟性的加值。",
                 "transfer": false,
                 "flags": {
@@ -1157,13 +1169,17 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.stats.wuxing.mod",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "icons/svg/sun.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.stats.wuxing.mod",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -1296,7 +1312,6 @@
         "effects": [
             {
                 "name": "所见所闻",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                 "description": "气感属性技能等级+1；你每次闪避敌方攻击时，为其添加一层“残气”（至多五层，持续到脱战）。",
                 "transfer": true,
                 "flags": {
@@ -1307,12 +1322,15 @@
                                 "label": "所见所闻-闪避触发",
                                 "trigger": "avoided",
                                 "active": true,
-                                "script": "if (!args.attacker) return;\n// 常驻被动 AE 不受领悟门槛约束，需显式确认招式已领悟才生效\nconst sourceItem = actor.itemTypes.wuxue.find(i => i.system.moves.some(m => m.name === \"所见所闻\"));\nif (!sourceItem) return;\nconst srcMove = sourceItem.system.moves.find(m => m.name === \"所见所闻\");\nif ((srcMove?.computedLevel || 0) <= 0) return;\n\n// 残气数据直接内联，origin 指向来源武学以便追溯\nconst effectData = {\n    name: \"残气\",\n    icon: \"systems/xjzl-system/assets/icons/wuxue/枫华.png\",\n    description: \"每层使你命中-2，闪避-2。\",\n    origin: sourceItem.uuid,\n    changes: [\n        { key: \"system.combat.hit_neigong\", mode: 2, value: \"-2\" },\n        { key: \"system.combat.hit_waigong\", mode: 2, value: \"-2\" },\n        { key: \"system.combat.dodge\", mode: 2, value: \"-2\" }\n    ],\n    flags: { \"xjzl-system\": { slug: \"canqi\", stackable: true, maxStacks: 5 } }\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nif (actor.token?.object) {\n    actor.showFloatyText(\"所见所闻\", { fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4 });\n}"
+                                "script": "if (!args.attacker) return;\n// 常驻被动 AE 不受领悟门槛约束，需显式确认招式已领悟才生效\nconst sourceItem = actor.itemTypes.wuxue.find(i => i.system.moves.some(m => m.name === \"所见所闻\"));\nif (!sourceItem) return;\nconst srcMove = sourceItem.system.moves.find(m => m.name === \"所见所闻\");\nif ((srcMove?.computedLevel || 0) <= 0) return;\n\n// 残气数据直接内联，origin 指向来源武学以便追溯\nconst effectData = {\n    name: \"残气\",\n    img: \"systems/xjzl-system/assets/icons/wuxue/枫华.png\",\n    description: \"每层使你命中-2，闪避-2。\",\n    origin: sourceItem.uuid,\n    system: { changes: [\n        { key: \"system.combat.hit_neigong\", type: \"add\", value: \"-2\" },\n        { key: \"system.combat.hit_waigong\", type: \"add\", value: \"-2\" },\n        { key: \"system.combat.dodge\", type: \"add\", value: \"-2\" }\n    ] },\n    flags: { \"xjzl-system\": { slug: \"canqi\", stackable: true, maxStacks: 5 } }\n};\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nif (actor.token?.object) {\n    actor.showFloatyText(\"所见所闻\", { fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4 });\n}"
                             }
                         ]
                     }
                 },
-                "changes": []
+                "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "system": {
+                    "changes": []
+                }
             }
         ]
     },

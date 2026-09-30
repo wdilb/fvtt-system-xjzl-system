@@ -14,7 +14,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         classes: ["xjzl-window", "xjzl-martial-editor", "item-neigong"],
         position: { width: 980, height: 720 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        // 输入变更自动保存；提交后保持编辑器打开。
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -48,7 +48,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         tabs: { template: "systems/xjzl-system/templates/item/neigong/tabs.hbs" },
         config: {
             template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs",
-            // 使用 V13 Part 原生状态同步；这里必须指向真正 overflow 的内部容器。
+            // 指向实际滚动容器，供核心在 Part 替换后恢复滚动位置。
             scrollable: [
                 ".neigong-realm-list",
                 ".neigong-panel-stack",
@@ -155,7 +155,8 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 img: e.img,
                 disabled: e.disabled,
                 description: e.description,
-                isSuppressed: e.isSuppressed // V11+ 特性
+                isSuppressed: e.isSuppressed, // V11+ 特性
+                transfer: e.transfer // 物品被动效果不提供拖拽入口
             };
         });
 
@@ -186,8 +187,8 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             });
         }
 
-        // 富文本字段统一交给 Foundry V13 的 prose-mirror 负责渲染与回写。
-        const enrich = value => foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        // 富文本预览统一由核心 TextEditor 处理。
+        const enrich = value => foundry.applications.ux.TextEditor.enrichHTML(
             value || "",
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );
@@ -382,7 +383,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: this.document.name,
-            icon: this.document.img,
+            img: this.document.img, // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             transfer: false // 内功的被动通常在圆满特效就搞定了，这里如果配置的话一般是特有buff/debuff
         }, { parent: this.document });
@@ -399,7 +400,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         if (!effect) return;
         const confirmed = await foundry.applications.api.DialogV2.confirm({
             window: { title: game.i18n.localize("XJZL.UI.Delete") },
-            content: `<p>${game.i18n.format("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
+            content: `<p>${game.i18n.localize("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
             rejectClose: false
         });
         if (confirmed) await effect.delete();

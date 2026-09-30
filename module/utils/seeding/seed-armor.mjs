@@ -100,16 +100,15 @@ export async function seedArmor() {
         for (const d of armorData) {
 
             // --- 5.1 处理 Active Effects ---
-            // 防具的属性加成现在全部依赖 AE。
-            // 通常防具的特效是 transfer: true (被动)。
-            // 你的 XJZLActiveEffect 类会自动处理 "未装备时抑制" 的逻辑，所以这里放心设为 true。
+            // 防具属性加成由 AE 提供；被动效果由 XJZLActiveEffect 按装备状态抑制。
             const effects = d.effects ? d.effects.map(e => ({
                 name: e.name,
-                icon: e.icon || d.img, // 如果没配图标，默认用物品图标
+                img: e.img || d.img,
                 // 防具通常是被动传输，除非是主动使用的技能
                 transfer: e.transfer ?? true,
+                showIcon: e.showIcon,
                 disabled: e.disabled ?? false,
-                changes: e.changes || [],
+                system: { changes: e.system?.changes ?? [] },
                 // 重要：保留 flags，因为里面存了 slug, stackable, 以及 AE 内部的 scripts
                 flags: e.flags || {},
                 description: e.description || "",

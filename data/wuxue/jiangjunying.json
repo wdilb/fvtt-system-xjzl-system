@@ -338,14 +338,13 @@
                         {
                             "label": "克制缴械",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const targetWeapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (targetWeapon) {\n        const type = targetWeapon.system.type;\n        if (type === 'sword' || type === 'staff') {\n            const jiaoxie = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jiaoxie\"));\n            if(jiaoxie) {\n                jiaoxie.duration = { rounds: 1 };\n                await game.xjzl.api.effects.addEffect(args.target, jiaoxie);\n                ChatMessage.create({\n                    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><b>缴械！</b><br>${args.target.name} 兵刃险些脱手，陷入缴械 1 回合。</div></div>`,\n                    speaker: ChatMessage.getSpeaker({actor: actor})\n                });\n            }\n        }\n    }\n}",
+                            "script": "if (args.isHit) {\n    const targetWeapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (targetWeapon) {\n        const type = targetWeapon.system.type;\n        if (type === 'sword' || type === 'staff') {\n            const jiaoxie = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('jiaoxie'));\n            if(jiaoxie) {\n                jiaoxie.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n                await game.xjzl.api.effects.addEffect(args.target, jiaoxie);\n                ChatMessage.create({\n                    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><b>缴械！</b><br>${args.target.name} 兵刃险些脱手，陷入缴械 1 回合。</div></div>`,\n                    speaker: ChatMessage.getSpeaker({actor: actor})\n                });\n            }\n        }\n    }\n}",
                             "active": true
                         }
                     ],
                     "automationNote": "检测到目标装备剑或棍时会自动施加 1 回合缴械状并将发送卡片提示。骑马变AOE需玩家手动选择多个目标。"
                 }
-            ],
-            "effects": []
+            ]
         }
     },
     {
@@ -490,29 +489,33 @@
                     },
                     "automationNote": "绝招主效果自动。骑马变AOE需手动圈选多个目标并在命中后手动给自身叠加对应数量的挑灯层数。"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "挑灯",
-                    "icon": "icons/svg/light.svg",
-                    "description": "外功防御+1。",
+            ]
+        },
+        "effects": [
+            {
+                "name": "挑灯",
+                "description": "外功防御+1。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tiaodeng",
+                        "stackable": true,
+                        "maxStacks": 100
+                    }
+                },
+                "img": "icons/svg/light.svg",
+                "system": {
                     "changes": [
                         {
                             "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "1"
+                            "value": "1",
+                            "type": "add"
                         }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "tiaodeng",
-                            "stackable": true,
-                            "maxStacks": 100
-                        }
-                    }
-                }
-            ]
-        }
+                    ]
+                },
+                "transfer": false,
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "大风弓",
@@ -552,7 +555,7 @@
                         {
                             "label": "应用游击",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"游击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst speedBonus = 1 + (lvl - 1);\neff.changes.push({ key: \"system.combat.speed\", mode: 2, value: String(speedBonus) });\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`进入游击状态 (速度+${speedBonus})`);",
+                            "script": "const eff = thisItem.effects.getName(\"游击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst speedBonus = 1 + (lvl - 1);\neff.system.changes.push({ key: \"system.combat.speed\", type: \"add\", value: String(speedBonus) });\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`进入游击状态 (速度+${speedBonus})`);",
                             "active": true
                         }
                     ]
@@ -672,28 +675,31 @@
                         {
                             "label": "击倒目标",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n}",
+                            "script": "if (args.isHit) {\n    const prone = game.xjzl.api.effects.getStatus('prone');\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "游击",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
-                    "description": "移动速度增加；对未交互目标造成伤害增加。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "youji",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "游击",
+                "description": "移动速度增加；对未交互目标造成伤害增加。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "youji",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "杨家枪法",
@@ -775,7 +781,7 @@
                         {
                             "label": "击破施加破甲",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"pojia\", duration: { rounds: 3 } });\n}",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"pojia\", duration: { value: 3, units: \"rounds\", expiry: \"turnStart\"} });\n}",
                             "active": true
                         }
                     ],
@@ -853,42 +859,47 @@
                     ],
                     "automationNote": "骑马移动增加检定难度需手动告知目标。"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "威风",
-                    "icon": "icons/svg/aura.svg",
-                    "description": "每次造成伤害时自身士气+5，敌人士气-5。",
-                    "duration": {
-                        "rounds": 2
-                    },
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "weifeng",
-                            "scripts": [
-                                {
-                                    "trigger": "hit",
-                                    "label": "威风士气变动",
-                                    "script": "if (args.isHit && args.actionType === 'attack') { await actor.changeResources({ 'system.resources.morale.value': { delta: 5 } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); if (args.target.system?.resources?.morale) await args.target.changeResources({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - 5)}, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); }"
-                                }
-                            ]
-                        }
+            ]
+        },
+        "effects": [
+            {
+                "name": "威风",
+                "description": "每次造成伤害时自身士气+5，敌人士气-5。",
+                "duration": {
+                    "value": 2,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weifeng",
+                        "scripts": [
+                            {
+                                "trigger": "hit",
+                                "label": "威风士气变动",
+                                "script": "if (args.isHit && args.actionType === 'attack') { await actor.changeResources({ 'system.resources.morale.value': { delta: 5 } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); if (args.target.system?.resources?.morale) await args.target.changeResources({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - 5)}, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); }"
+                            }
+                        ]
                     }
                 },
-                {
-                    "name": "骠骑",
-                    "icon": "icons/svg/horse.svg",
-                    "description": "马匹速度+5；你在马匹上的下一次攻击提升(马匹速度×系数)的伤害，系数随【横江飞渡】招式等级成长。(数值需手动结算，用后手动移除)",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "piaoqi",
-                            "stackable": false
-                        }
+                "img": "icons/svg/aura.svg",
+                "transfer": false,
+                "showIcon": 2
+            },
+            {
+                "name": "骠骑",
+                "description": "马匹速度+5；你在马匹上的下一次攻击提升(马匹速度×系数)的伤害，系数随【横江飞渡】招式等级成长。(数值需手动结算，用后手动移除)",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "piaoqi",
+                        "stackable": false
                     }
-                }
-            ]
-        }
+                },
+                "img": "icons/svg/horse.svg",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "射雕弓",
@@ -977,7 +988,7 @@
                         {
                             "label": "击破下盘不稳",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if(unstable) {\n        unstable.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, unstable);\n    }\n    const curMorale = actor.system.resources.morale.value;\n    const maxMorale = actor.system.resources.morale.max;\n    await actor.changeResources({ \"system.resources.morale.value\": Math.min(maxMorale, curMorale + 10) }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    actor.showFloatyText(\"士气 +10\", {fill: \"#00ff00\"});\n}",
+                            "script": "if (args.isBroken) {\n    const unstable = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('unstable'));\n    if(unstable) {\n        unstable.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, unstable);\n    }\n    const curMorale = actor.system.resources.morale.value;\n    const maxMorale = actor.system.resources.morale.max;\n    await actor.changeResources({ \"system.resources.morale.value\": Math.min(maxMorale, curMorale + 10) }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    actor.showFloatyText(\"士气 +10\", {fill: \"#00ff00\"});\n}",
                             "active": true
                         }
                     ],
@@ -1059,37 +1070,41 @@
                     ],
                     "automationNote": "命中后通过卡片通告击退。友方士气带来的额外伤害（每人+5）无法自动侦测全场，需在弹窗手动录入附加伤害。"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "饮羽",
-                    "icon": "icons/magic/symbols/arrow-strike-stone-red.webp",
-                    "description": "堆叠标记，当累计 2 层后再次施展【弯弓饮羽】时将消耗层数爆发巨额伤害。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yinyu",
-                            "stackable": true,
-                            "maxStacks": 2
-                        }
+            ]
+        },
+        "effects": [
+            {
+                "name": "饮羽",
+                "description": "堆叠标记，当累计 2 层后再次施展【弯弓饮羽】时将消耗层数爆发巨额伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yinyu",
+                        "stackable": true,
+                        "maxStacks": 2
                     }
                 },
-                {
-                    "name": "落雁",
-                    "icon": "icons/svg/wing.svg",
-                    "description": "免疫下盘不稳、禁足、缚身 (请在受到这些状态时手动拒绝)。",
-                    "transfer": false,
-                    "duration": {
-                        "rounds": 2
-                    },
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "luoyan"
-                        }
+                "img": "icons/magic/symbols/arrow-strike-stone-red.webp",
+                "showIcon": 2
+            },
+            {
+                "name": "落雁",
+                "description": "免疫下盘不稳、禁足、缚身 (请在受到这些状态时手动拒绝)。",
+                "transfer": false,
+                "duration": {
+                    "value": 2,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "luoyan"
                     }
-                }
-            ]
-        }
+                },
+                "img": "icons/svg/wing.svg",
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "岳家枪法",
@@ -1140,7 +1155,7 @@
                         {
                             "label": "破绽击倒",
                             "trigger": "hit",
-                            "script": "const hasUnstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || e.statuses?.has(\"unstable\"));\nif (args.isHit && hasUnstable) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    if (prone) {\n        await game.xjzl.api.effects.addEffect(args.target, prone);\n    }\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #e67e22; background:rgba(230,126,34,0.1); margin-left:2px;\"><b>破绽击败！</b><br>${args.target.name} 下盘不稳，被当场扫翻击倒！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "const hasUnstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || e.statuses?.has(\"unstable\"));\nif (args.isHit && hasUnstable) {\n    const prone = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n    if (prone) {\n        await game.xjzl.api.effects.addEffect(args.target, prone);\n    }\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #e67e22; background:rgba(230,126,34,0.1); margin-left:2px;\"><b>破绽击败！</b><br>${args.target.name} 下盘不稳，被当场扫翻击倒！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ],
@@ -1202,7 +1217,7 @@
                         {
                             "label": "添加错骨",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n    if (cuogu) {\n        cuogu.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, cuogu);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const cuogu = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('cuogu'));\n    if (cuogu) {\n        cuogu.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.target, cuogu);\n    }\n}",
                             "active": true
                         }
                     ],
@@ -1274,42 +1289,45 @@
                         {
                             "label": "开启怒发冲冠",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 20;\nconst eff = thisItem.effects.getName(\"怒发冲冠\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(dmgBonus);\neff.duration = { rounds: 3 };\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 20;\nconst eff = thisItem.effects.getName(\"怒发冲冠\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.system.changes[0].value = String(dmgBonus);\neff.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"};\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ],
                     "automationNote": "完全自动化。BUFF附加的招式伤害按照等级自动成长。每回合初自动获取士气。"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "怒发冲冠",
-                    "icon": "icons/svg/explosion.svg",
-                    "description": "增加极高的招式伤害，且每回合初获取 10 点士气。",
-                    "transfer": false,
+            ]
+        },
+        "effects": [
+            {
+                "name": "怒发冲冠",
+                "description": "增加极高的招式伤害，且每回合初获取 10 点士气。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "nufachongguan",
+                        "scripts": [
+                            {
+                                "label": "回合初怒气",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "const attMorale = actor.system.resources.morale;\nawait actor.changeResources({\"system.resources.morale.value\": Math.min(attMorale.max, attMorale.value + 10)}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nactor.showFloatyText(\"怒发冲冠：士气 +10\", {fill: \"#00ff00\"});"
+                            }
+                        ]
+                    }
+                },
+                "img": "icons/svg/explosion.svg",
+                "system": {
                     "changes": [
                         {
                             "key": "system.combat.damages.global.mod",
-                            "mode": 2,
-                            "value": "0"
+                            "value": "0",
+                            "type": "add"
                         }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "nufachongguan",
-                            "scripts": [
-                                {
-                                    "label": "回合初怒气",
-                                    "trigger": "turnStart",
-                                    "active": true,
-                                    "script": "const attMorale = actor.system.resources.morale;\nawait actor.changeResources({\"system.resources.morale.value\": Math.min(attMorale.max, attMorale.value + 10)}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nactor.showFloatyText(\"怒发冲冠：士气 +10\", {fill: \"#00ff00\"});"
-                                }
-                            ]
-                        }
-                    }
-                }
-            ]
-        }
+                    ]
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "荡寇刀法",
@@ -1385,7 +1403,7 @@
                         {
                             "label": "击破溃散与击飞",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    // 动态计算溃散持续时间\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const kuisanData = thisItem.effects.getName(\"溃散\").toObject();\n    delete kuisanData._id;\n    kuisanData.origin = thisItem.uuid;\n    kuisanData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, kuisanData);\n    \n    // 询问是否击飞\n    const zhanyi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhanyi\");\n    if (zhanyi) {\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"战意击飞\" },\n            content: `<p>目标已被破防，是否消耗 1 层 <b>[战意]</b> 将其击飞 1 米？</p>`,\n            yes: { label: \"击飞\" },\n            no: { label: \"保留战意\" }\n        });\n        if (confirm) {\n            await game.xjzl.api.effects.removeEffect(actor, \"zhanyi\", 1);\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\"><div style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-wind\"></i> 消耗战意，将 ${args.target.name} 击飞 1 米！</div></div>` });\n        }\n    }\n}",
+                            "script": "if (args.isBroken) {\n    // 动态计算溃散持续时间\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const kuisanData = thisItem.effects.getName(\"溃散\").toObject();\n    delete kuisanData._id;\n    kuisanData.origin = thisItem.uuid;\n    kuisanData.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\n    await game.xjzl.api.effects.addEffect(args.target, kuisanData);\n    \n    // 询问是否击飞\n    const zhanyi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhanyi\");\n    if (zhanyi) {\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"战意击飞\" },\n            content: `<p>目标已被破防，是否消耗 1 层 <b>[战意]</b> 将其击飞 1 米？</p>`,\n            yes: { label: \"击飞\" },\n            no: { label: \"保留战意\" }\n        });\n        if (confirm) {\n            await game.xjzl.api.effects.removeEffect(actor, \"zhanyi\", 1);\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\"><div style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-wind\"></i> 消耗战意，将 ${args.target.name} 击飞 1 米！</div></div>` });\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1463,7 +1481,7 @@
                         {
                             "label": "施加绝招溃散",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const kuisanData = thisItem.effects.getName(\"溃散\").toObject();\n    delete kuisanData._id;\n    kuisanData.origin = thisItem.uuid;\n    kuisanData.duration = { rounds: 3 }; // 绝招固定3回合\n    await game.xjzl.api.effects.addEffect(args.target, kuisanData);\n}",
+                            "script": "if (args.isHit) {\n    const kuisanData = thisItem.effects.getName(\"溃散\").toObject();\n    delete kuisanData._id;\n    kuisanData.origin = thisItem.uuid;\n    kuisanData.duration = { value: 3, units: \"rounds\", expiry: \"turnStart\"}; // 绝招固定3回合\n    await game.xjzl.api.effects.addEffect(args.target, kuisanData);\n}",
                             "active": true
                         }
                     ]
@@ -1473,7 +1491,6 @@
         "effects": [
             {
                 "name": "战意",
-                "icon": "icons/svg/combat.svg",
                 "description": "每层使你在回合初士气+5。",
                 "transfer": false,
                 "flags": {
@@ -1490,11 +1507,12 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/combat.svg",
+                "showIcon": 2
             },
             {
                 "name": "溃散",
-                "icon": "icons/svg/downgrade.svg",
                 "description": "每回合初士气-20。",
                 "transfer": false,
                 "flags": {
@@ -1510,14 +1528,17 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/downgrade.svg",
+                "showIcon": 2
             },
             {
                 "name": "金鼓",
-                "icon": "icons/svg/sound.svg",
                 "description": "每回合初获得士气。",
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "transfer": false,
                 "flags": {
@@ -1533,7 +1554,9 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/sound.svg",
+                "showIcon": 2
             }
         ]
     },
@@ -1557,8 +1580,8 @@
                     "range": "15米",
                     "targetInfo": "环境区域",
                     "actionCost": "蓄力动作",
-                    "description": "<p>挽弓指天，急速抛射箭矢，在目标空格及其周围 3 米范围形成‘箭雨’，持续三回合。</p><p><strong>箭雨：</strong>每回合第一次进入此范围或在此范围开始回合的敌人和其他友方受到 10 点气血流失，且获得一层“流血”，持续到战斗脱离。</p><p>·招式将根据消耗箭矢的品级，提升箭雨的气血流失数值：<br>凡品+0，铜品+5，银品+10，金品+30，玉品+100。</p><p><strong>升级：</strong>箭雨气血流失伤害+5，内力消耗+2。</p>",
-                    "automationNote": "此招式阻断了直接指向目标的伤害，而是发送环境布置卡片。请依靠卡片提示，手动消耗相应品阶的箭矢，并利用系统的[流血]效果施加给踏入此区域的人。",
+                    "description": "<p>挽弓指天，急速抛射箭矢，在目标空格及其周围 3 米范围形成‘箭雨’，持续三回合。</p><p><strong>箭雨：</strong>每回合第一次进入此范围或在此范围开始回合的所有角色（包括施展者）受到 10 点气血流失，且获得一层“流血”，持续到战斗脱离。</p><p>·招式将根据消耗箭矢的品级，提升箭雨的气血流失数值：<br>凡品+0，铜品+5，银品+10，金品+30，玉品+100。</p><p><strong>升级：</strong>箭雨气血流失伤害+5，内力消耗+2。</p>",
+                    "automationNote": "施展时先选择本次使用的箭矢品级（不自动处理真实消耗），再选择目标空格，建立 3 米箭雨范围，持续 3 回合；取消任一选择则不创建区域。范围内所有角色（包括施展者）每回合首次进入或在范围内开始回合时自动结算气血流失并获得系统通用【流血】。流血层保留，脱战后的移除由玩家手动处理。",
                     "x-xjzl-aura": true,
                     "costs": {
                         "mp": [
@@ -1585,10 +1608,10 @@
                             "active": true
                         },
                         {
-                            "label": "发送地形指引卡",
-                            "trigger": "hit_once",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst baseDmg = 10 + (lvl - 1) * 5;\nconst msg = `\n<div class=\"xjzl-chat-card\">\n    <div class=\"card-content-wrapper\" style=\"border-left:4px solid #8e44ad; padding-left: 8px;\">\n        <div style=\"font-weight:bold; color:#8b0000; font-size:1.1em;\"><i class=\"fas fa-cloud-meatball\"></i> 箭雨已形成！</div>\n        <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n            请在地面放置一个 <b>3米范围</b> 的标记（持续三回合）。<br><hr>\n            进入该区域者需手动执行：<br>\n            1. 造成 <b>外功真实流失 (基础${baseDmg} + 箭矢品质修正)</b>。<br>\n            2. 添加系统通用效果<b>[流血]</b>一层。\n        </div>\n    </div>\n</div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });",
-                            "active": true
+                            "label": "箭雨区域",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 出招阶段只创建一次区域，与目标数量无关；先选择箭矢品级，再由玩家在画布上选择落点。\n// oncePerRound 让“首次进入/范围内开始回合”共用一次触发；两种入口都结算流失并挂一层系统通用【流血】。\nconst jyLvl = Math.max(1, move.computedLevel || 1);\nconst quality = await foundry.applications.api.DialogV2.wait({\n    window: {title: \"漫天箭雨·箭矢品级\"},\n    content: \"<p>请选择本次消耗的箭矢品级（系统不自动处理真实消耗）：</p>\",\n    buttons: [\n        {action: \"凡品\", label: \"凡品（+0）\"},\n        {action: \"铜品\", label: \"铜品（+5）\"},\n        {action: \"银品\", label: \"银品（+10）\"},\n        {action: \"金品\", label: \"金品（+30）\"},\n        {action: \"玉品\", label: \"玉品（+100）\"}\n    ]\n});\nif (!quality) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消箭矢品级选择，本次出招中止。\";\n    return;\n}\nconst qualityBonus = {凡品: 0, 铜品: 5, 银品: 10, 金品: 30, 玉品: 100}[quality] ?? 0;\nconst jyDmg = 10 + 5 * (jyLvl - 1) + qualityBonus;\nconst jyRegion = await game.xjzl.auraQuick.place({\n    label: \"wuxue-jianyu-\" + actor.id,\n    displayName: \"箭雨\",\n    sourceActorUuid: actor.uuid,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadStatusId: \"bleed_stack\",\n    enterAction: {kind: \"damage\", amount: String(jyDmg), type: \"liushi\"},\n    oncePerRound: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(jyDmg), type: \"liushi\"},\n    durationRounds: 3,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: false\n});\nif (!jyRegion) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消箭雨落点选择，本次出招中止。\";\n}"
                         }
                     ]
                 }
@@ -1841,7 +1864,6 @@
         "effects": [
             {
                 "name": "引燃",
-                "icon": "icons/svg/fire.svg",
                 "description": "被猛火油引燃，回合初持续受到火焰燃烧波及。",
                 "transfer": false,
                 "flags": {
@@ -1850,13 +1872,17 @@
                         "stackable": true
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnStart",
-                        "mode": 2,
-                        "value": "-5"
-                    }
-                ]
+                "img": "icons/svg/fire.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnStart",
+                            "value": "-5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             }
         ]
     },
@@ -2028,11 +2054,12 @@
         "effects": [
             {
                 "name": "号令-一鼓作气",
-                "icon": "icons/svg/sound.svg",
                 "description": "每回合初获得 10 点士气。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2047,15 +2074,18 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/sound.svg",
+                "showIcon": 2
             },
             {
                 "name": "号令-全军冲锋",
-                "icon": "icons/svg/wing.svg",
                 "description": "移动速度+5。*(回合初需选择扣除5点士气，若不消耗则解除此状态)*",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2071,21 +2101,26 @@
                         ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
+                "img": "icons/svg/wing.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "5",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "号令-迎敌备战",
-                "icon": "icons/svg/shield.svg",
                 "description": "内外功防御+10。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2093,26 +2128,31 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.def_waigong",
-                        "mode": 2,
-                        "value": "10"
-                    },
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "icons/svg/shield.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "value": "10",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "号令-诱敌深入",
-                "icon": "icons/svg/daze.svg",
                 "description": "闪避+10。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2120,21 +2160,26 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.dodge",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "icons/svg/daze.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.dodge",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "号令-包抄夹击",
-                "icon": "icons/svg/target.svg",
                 "description": "非普攻招式命中后添加“下盘不稳”一回合。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2145,19 +2190,22 @@
                                 "label": "夹击触发不稳",
                                 "trigger": "hit",
                                 "active": true,
-                                "script": "if (args.isHit && args.move?.type !== 'basic') {\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    unstable.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, unstable);\n    actor.showFloatyText(\"包抄成功\", {fill: \"#e74c3c\"});\n}"
+                                "script": "if (args.isHit && args.move?.type !== 'basic') {\n    const unstable = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('unstable'));\n    unstable.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, unstable);\n    actor.showFloatyText(\"包抄成功\", {fill: \"#e74c3c\"});\n}"
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/target.svg",
+                "showIcon": 2
             },
             {
                 "name": "号令-破军诛将",
-                "icon": "icons/svg/combat.svg",
                 "description": "招式伤害+10。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2165,21 +2213,26 @@
                         "stackable": false
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                "img": "icons/svg/combat.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "value": "10",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
             },
             {
                 "name": "号令-合军聚众",
-                "icon": "icons/svg/heal.svg",
                 "description": "可以选择每回合末-5 士气，然后回复 5 气血。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2194,15 +2247,18 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/heal.svg",
+                "showIcon": 2
             },
             {
                 "name": "号令-鸣金收兵",
-                "icon": "icons/svg/direction.svg",
                 "description": "可以选择每回合末-5 士气，然后可以朝发令者方向不消耗速度移动至多 3 米。",
                 "transfer": false,
                 "duration": {
-                    "rounds": 3
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
                 },
                 "flags": {
                     "xjzl-system": {
@@ -2217,7 +2273,9 @@
                             }
                         ]
                     }
-                }
+                },
+                "img": "icons/svg/direction.svg",
+                "showIcon": 2
             }
         ]
     }

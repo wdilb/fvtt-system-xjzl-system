@@ -8,33 +8,73 @@
             "quality": 1,
             "price": 150,
             "description": "<p>佩戴后走动时铃铛轻响，既显灵动，也可预警。</p><hr><p>效果：内功防御+1、内力+2，先攻+1。<br>·你周围10米范围内的其他友方先攻+1。<br>·此物仅侠喵可佩戴。</p>",
-            "automationNote": "自身属性已自动化。光环请手动。",
+            "automationNote": "部分自动化（战斗内）：自身先攻+1 自动生效；进战后自动生成跟随 10 米的光环，周围 10 米的其他友方先攻+1（离开范围自动失效），战斗中佩戴时在自身回合开始自动补建光环。边界：友军在光环生效前已掷出的先攻无法追溯加值（Foundry 先攻在战斗开始时掷出）。卸下装备或脱战时光环消散。此物仅侠喵可佩戴。",
             "x-xjzl-aura": true,
-            "scripts": []
+            "scripts": [
+                {
+                    "label": "铜铃预警光环",
+                    "trigger": "combatStart",
+                    "active": true,
+                    "script": "// 铜铃猫项圈：进战后自动生成跟随 10 米光环（卸下装备或脱战时消散），\n// 周围 10 米的其他友方先攻+1（光环 payload 自动施加/摘除）。\nawait game.xjzl.aura.create(actor, {\n    label: \"armor-tongling-\" + actor.id,\n    displayName: \"铜铃预警\",\n    follow: true,\n    radius: 10,\n    faction: \"ally\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"铜铃预警\",\n    enterEnabled: true,\n    lifecycle: \"equip\",\n    sourceItemUuid: thisItem.uuid,\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                },
+                {
+                    "label": "铜铃预警补挂",
+                    "trigger": "turnStart",
+                    "active": true,
+                    "script": "// 兜底：战斗中佩戴时在自身回合开始补建光环（同标签幂等，已有则跳过）。\n// 边界：开战时已掷出的先攻无法追溯加值。\nif (game.xjzl.aura.query(\"armor-tongling-\" + actor.id).length) return;\nawait game.xjzl.aura.create(actor, {\n    label: \"armor-tongling-\" + actor.id,\n    displayName: \"铜铃预警\",\n    follow: true,\n    radius: 10,\n    faction: \"ally\",\n    includeSelf: false,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"铜铃预警\",\n    enterEnabled: true,\n    lifecycle: \"equip\",\n    sourceItemUuid: thisItem.uuid,\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                }
+            ]
         },
         "effects": [
             {
                 "name": "铜铃猫项圈",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链1.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 1
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 2
-                    },
-                    {
-                        "key": "system.combat.initiative",
-                        "mode": 2,
-                        "value": 1
+                "img": "systems/xjzl-system/assets/icons/armor/项链1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 1,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 2,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.initiative",
+                            "value": 1,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tonglingmaoxiangquan"
                     }
-                ]
+                }
+            },
+            {
+                "name": "铜铃预警",
+                "description": "铜铃预警：先攻+1（由佩戴者的铜铃猫项圈光环赋予）。",
+                "transfer": false,
+                "showIcon": 2,
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.initiative",
+                            "value": 1,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tonglingyuqing"
+                    }
+                }
             }
         ]
     },
@@ -53,16 +93,23 @@
         "effects": [
             {
                 "name": "十字架",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链2.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.stats.freePoints.mod",
-                        "mode": 2,
-                        "value": 5
+                "img": "systems/xjzl-system/assets/icons/armor/项链2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.stats.freePoints.mod",
+                            "value": 5,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shizijia"
                     }
-                ]
+                }
             }
         ]
     },
@@ -81,16 +128,23 @@
         "effects": [
             {
                 "name": "未来佛佛像",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链3.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.stats.freePoints.mod",
-                        "mode": 2,
-                        "value": 4
+                "img": "systems/xjzl-system/assets/icons/armor/项链3.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.stats.freePoints.mod",
+                            "value": 4,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weilaifofoxiang"
                     }
-                ]
+                }
             }
         ]
     },
@@ -109,21 +163,28 @@
         "effects": [
             {
                 "name": "正心玉",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链1.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.stats.freePoints.mod",
-                        "mode": 2,
-                        "value": 2
-                    },
-                    {
-                        "key": "system.arts.shuxie.checkMod",
-                        "mode": 2,
-                        "value": 1
+                "img": "systems/xjzl-system/assets/icons/armor/项链1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.stats.freePoints.mod",
+                            "value": 2,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.arts.shuxie.checkMod",
+                            "value": 1,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhengxinyu"
                     }
-                ]
+                }
             }
         ]
     },
@@ -156,26 +217,33 @@
         "effects": [
             {
                 "name": "天机环",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链3.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 20
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 20
-                    },
-                    {
-                        "key": "system.stats.wuxing.mod",
-                        "mode": 2,
-                        "value": 2
+                "img": "systems/xjzl-system/assets/icons/armor/项链3.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 20,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 20,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.stats.wuxing.mod",
+                            "value": 2,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tianjihuan"
                     }
-                ]
+                }
             }
         ]
     },
@@ -194,21 +262,28 @@
         "effects": [
             {
                 "name": "七璜联珠组",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链1.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 10
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 20
+                "img": "systems/xjzl-system/assets/icons/armor/项链1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 10,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 20,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qihuanglianzhuzu"
                     }
-                ]
+                }
             }
         ]
     },
@@ -227,21 +302,28 @@
         "effects": [
             {
                 "name": "累丝金龙吊坠",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链2.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 10
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 20
+                "img": "systems/xjzl-system/assets/icons/armor/项链2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 10,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 20,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "leisijinlongdiaozhui"
                     }
-                ]
+                }
             }
         ]
     },
@@ -260,21 +342,28 @@
         "effects": [
             {
                 "name": "琥珀项链",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链3.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 10
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 20
+                "img": "systems/xjzl-system/assets/icons/armor/项链3.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 10,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 20,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "hupoxianglian"
                     }
-                ]
+                }
             }
         ]
     },
@@ -293,21 +382,28 @@
         "effects": [
             {
                 "name": "亮银琢玉环",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链1.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 5
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 10
+                "img": "systems/xjzl-system/assets/icons/armor/项链1.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 5,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 10,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "liangyinzhuoyuhuan"
                     }
-                ]
+                }
             }
         ]
     },
@@ -326,21 +422,28 @@
         "effects": [
             {
                 "name": "寒玉吊坠",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链2.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 2
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 4
+                "img": "systems/xjzl-system/assets/icons/armor/项链2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 2,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 4,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "hanyudiaozhui"
                     }
-                ]
+                }
             }
         ]
     },
@@ -359,21 +462,28 @@
         "effects": [
             {
                 "name": "镀金项圈",
-                "icon": "systems/xjzl-system/assets/icons/armor/项链3.png",
                 "transfer": true,
                 "disabled": false,
-                "changes": [
-                    {
-                        "key": "system.combat.def_neigong",
-                        "mode": 2,
-                        "value": 1
-                    },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": 2
+                "img": "systems/xjzl-system/assets/icons/armor/项链3.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "value": 1,
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.resources.mp.bonus",
+                            "value": 2,
+                            "type": "add"
+                        }
+                    ]
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "dujinxiangquan"
                     }
-                ]
+                }
             }
         ]
     }

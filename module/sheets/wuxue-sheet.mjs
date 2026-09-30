@@ -14,7 +14,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         classes: ["xjzl-window", "xjzl-martial-editor", "item", "wuxue"],
         position: { width: 980, height: 720 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        // 输入变更自动保存；提交后保持编辑器打开。
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -52,7 +52,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 内容 Parts
         details: {
             template: "systems/xjzl-system/templates/item/wuxue/tab-details.hbs",
-            // 只登记真正产生滚动的节点，交给 V13 在 Part 替换前后同步 scrollTop/scrollLeft。
+            // 只登记实际滚动容器，供核心在 Part 替换后恢复滚动位置。
             // 不额外监听 scroll 事件，避免与 Foundry 原生恢复重复执行。
             scrollable: [
                 ".directory-list",
@@ -153,7 +153,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.tabs = this.tabGroups;
 
         // 1. 侧边栏总纲描述 (异步解析)
-        const enrich = value => foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        const enrich = value => foundry.applications.ux.TextEditor.enrichHTML(
             value || "",
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );
@@ -220,7 +220,8 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 img: e.img,
                 disabled: e.disabled,
                 description: e.description,
-                isSuppressed: e.isSuppressed
+                isSuppressed: e.isSuppressed,
+                transfer: e.transfer // 物品被动效果不提供拖拽入口
             };
         });
 
@@ -470,7 +471,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 确认弹窗
         const confirm = await foundry.applications.api.DialogV2.confirm({
             window: { title: game.i18n.localize("XJZL.UI.Delete") },
-            content: `<p>${game.i18n.format("XJZL.Wuxue.DeleteMoveConfirm", { name: moves.find(move => move.id === moveId)?.name || "" })}</p>`,
+            content: `<p>${game.i18n.localize("XJZL.Wuxue.DeleteMoveConfirm", { name: moves.find(move => move.id === moveId)?.name || "" })}</p>`,
             rejectClose: false
         });
 
@@ -493,7 +494,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 创建一个新的 AE 文档嵌入到此 Item
         return ActiveEffect.create({
             name: "新特效",
-            icon: "icons/svg/aura.svg",
+            img: "icons/svg/aura.svg", // V14 schema 字段为 img（icon 已移除，会被核心清洗丢弃）
             origin: this.document.uuid,
             // 默认为不自动应用 (transfer=false)，因为这是给招式触发用的
             transfer: false
@@ -512,7 +513,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         if (!effect) return;
         const confirmed = await foundry.applications.api.DialogV2.confirm({
             window: { title: game.i18n.localize("XJZL.UI.Delete") },
-            content: `<p>${game.i18n.format("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
+            content: `<p>${game.i18n.localize("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
             rejectClose: false
         });
         if (confirmed) await effect.delete();

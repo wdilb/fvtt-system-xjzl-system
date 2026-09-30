@@ -309,8 +309,7 @@ export async function seedWuxue() {
 
             // 武学一般没有 Item 级的 effects，通常脚本都在 moves 里
             // 但如果有些被动武学有全局效果，也可以支持
-            // AI生成的JSON 似乎有时候会把 effects 写在 system 里，这里做一下兼容性的查找
-            const rawEffects = d.effects || d.system?.effects || [];
+            const rawEffects = d.effects || [];
             const effects = rawEffects.map(e => {
                 // === 自动修复逻辑：根目录 scripts 迁移 ===
                 if (e.scripts) {
@@ -334,10 +333,11 @@ export async function seedWuxue() {
                 // 基础结构
                 const effectData = {
                     name: e.name,
-                    icon: d.img, // 如果特效没配图标，默认用物品图标，暂时使用物品图标吧，AI会给特效配上不存在的图标 e.icon
+                    img: d.img, // 使用物品图标，避免模板引用不存在的图标路径。
                     transfer: e.transfer ?? false,
+                    showIcon: e.showIcon,
                     disabled: e.disabled ?? false,
-                    changes: e.changes || [],
+                    system: { changes: e.system?.changes ?? [] },
                     flags: e.flags || {},
                     description: e.description || "",
                     // 补上 duration

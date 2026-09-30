@@ -30,7 +30,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         if (options.actor) {
             options.id = `character-preview-${options.actor.id}`;
             options.window = options.window || {};
-            options.window.title = game.i18n.format("XJZL.UI.CharacterPreview.WindowTitle", { name: options.actor.name });
+            options.window.title = game.i18n.localize("XJZL.UI.CharacterPreview.WindowTitle", { name: options.actor.name });
         }
         super(options);
         this.actor = options.actor;
@@ -167,8 +167,8 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                 });
 
                 const fileName = totalPages > 1
-                    ? game.i18n.format("XJZL.UI.CharacterPreview.A4PageFileName", { name: this.actor.name, page: i + 1 })
-                    : game.i18n.format("XJZL.UI.CharacterPreview.A4SingleFileName", { name: this.actor.name });
+                    ? game.i18n.localize("XJZL.UI.CharacterPreview.A4PageFileName", { name: this.actor.name, page: i + 1 })
+                    : game.i18n.localize("XJZL.UI.CharacterPreview.A4SingleFileName", { name: this.actor.name });
                 zip.file(fileName, dataUrl.split(',')[1], { base64: true });
             }
 
@@ -179,8 +179,8 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                 title: game.i18n.localize("XJZL.UI.CharacterPreview.A4CompleteTitle"),
                 content: `
                     <div style="padding: 10px; text-align: center;">
-                        <p style="font-size: 1.1em; margin-bottom: 5px;">${game.i18n.format("XJZL.UI.CharacterPreview.A4CompleteMessage", { name: `<strong>${this.actor.name}</strong>` })}</p>
-                        <p>${game.i18n.format("XJZL.UI.CharacterPreview.A4PageCount", { count: `<strong>${totalPages}</strong>` })}</p>
+                        <p style="font-size: 1.1em; margin-bottom: 5px;">${game.i18n.localize("XJZL.UI.CharacterPreview.A4CompleteMessage", { name: `<strong>${this.actor.name}</strong>` })}</p>
+                        <p>${game.i18n.localize("XJZL.UI.CharacterPreview.A4PageCount", { count: `<strong>${totalPages}</strong>` })}</p>
                     </div>
                 `,
                 buttons: {
@@ -189,7 +189,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                         icon: '<i class="fas fa-file-download"></i>',
                         callback: () => {
                             const link = document.createElement("a");
-                            link.download = game.i18n.format("XJZL.UI.CharacterPreview.A4FileName", { name: this.actor.name });
+                            link.download = game.i18n.localize("XJZL.UI.CharacterPreview.A4FileName", { name: this.actor.name });
                             link.href = objectUrl;
                             document.body.appendChild(link);
                             link.click();
@@ -280,7 +280,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
 
             // 触发图片下载
             const link = document.createElement("a");
-            link.download = game.i18n.format("XJZL.UI.CharacterPreview.LongImageFileName", { name: this.actor.name });
+            link.download = game.i18n.localize("XJZL.UI.CharacterPreview.LongImageFileName", { name: this.actor.name });
             link.href = dataUrl;
             link.click();
 
@@ -429,7 +429,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         // 2. 基础档案组装
         context.basic = {
             name: actor.name, img: actor.img, sect: sectDisplay,
-            realmLevel: localizeOr(`XJZL.Realm.${realmLevel}`, game.i18n.format("XJZL.UI.CharacterPreview.RealmFallback", { level: realmLevel })),
+            realmLevel: localizeOr(`XJZL.Realm.${realmLevel}`, game.i18n.localize("XJZL.UI.CharacterPreview.RealmFallback", { level: realmLevel })),
             background: actor.itemTypes.background?.[0]?.name || game.i18n.localize("XJZL.Wizard.Common.None"),
             personality: actor.itemTypes.personality?.[0]?.name || game.i18n.localize("XJZL.Wizard.Common.None"),
             xiayi: system.social.xiayi || 0, exing: system.social.exing || 0,
@@ -516,7 +516,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             context.wuxueGroups.push({
                 // 智能应用书名号
                 name: formatTitle(wuxue.name), category: catDisplay,
-                tierName: localizeOr(`XJZL.Tiers.${wuxue.system.tier}`, game.i18n.format("XJZL.UI.CharacterPreview.TierFallback", { tier: wuxue.system.tier })),
+                tierName: localizeOr(`XJZL.Tiers.${wuxue.system.tier}`, game.i18n.localize("XJZL.UI.CharacterPreview.TierFallback", { tier: wuxue.system.tier })),
                 moves: pinnedMoves.map(m => {
                     const derived = wuxue.calculateMoveDamage(m.id) || { damage: 0 };
                     const lvl = Math.max(1, m.computedLevel || 1);
@@ -532,7 +532,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
 
                     return {
                         name: m.name,
-                        tierName: localizeOr(`XJZL.Tiers.${mTier}`, game.i18n.format("XJZL.UI.CharacterPreview.TierFallback", { tier: mTier })),
+                        tierName: localizeOr(`XJZL.Tiers.${mTier}`, game.i18n.localize("XJZL.UI.CharacterPreview.TierFallback", { tier: mTier })),
                         levelName: levelNames[Math.min(4, Math.max(0, m.effectiveStage ?? m.computedLevel ?? 0))],
                         type: m.type, typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
                         isUltimate: m.isUltimate, actionCost: m.actionCost || game.i18n.localize("XJZL.UI.ActionTracker.Major"), range: m.range,
