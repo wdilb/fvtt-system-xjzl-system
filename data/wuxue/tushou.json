@@ -3030,7 +3030,7 @@
                             "label": "踏莲区域",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 踏莲：落点由玩家在画布选择（移动路径留痕受框架限制，仅自动生成所选格，其余路径格请手动补充）。\n// 同格两层区域：敌方首次进入陷入禁足（在区域内保持，近似\"一回合\"）；友方首次进入回复 10 气血。\nconst tlSuffix = foundry.utils.randomID(4);\nconst tlEnemy = await game.xjzl.auraQuick.place({\n    label: \"wuxue-talian-enemy-\" + actor.id + \"-\" + tlSuffix,\n    sourceActorUuid: actor.uuid,\n    displayName: \"踏莲\",\n    radius: 0,\n    follow: false,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadStatusId: \"root\",\n    enterEnabled: true,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nif (!tlEnemy) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消踏莲落点选择，本次出招中止。\";\n    return;\n}\nconst tlOrigin = tlEnemy.shapes?.[0]?.origin;\nif (!tlOrigin) return;\nawait game.xjzl.aura.create({scene: tlEnemy.parent, x: tlOrigin.x, y: tlOrigin.y}, {\n    label: \"wuxue-talian-ally-\" + actor.id + \"-\" + tlSuffix,\n    sourceActorUuid: actor.uuid,\n    displayName: \"踏莲\",\n    radius: 0,\n    follow: false,\n    faction: \"ally\",\n    includeSelf: true,\n    enterEnabled: true,\n    enterAction: {kind: \"healing\", amount: \"10\", type: \"hp\"},\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                            "script": "// 踏莲：落点由玩家在画布选择（移动路径留痕受框架限制，仅自动生成所选格，其余路径格请手动补充）。\n// 同格两层区域：敌方首次进入陷入禁足（在区域内保持，近似\"一回合\"）；友方首次进入回复 10 气血。\nconst tlSuffix = foundry.utils.randomID(4);\nconst tlEnemy = await game.xjzl.auraQuick.place({\n    label: \"wuxue-talian-enemy-\" + actor.id + \"-\" + tlSuffix,\n    sourceActorUuid: actor.uuid,\n    displayName: \"踏莲\",\n    radius: 0,\n    follow: false,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadStatusId: \"root\",\n    enterEnabled: true,\n    throttlePerRound: true,\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\nif (!tlEnemy) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消踏莲落点选择，本次出招中止。\";\n    return;\n}\nconst tlOrigin = tlEnemy.shapes?.[0]?.origin;\nif (!tlOrigin) return;\nawait game.xjzl.aura.create({scene: tlEnemy.parent, x: tlOrigin.x, y: tlOrigin.y}, {\n    label: \"wuxue-talian-ally-\" + actor.id + \"-\" + tlSuffix,\n    sourceActorUuid: actor.uuid,\n    displayName: \"踏莲\",\n    radius: 0,\n    follow: false,\n    faction: \"ally\",\n    includeSelf: true,\n    enterEnabled: true,\n    throttlePerRound: true,\n    enterAction: {kind: \"healing\", amount: \"10\", type: \"hp\"},\n    durationRounds: 1,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
                         }
                     ]
                 }
@@ -3966,7 +3966,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>浑身飞出上百只蜚蠊，并且呼唤周围地下的蜚蠊，遮天蔽日，使自身周围 1 米的空间变为‘蜚蠊地狱’，下回合可继续消耗蓄力动作施展（不消耗怒气内力），每蓄力 1 回合招式范围+1。</p><p><strong>蜚蠊地狱：</strong>在区域内开始回合的敌人受到 20 点毒素伤害，并且进行[定力]检定（难度 5），检定失败，陷入“眩晕”，持续一回合。</p><p><strong>升级：</strong>招式范围+2，毒素伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "完全自动化（战斗内）：施展后生成跟随自身的“蜚蠊地狱”（初始 1 米），范围内敌人回合初自动受到毒素伤害并作[定力]检定（难度 5），失败自动陷入眩晕一回合。每以蓄力动作再次施展，范围自动 +1；脱战时消散。",
+                    "automationNote": "完全自动化（战斗内）：施展后生成跟随自身的“蜚蠊地狱”（初始 1 米），范围内敌人回合初自动受到毒素伤害并作[定力]检定（难度 5），失败自动陷入眩晕一回合。每以蓄力动作再次施展，范围自动 +1（自下回合起的续施展不再消耗怒气与内力）；脱战时消散。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -3986,10 +3986,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "蜚蠊地狱续施展免耗",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "// 蜚蠊地狱续施展：场上已有自己的蜚蠊地狱光环且创建于更早回合时，本次蓄力再施展不消耗怒气与内力\n// （原文限定\"下回合可继续施展\"，同回合二连发不免耗）；范围+1 由 attack 阶段 refreshAura 完成。\n// 创建回合随 params 快照持久化在光环 meta 中，refreshAura 重建时原样透传。\nconst flPrevAura = game.xjzl.aura.query(\"wuxue-feilian-\" + actor.id)[0];\nconst flPrevRound = flPrevAura?.getFlag(\"xjzl-system\", \"aura\")?.params?.createdRound ?? null;\nif (flPrevAura && flPrevRound !== null && flPrevRound !== (game.combat?.round ?? 0)) {\n    args.costConfig.mp = 0;\n    args.costConfig.rage = 0;\n}"
+                        },
+                        {
                             "label": "蜚蠊地狱光环",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 蜚蠊地狱：以自身为中心跟随（初始 1 米），敌方回合初受 20+10×升级 毒素伤害并作定力检定（监听 AE）。\n// 每以蓄力动作再次施展，范围 +1（按既有区域重建）。\nconst flLabel = \"wuxue-feilian-\" + actor.id;\nconst flExisting = game.xjzl.aura.query(flLabel)[0];\nconst flLvl = Math.max(1, move.computedLevel || 1);\nif (flExisting) {\n    const flPrev = Number(flExisting.getFlag(\"xjzl-system\", \"aura\")?.params?.radius) || 1;\n    await game.xjzl.aura.refreshAura(flLabel, {radius: flPrev + 1}, {scene: flExisting.parent});\n    return;\n}\nawait game.xjzl.aura.create(actor, {\n    label: flLabel,\n    displayName: \"蜚蠊地狱\",\n    follow: true,\n    radius: 1,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"蜚蠊地狱\",\n    enterEnabled: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(20 + 10 * (flLvl - 1)), type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n"
+                            "script": "// 蜚蠊地狱：以自身为中心跟随（初始 1 米），敌方回合初受 20+10×升级 毒素伤害并作定力检定（监听 AE）。\n// 每以蓄力动作再次施展，范围 +1（按既有区域重建）。\nconst flLabel = \"wuxue-feilian-\" + actor.id;\nconst flExisting = game.xjzl.aura.query(flLabel)[0];\nconst flLvl = Math.max(1, move.computedLevel || 1);\nif (flExisting) {\n    const flPrev = Number(flExisting.getFlag(\"xjzl-system\", \"aura\")?.params?.radius) || 1;\n    await game.xjzl.aura.refreshAura(flLabel, {radius: flPrev + 1}, {scene: flExisting.parent});\n    return;\n}\nawait game.xjzl.aura.create(actor, {\n    label: flLabel,\n    displayName: \"蜚蠊地狱\",\n    follow: true,\n    radius: 1,\n    faction: \"enemy\",\n    includeSelf: false,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: \"蜚蠊地狱\",\n    enterEnabled: true,\n    roundEnabled: true,\n    roundTiming: \"tokenTurnStart\",\n    roundAction: {kind: \"damage\", amount: String(20 + 10 * (flLvl - 1)), type: \"poison\"},\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true,\n    createdRound: game.combat?.round ?? 0\n});\n"
                         }
                     ]
                 }

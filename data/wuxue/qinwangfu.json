@@ -121,7 +121,7 @@
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
                     "description": "<p>持刀倚天，灼灼曜日，自身每有一层“金乌”，对范围内敌人造成 10 点火焰伤害。然后在自身周围 10m 范围内创造‘灼日’，持续到战斗脱离或你解除架招【烈日炎炎】。</p><p><strong>灼日：</strong>区域内敌人在自己的每个回合初，受到 10 点火焰伤害，若处于无架招状态，持续陷入“目盲”。</p><p>·灼日区域以你为中心跟随你移动，你只能拥有一 个灼日，如果你创造新的灼日，之前的消失。</p><p><strong>升级：</strong>每层金乌和灼日区域造成的火焰伤害+10，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "完全自动化：施展【骄阳似火】时金乌层数爆发伤害按 calc 自动结算；自动生成跟随光环【灼日】，范围内敌人每回合初（各自的回合开始）受 10×招式等级 的火焰伤害（必中不暴击），无架招状态由导体标记自动陷入目盲。解除架招【烈日炎炎】或脱离战斗时光环消散并按账目摘除状态。",
+                    "automationNote": "完全自动化：施展【骄阳似火】时金乌层数爆发伤害按 calc 自动结算；自动生成跟随光环【灼日】，范围内敌人各自回合初受 10×招式等级 的火焰伤害（必中不暴击），无架招者自动陷入目盲，离开区域或开启架招后目盲自然消退。解除架招【烈日炎炎】或脱战时光环消散并按账目摘除状态。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "isFixed": true,
@@ -152,7 +152,7 @@
                             "label": "生成灼日提示",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dotDmg = 10 + (lvl - 1) * 10;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: `<div class=\"xjzl-chat-card\"><b>灼日</b> 已生成：范围内敌人每回合初受 ${dotDmg} 点火焰伤害；无架招状态持续目盲。解除架招或脱战时消散。</div>`});"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dotDmg = 10 + (lvl - 1) * 10;\nawait ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: `<div class=\"xjzl-chat-card\"><b>灼日</b> 已生成：范围内敌人每回合初受 ${dotDmg} 点火焰伤害；无架招状态持续目盲。解除架招或脱战时消散。</div>`});"
                         },
                         {
                             "label": "灼日光环",
@@ -178,7 +178,7 @@
                                 "label": "无架招目盲导体",
                                 "trigger": "turnStart",
                                 "active": true,
-                                "script": "// 导体在目标回合初检查架招状态；未架招者持续承受目盲。\nif (actor.system?.martial?.stanceActive) return;\nconst hasBlind = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"blind\");\nif (!hasBlind) {\n    await game.xjzl.api.effects.addEffect(actor, \"blind\");\n    actor.showFloatyText(\"烈日灼目！\", { fill: \"#e67e22\", fontSize: 28 });\n}"
+                                "script": "// 导体在目标回合初检查架招状态；未架招者每回合初重复施加目盲（addEffect 同 slug 刷新 1 回合时长，\n// 不能判空再挂——效果到期删除与回合脚本的交错会让目标在区域内断档）。\nif (actor.system?.martial?.stanceActive) return;\nawait game.xjzl.api.effects.addEffect(actor, {id: \"blind\", duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}});\nawait actor.showFloatyText(\"烈日灼目！\", { fill: \"#e67e22\", fontSize: 28 });"
                             }
                         ]
                     }
