@@ -189,34 +189,34 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "夺命",
-                    "description": "每次出招后流失 10 点气血、内力。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "duoming",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "出招流失",
-                                    "trigger": "attack",
-                                    "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nawait actor.applyHealing({ healer: actor, amount: -10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ healer: actor, amount: -10, type: \"mp\", showScrolling: true });\nactor.showFloatyText(\"夺命反噬！\", { fill: \"#8b0000\" });",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "img": "icons/svg/blood.svg",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "夺命",
+                "description": "每次出招后流失 10 点气血、内力。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "duoming",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "出招流失",
+                                "trigger": "attack",
+                                "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nawait actor.applyHealing({ healer: actor, amount: -10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ healer: actor, amount: -10, type: \"mp\", showScrolling: true });\nactor.showFloatyText(\"夺命反噬！\", { fill: \"#8b0000\" });",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "img": "icons/svg/blood.svg",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "阎王棍",
@@ -743,118 +743,118 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "行刑",
-                    "description": "标记状态：用于阎王棍其他招式判定。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xingxing",
-                            "stackable": false
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
+            ]
+        },
+        "effects": [
+            {
+                "name": "行刑",
+                "description": "标记状态：用于阎王棍其他招式判定。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xingxing",
+                        "stackable": false
+                    }
                 },
-                {
-                    "name": "阿鼻降难-破",
-                    "description": "下一次出招无视敌方闪避，距离+20米。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "abijiannan_broken",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "无视闪避",
-                                    "trigger": "attack",
-                                    "script": "args.flags.alwaysHit = true;\nui.notifications.info(\"阿鼻降难效果：本次必定命中，距离+20米！\");",
-                                    "active": true
-                                },
-                                {
-                                    "label": "消耗",
-                                    "trigger": "hit",
-                                    "script": "await game.xjzl.api.effects.removeEffect(actor, \"abijiannan_broken\");",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
                 },
-                {
-                    "name": "卞城枉死",
-                    "description": "护盾：恶行值减伤。生效一次后销毁。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "biancheng",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "恶行护盾",
-                                    "trigger": "preTake",
-                                    "script": "if (!args.isCrit) return;\n\n// 1. 读取 Flag 中的护盾强度\nconst shieldValue = thisEffect.getFlag(\"xjzl-system\", \"shieldValue\") || 0;\n\n// 2. 计算减伤\nconst original = args.output.damage;\n// 确保至少扣1点血 (除非完全免疫，但此招描述为抵挡)\nlet reduced = Math.max(1, original - shieldValue);\nconst blocked = original - reduced;\n\n// 3. 应用结果\nargs.output.damage = reduced;\n\n// 4. 发送卡片通知\nlet msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\">\n    <b>卞城枉死</b> 触发！<br>\n    原始伤害: ${original}<br>\n    抵消伤害: ${blocked}<br>\n    <span style=\"font-size:1.2em; font-weight:bold;\">最终伤害: ${reduced}</span>\n`;\n\n// 追击判定：伤害<=1点\nif (reduced <= 1) {\n    msg += `<hr><b style=\"color:red;\">条件满足！</b><br>伤害已压制至1点以下。<br>获得【泰山锥肉】追击机会！`;\n}\n\nmsg += `</div></div>`;\n\nChatMessage.create({\n    content: msg,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 5. 通过效果管理器销毁护盾，确保层数/权限处理一致\nawait game.xjzl.api.effects.removeEffect(actor, \"biancheng\");",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
-                },
-                {
-                    "name": "禁架 (大侠)",
-                    "description": "无法再次开启被击破的架招。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "jin_jia",
-                            "stackable": false
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
-                },
-                {
-                    "name": "禁暴 (大恶)",
-                    "description": "外功伤害招式无法造成暴击。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "jin_bao",
-                            "stackable": false
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "system": {
-                        "changes": [
+                "showIcon": 2
+            },
+            {
+                "name": "阿鼻降难-破",
+                "description": "下一次出招无视敌方闪避，距离+20米。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "abijiannan_broken",
+                        "stackable": false,
+                        "scripts": [
                             {
-                                "key": "system.combat.crit_waigong",
-                                "value": "999",
-                                "type": "override"
+                                "label": "无视闪避",
+                                "trigger": "attack",
+                                "script": "args.flags.alwaysHit = true;\nui.notifications.info(\"阿鼻降难效果：本次必定命中，距离+20米！\");",
+                                "active": true
+                            },
+                            {
+                                "label": "消耗",
+                                "trigger": "hit",
+                                "script": "await game.xjzl.api.effects.removeEffect(actor, \"abijiannan_broken\");",
+                                "active": true
                             }
                         ]
-                    },
-                    "showIcon": 2
-                }
-            ]
-        }
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            },
+            {
+                "name": "卞城枉死",
+                "description": "护盾：恶行值减伤。生效一次后销毁。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "biancheng",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "恶行护盾",
+                                "trigger": "preTake",
+                                "script": "if (!args.isCrit) return;\n\n// 1. 读取 Flag 中的护盾强度\nconst shieldValue = thisEffect.getFlag(\"xjzl-system\", \"shieldValue\") || 0;\n\n// 2. 计算减伤\nconst original = args.output.damage;\n// 确保至少扣1点血 (除非完全免疫，但此招描述为抵挡)\nlet reduced = Math.max(1, original - shieldValue);\nconst blocked = original - reduced;\n\n// 3. 应用结果\nargs.output.damage = reduced;\n\n// 4. 发送卡片通知\nlet msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\">\n    <b>卞城枉死</b> 触发！<br>\n    原始伤害: ${original}<br>\n    抵消伤害: ${blocked}<br>\n    <span style=\"font-size:1.2em; font-weight:bold;\">最终伤害: ${reduced}</span>\n`;\n\n// 追击判定：伤害<=1点\nif (reduced <= 1) {\n    msg += `<hr><b style=\"color:red;\">条件满足！</b><br>伤害已压制至1点以下。<br>获得【泰山锥肉】追击机会！`;\n}\n\nmsg += `</div></div>`;\n\nChatMessage.create({\n    content: msg,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 5. 通过效果管理器销毁护盾，确保层数/权限处理一致\nawait game.xjzl.api.effects.removeEffect(actor, \"biancheng\");",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            },
+            {
+                "name": "禁架 (大侠)",
+                "description": "无法再次开启被击破的架招。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jin_jia",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            },
+            {
+                "name": "禁暴 (大恶)",
+                "description": "外功伤害招式无法造成暴击。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jin_bao",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "value": "999",
+                            "type": "override"
+                        }
+                    ]
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "蛰伏",
@@ -900,45 +900,45 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "蛰伏",
-                    "description": "下一次出招暴击骰减少。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "zhefu",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "出招后移除",
-                                    "trigger": "attack",
-                                    "script": "await game.xjzl.api.effects.removeEffect(actor, \"zhefu\");",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "img": "icons/svg/eye.svg",
-                    "system": {
-                        "changes": [
+            ]
+        },
+        "effects": [
+            {
+                "name": "蛰伏",
+                "description": "下一次出招暴击骰减少。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhefu",
+                        "stackable": false,
+                        "scripts": [
                             {
-                                "key": "system.combat.crit_waigong",
-                                "value": "-2",
-                                "type": "add"
-                            },
-                            {
-                                "key": "system.combat.crit_neigong",
-                                "value": "-2",
-                                "type": "add"
+                                "label": "出招后移除",
+                                "trigger": "attack",
+                                "script": "await game.xjzl.api.effects.removeEffect(actor, \"zhefu\");",
+                                "active": true
                             }
                         ]
-                    },
-                    "showIcon": 2
-                }
-            ]
-        }
+                    }
+                },
+                "img": "icons/svg/eye.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "value": "-2",
+                            "type": "add"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "value": "-2",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "黑白无常",
@@ -977,8 +977,7 @@
                     },
                     "scripts": []
                 }
-            ],
-            "effects": []
+            ]
         }
     },
     {
@@ -1195,33 +1194,33 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "阎王不死印-被动",
-                    "description": "受伤自动积累不死气。",
-                    "transfer": true,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "undying_seal_passive",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "积累不死气",
-                                    "trigger": "damaged",
-                                    "script": "const damage = args.hpLost + (args.hutiLost || 0);\nif (damage <= 0) return;\nconst gain = Math.floor(damage / 2);\n\nlet current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nconst max = actor.system.resources.mp.max;\nlet newVal = Math.min(current + gain, max);\n\nawait actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", newVal);\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #4a148c; background: rgba(74, 20, 140, 0.05);\">\n            <div style=\"font-weight:bold; color: #4a148c;\">阎王不死印 - 吸纳死气</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                承受伤害转化。<br>\n                不死气: <b>+${gain}</b> (当前: ${newVal})\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ author: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "system": {
-                        "changes": []
-                    }
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "阎王不死印-被动",
+                "description": "受伤自动积累不死气。",
+                "transfer": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "undying_seal_passive",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "积累不死气",
+                                "trigger": "damaged",
+                                "script": "const damage = args.hpLost + (args.hutiLost || 0);\nif (damage <= 0) return;\nconst gain = Math.floor(damage / 2);\n\nlet current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nconst max = actor.system.resources.mp.max;\nlet newVal = Math.min(current + gain, max);\n\nawait actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", newVal);\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #4a148c; background: rgba(74, 20, 140, 0.05);\">\n            <div style=\"font-weight:bold; color: #4a148c;\">阎王不死印 - 吸纳死气</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                承受伤害转化。<br>\n                不死气: <b>+${gain}</b> (当前: ${newVal})\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ author: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "system": {
+                    "changes": []
+                }
+            }
+        ]
     },
     {
         "name": "喵之令",
@@ -1504,8 +1503,7 @@
                         }
                     ]
                 }
-            ],
-            "effects": []
+            ]
         }
     },
     {
@@ -1656,33 +1654,33 @@
                     },
                     "scripts": []
                 }
-            ],
-            "effects": [
-                {
-                    "name": "躲猫猫",
-                    "description": "速度增加，条件性无法选中。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "duomaomao",
-                            "stackable": false,
-                            "scripts": []
-                        }
-                    },
-                    "img": "icons/svg/mystery-man.svg",
-                    "system": {
-                        "changes": [
-                            {
-                                "key": "system.combat.speed",
-                                "value": "0",
-                                "type": "add"
-                            }
-                        ]
-                    },
-                    "showIcon": 2
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "躲猫猫",
+                "description": "速度增加，条件性无法选中。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "duomaomao",
+                        "stackable": false,
+                        "scripts": []
+                    }
+                },
+                "img": "icons/svg/mystery-man.svg",
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "value": "0",
+                            "type": "add"
+                        }
+                    ]
+                },
+                "showIcon": 2
+            }
+        ]
     },
     {
         "name": "虎豹猫音",
@@ -1728,8 +1726,7 @@
                         }
                     ]
                 }
-            ],
-            "effects": []
+            ]
         }
     },
     {
@@ -1781,8 +1778,7 @@
                         }
                     ]
                 }
-            ],
-            "effects": []
+            ]
         }
     },
     {
@@ -1836,26 +1832,26 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "九命",
-                    "description": "满九层必死。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "jiuming",
-                            "stackable": true,
-                            "maxStacks": 9
-                        }
-                    },
-                    "img": "icons/svg/skull.svg",
-                    "system": {
-                        "changes": []
-                    },
-                    "showIcon": 2
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "九命",
+                "description": "满九层必死。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jiuming",
+                        "stackable": true,
+                        "maxStacks": 9
+                    }
+                },
+                "img": "icons/svg/skull.svg",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
     }
 ]
