@@ -164,7 +164,7 @@
             "sect": "wanfosi",
             "description": "<p>万佛寺核心内功心法，为万佛七十二绝技之一。修行者皆身心六根清净，无明烦恼已断，大成后刚猛顽强，排除万魔。</p>",
             "requirement": "悟性需求: 4",
-            "automationNote": "完全自动化：出招命中后对周围2米内敌人自动结算气血流失，小成5点、圆满10点（必中不暴击）；圆满时怒气≥5，招式伤害+10。切换运功或脱战时光环消散。",
+            "automationNote": "完全自动化：出招后（普通攻击不触发）对周围2米内敌人自动结算气血流失，小成5点、圆满10点（必中不暴击）；圆满时怒气≥5，招式伤害+10。切换运功或脱战时光环消散。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -194,7 +194,7 @@
                         {
                             "label": "伏魔光环",
                             "trigger": "combatStart",
-                            "script": "// 监听 AE 挂在范围内角色身上，仅主人招式命中时按境界结算震伤（小成 5、圆满 10）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-luohanzhen-\" + actor.id,\n    displayName: \"罗汉伏魔功\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"罗汉伏魔功监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});",
+                            "script": "// 监听 AE 挂在范围内角色身上，仅主人出招后按境界结算震伤（小成 5、圆满 10），普通攻击不触发。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-luohanzhen-\" + actor.id,\n    displayName: \"罗汉伏魔功\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"罗汉伏魔功监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});",
                             "active": true
                         }
                     ]
@@ -221,7 +221,7 @@
                             "label": "伏魔光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 监听 AE 挂在范围内角色身上，仅主人招式命中时按境界结算震伤（小成 5、圆满 10）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-luohanzhen-\" + actor.id,\n    displayName: \"罗汉伏魔功\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"罗汉伏魔功监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                            "script": "// 监听 AE 挂在范围内角色身上，仅主人出招后按境界结算震伤（小成 5、圆满 10），普通攻击不触发。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-luohanzhen-\" + actor.id,\n    displayName: \"罗汉伏魔功\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"罗汉伏魔功监听\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
                         }
                     ]
                 }
@@ -261,9 +261,9 @@
                         "scripts": [
                             {
                                 "label": "罗汉伏魔功监听",
-                                "trigger": "hit_once",
+                                "trigger": "attack",
                                 "active": true,
-                                "script": "// 罗汉伏魔功监听：仅主人以招式（含借机普攻，排除普通攻击）命中后，按境界对 2 米内敌人结算气血流失（小成 5、圆满 10）。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner || owner.uuid !== actor.uuid) return;\nif (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif ((args.move?.type === 'basic' && args.move?.id !== 'opportunity-attack')) return;\nconst stage = srcAE.parent?.system?.stage ?? 1;\nconst victims = await game.xjzl.aura.queryTokens(owner, {radius: 2, faction: 'enemy', includeSelf: false});\nfor (const t of victims) {\n    await t.applyDamage({amount: stage >= 3 ? 10 : 5, type: 'liushi', attacker: owner, isHit: true, isCrit: false, source: 'dot'});\n}\nif (victims.length) owner.showFloatyText('罗汉伏魔功·震伤!', {fill: '#c0392b', fontSize: 30});"
+                                "script": "// 罗汉伏魔功监听：仅主人出招后（attack 阶段，覆盖实招、虚招、气招与架招开启）按境界对 2 米内敌人结算气血流失（小成 5、圆满 10）；普通攻击不触发。\nconst srcAE = await fromUuid(thisEffect.origin);\nconst owner = srcAE?.parent?.parent;\nif (!owner || owner.uuid !== actor.uuid) return;\nif (args.move?.type === 'basic' && args.move?.id !== 'opportunity-attack') return;\nconst stage = srcAE.parent?.system?.stage ?? 1;\nconst victims = await game.xjzl.aura.queryTokens(owner, {radius: 2, faction: 'enemy', includeSelf: false});\nfor (const t of victims) {\n    await t.applyDamage({amount: stage >= 3 ? 10 : 5, type: 'liushi', attacker: owner, isHit: true, isCrit: false, source: 'dot'});\n}\nif (victims.length) await owner.showFloatyText('罗汉伏魔功·震伤!', {fill: '#c0392b', fontSize: 30});"
                             }
                         ]
                     }

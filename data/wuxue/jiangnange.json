@@ -72,7 +72,7 @@
                             "label": "击飞提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #2980b9; background: rgba(41,128,185,0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-wind\"></i> 飞花似梦</div>\n        <div>目标 <b>${args.target.name}</b> 被击飞 1 米！请手动调整其位置。</div>\n    </div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #2980b9; background: rgba(41,128,185,0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-wind\"></i> 飞花似梦</div>\n        <div>目标 <b>${args.target.name}</b> 被击飞 1 米！请手动调整其位置。</div>\n    </div>`;\n    await ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1521,7 +1521,7 @@
                             "label": "渊微区域",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 渊微（仅标记）：消耗【弈理】，原地生成 5 米标记光环，持续 1+升级 回合（单实例）。\n// 区域规则超出光环框架，创建时发一次说明卡：敌人无法离开（G3）、自身回合初额外主要动作由 GM 手动结算。\nconst ywYili = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yili\");\nif (!ywYili) return;\nawait ywYili.delete();\nconst ywLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-yuanwei-\" + actor.id,\n    displayName: \"渊微\",\n    follow: false,\n    radius: 5,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1 + (ywLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>渊微</b>已布下（5 米，持续 \" + (1 + (ywLvl - 1)) + \" 回合）：区域内敌人无法离开（移动限制请 GM 手动裁定）；自身处于区域内时每回合初额外获得一个主要动作（请自行记录）。区域到期自动消散。</div>\"});"
+                            "script": "// 渊微（仅标记）：消耗【弈理】，原地生成 5 米标记光环，持续 1+升级 回合（单实例）。\n// 区域规则超出光环框架，创建时发一次说明卡：敌人无法离开（G3）、自身回合初额外主要动作由 GM 手动结算。\nconst ywYili = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yili\");\nif (!ywYili) return;\nawait game.xjzl.api.effects.removeEffect(actor, \"yili\", 99);\nconst ywLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-yuanwei-\" + actor.id,\n    displayName: \"渊微\",\n    follow: false,\n    radius: 5,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 1 + (ywLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nawait ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: \"<div class='xjzl-chat-card'><b>渊微</b>已布下（5 米，持续 \" + (1 + (ywLvl - 1)) + \" 回合）：区域内敌人无法离开（移动限制请 GM 手动裁定）；自身处于区域内时每回合初额外获得一个主要动作（请自行记录）。区域到期自动消散。</div>\"});"
                         }
                     ]
                 }

@@ -8,7 +8,8 @@
  * 生命周期入口：
  * ① 数据脚本时机（正常流，直接调 create/dismiss）；
  * ② 系统级 Foundry 钩子兜底（updateItem/deleteItem/updateActor 按
- *    region flags 的源映射清理；架招光环由 stopStance 直调）；
+ *    region flags 的源映射清理；架招光环由 stopStance（解除/被破/濒死）
+ *    与 item.mjs 切换架招路径直调）；
  * ③ 战斗结束清理绑定光环，ready 时校验孤儿实例。
  *
  * region flags `xjzl-system.aura` 持久化：label、lifecycle、源物品/Actor/Token

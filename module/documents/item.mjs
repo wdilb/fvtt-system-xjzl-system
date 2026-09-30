@@ -3,6 +3,7 @@ import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { createAutomaticDetailAccess } from "../utils/chat-detail-access.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
+import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -2010,8 +2011,11 @@ export class XJZLItem extends Item {
       // 架招招式：在新架招 attack 脚本执行前清理其他武学遗留的绑定特效（tiedToStance），
       // 避免旧绑定 AE 参与本次出招。豁免 origin 指向当前武学的特效：
       // 同武学切换/重开架招时由 addEffect 按 slug 复用刷新，不做删除。
+      // 切换架招不经 stopStance（该入口只服务主动解除/被破/濒死），旧 stance 生命周期
+      // 光环须在此一并销毁；必须先于新架招 attack 脚本建环，否则会误删新建的区域。
       if (move.type === "stance") {
         await actor.clearStanceTiedEffects(this.uuid);
+        await AuraManager.dismissBySource({sourceActorUuid: actor.uuid, lifecycle: "stance"});
       }
 
       const attackContext = {
