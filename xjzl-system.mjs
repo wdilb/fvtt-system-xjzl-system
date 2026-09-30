@@ -65,6 +65,7 @@ import { registerAuraBehavior } from "./module/region/xjzl-aura-behavior.mjs";
 import { AuraManager } from "./module/region/xjzl-aura-manager.mjs";
 import { registerAuraQuick, openAuraQuick, placeAura } from "./module/region/xjzl-aura-quick.mjs";
 import { registerAuraFxSetting } from "./module/region/xjzl-aura-fx.mjs";
+import { registerCombatFxSetting } from "./module/managers/combat-fx-manager.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
 import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
@@ -92,6 +93,8 @@ Hooks.once("init", async function () {
   registerAuraQuick();
   // 光环视觉增强（AURA-07）：圆轮廓随 Region 子类生效；粒子设置在此注册。
   registerAuraFxSetting();
+  // 受击视觉反馈：每位玩家独立控制，开关切换无需刷新页面。
+  registerCombatFxSetting();
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;

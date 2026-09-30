@@ -341,7 +341,7 @@ export class EncounterManager {
       const actor = target.actor;
       if (!actor) throw new Error(game.i18n.localize("XJZL.Encounter.TargetInvalid", { name: target.name }));
       if (entry.automationType === "damage") {
-        const result = await actor.applyDamage({ amount, type: entry.damageType, isHit: true, isCrit: false, source: "extra" });
+        const result = await actor.applyDamage({ amount, type: entry.damageType, isHit: true, isCrit: false, source: "extra", targetTokenUuid: target.combatant?.token?.uuid || null });
         results.push(`${target.name}：-${result?.finalDamage ?? 0}`);
       } else if (entry.automationType === "healing") {
         const result = await actor.applyHealing({ amount, type: "hp", source: "extra" });

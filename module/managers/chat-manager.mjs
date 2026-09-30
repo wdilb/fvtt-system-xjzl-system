@@ -1516,6 +1516,7 @@ export class ChatCardManager {
             const damageResult = await targetActor.applyDamage({
                 amount: damageConfig.amount,     // 面板伤害
                 type: damageConfig.type,    // 伤害类型
+                targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
                 attacker: attacker,        // 攻击者
                 isHit: isHit,              // 命中状态
                 isCrit: isCrit,            // 暴击状态 (用于触发特效)
@@ -2048,6 +2049,7 @@ export class ChatCardManager {
             const damageResult = await targetActor.applyDamage({
                 amount: damageConfig.amount,
                 type: damageConfig.type,    // 沿用招式类型
+                targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
                 attacker: attacker,
                 isHit: isHit,
                 isCrit: config.isCrit,     // 强制暴击状态
@@ -2391,6 +2393,7 @@ export class ChatCardManager {
                         const damageResult = await actor.applyDamage({
                             amount: amount,
                             type: typeKey,
+                            targetTokenUuid: doc?.documentName === "Token" ? doc.uuid : null,
                             attacker: attacker,
                             isHit: true,
                             ignoreMinDamage: true //可以减免到0

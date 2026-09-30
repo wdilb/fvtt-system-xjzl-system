@@ -4,6 +4,7 @@
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { queueHitEffect } from "../managers/combat-fx-manager.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
@@ -1847,6 +1848,7 @@ export class XJZLActor extends Actor {
   /**
    * [核心] 伤害结算处理函数
    * 流程：AVOIDED -> PRE_DEFENSE -> (计算暴击/防御) -> PRE_TAKE -> (扣血) -> DAMAGED
+   * 结算完成后广播受击视觉反馈；特效失败不改变结算结果。
    * @param {Object} data - 伤害参数包
    * @returns {Object} 结算结果
    */
@@ -1895,6 +1897,7 @@ export class XJZLActor extends Actor {
       const protection = this.system.combat.protection || 0;
 
       let tiliLost = 0;
+      let actualTiliLost = 0;
       let isDead = false;
 
       // 3. 伤害计算
@@ -1921,6 +1924,7 @@ export class XJZLActor extends Actor {
             { "system.resources.tili.value": newVal },
             creatureResourceContext
           );
+          actualTiliLost = actualLost;
 
           // 飘字
           let flavor = `-${actualLost} 体力`;
@@ -2000,6 +2004,9 @@ export class XJZLActor extends Actor {
           isDead: finalDamageResult.isDead
         });
       }
+
+      // 原返回值保留理论体力损失；视觉只读取实际扣除，避免对零体力野兽误播受击。
+      queueHitEffect(this, data, { finalDamage: tiliLost, tiliLost: actualTiliLost }, xjzlSocket);
 
       return finalDamageResult;
     }
@@ -2579,6 +2586,14 @@ export class XJZLActor extends Actor {
         isDead: isDead
       });
     }
+
+    // 附带流失也可能穿透护体；只给视觉合并损失，不改变脚本和返回值中的常规伤害契约。
+    queueHitEffect(this, data, {
+      finalDamage,
+      hpLost: totalHpLost,
+      hutiLost: totalHutiLost,
+      mpLost: totalMpLost
+    }, xjzlSocket, config);
 
     return finalDamageResult;
   }

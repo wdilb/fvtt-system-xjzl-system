@@ -616,6 +616,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     const result = await target.actor.applyDamage({
       amount,
       type,
+      targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
       attacker: attackerActor,
       isHit: true,
       isCrit: config.isCrit,

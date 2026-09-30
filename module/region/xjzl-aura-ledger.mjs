@@ -313,7 +313,7 @@ export class AuraLedger {
 
     // 每次真实进入施加一次；记账先于直接动作：动作抛错时账目已记录。
     const entry = await this.#applyPayload(system, meta, region, token, actor, op.behaviorId);
-    await applyAction(system.enterAction, actor, sourceToken?.actor ?? null);
+    await applyAction(system.enterAction, actor, sourceToken?.actor ?? null, token.uuid);
     if (throttleEnabled && throttleKey) {
       await this.setThrottle(region, throttleScope, throttleKey);
     }
@@ -396,7 +396,7 @@ export class AuraLedger {
     const meta = region.getFlag(FLAG_SCOPE, FLAG_AURA) ?? {};
     const sourceToken = await resolveSourceToken(meta);
     if (!passesFilter(system, token, sourceToken)) return;
-    await applyAction(system.enterAction, actor, sourceToken?.actor ?? null);
+    await applyAction(system.enterAction, actor, sourceToken?.actor ?? null, token.uuid);
   }
 
   /**
@@ -455,7 +455,7 @@ export class AuraLedger {
       }
     }
     if (actionKindOf(system.roundAction) !== "none") {
-      await applyAction(system.roundAction, actor, sourceToken?.actor ?? null);
+      await applyAction(system.roundAction, actor, sourceToken?.actor ?? null, token.uuid);
     }
     if (system.oncePerRound && throttleKey) {
       await this.setThrottle(region, throttleScope, throttleKey);
@@ -826,8 +826,9 @@ export function passesFilter(system, token, sourceToken) {
  * @param {object} action - {kind, amount, type, pierce}
  * @param {Actor} actor - 目标 Actor
  * @param {Actor|null} sourceActor - 源 Actor（统计溯源与公式 rollData）
+ * @param {string|null} targetTokenUuid - 受击 Token UUID，用于把视觉效果定位到正确实例
  */
-async function applyAction(action, actor, sourceActor) {
+async function applyAction(action, actor, sourceActor, targetTokenUuid = null) {
   const kind = actionKindOf(action);
   if (kind === "none") return;
   const amount = await resolveAmount(action.amount, sourceActor);
@@ -836,6 +837,7 @@ async function applyAction(action, actor, sourceActor) {
     await actor.applyDamage({
       amount,
       type: action.type || "liushi",
+      targetTokenUuid,
       attacker: sourceActor,
       isHit: true,
       isCrit: false,

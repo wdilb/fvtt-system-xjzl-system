@@ -3,6 +3,7 @@ import { EncounterManager } from "./managers/encounter-manager.mjs";
 import { XJZLContainerTransactionManager } from "./managers/container-transaction-manager.mjs";
 import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
 import { AuraLedger } from "./region/xjzl-aura-ledger.mjs";
+import { renderHitEffect } from "./managers/combat-fx-manager.mjs";
 
 export let xjzlSocket;
 
@@ -52,6 +53,8 @@ export function setupSocket() {
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
     xjzlSocket.register("showScrollingText", _socketShowScrollingText);
+    // 受击特效只在各客户端本地渲染，不参与权限结算。
+    xjzlSocket.register("playHitEffect", _socketPlayHitEffect);
 
     // === 脚本执行路由 ===
     // 注册Actor脚本执行（用于战斗流转脚本路由到玩家端执行）
@@ -341,6 +344,15 @@ async function _socketShowScrollingText(tokenUuid, text, settings) {
     // 4. 执行渲染
     // 使用 interface.createScrollingText 确保是 UI 层面的绘制
     canvas.interface.createScrollingText(tokenObject.center, text, settings);
+}
+
+/** 在当前客户端渲染受击特效；特效失败不得影响伤害事务。 */
+async function _socketPlayHitEffect(payload = {}) {
+    try {
+        await renderHitEffect(payload);
+    } catch (error) {
+        console.error("XJZL | 受击特效广播处理失败。", error);
+    }
 }
 
 /**
