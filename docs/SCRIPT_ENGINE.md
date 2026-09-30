@@ -808,6 +808,8 @@ if (!Macros.checkStance(actor, args)) return;
 
 ## 常用安全模式
 
+画布距离判定使用 `canvas.grid.measurePath(waypoints).distance`，路径点传画布像素坐标（如 Token 的 `center`）。开启自定义距离规则且方格场景的对角线规则为“等效”时，`.distance` 按 1-2-2-2 家规计算；其他场景使用核心结果。总 `cost` 保留核心累计成本，不能当作家规距离。
+
 ### 反伤
 
 ```javascript

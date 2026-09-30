@@ -1175,7 +1175,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
         // =====================================================
         // Header 滚动条记忆修复 (Capture + Passive)
-        // 解决了 V13 原生 scrollable 无法监听 header滚动条的问题
+        // Header 滚动容器不由 AppV2 的 scrollable 管理，重绘后需自行恢复位置。
         // =====================================================
 
         // 1. RAF 确保在 CSS 布局计算完成后执行
@@ -1668,13 +1668,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         if (confirmed) {
             // 实例化并渲染向导，将当前 Actor 传进去
             new XJZLCharacterWizardApp({ actor: this.document }).render(true);
-            // 可选：把现在的角色卡先最小化或关掉，避免挡视野
+            // 关闭角色卡，避免遮挡建卡向导。
             this.close();
         }
     }
 
     /* -------------------------------------------- */
-    /*  Drag & Drop 核心逻辑 (修复版)               */
+    /*  Drag & Drop 核心逻辑                        */
     /* -------------------------------------------- */
 
     /**

@@ -59,7 +59,7 @@ export async function rollDisabilityTable(actor) {
   </div>
   `;
 
-  // 4. 发送消息 (V13 标准写法)
+  // 4. 发送消息（author 标识发送者）
   const chatData = {
     author: game.user.id,
     speaker: actor ? ChatMessage.getSpeaker({ actor }) : { alias: "命运" },

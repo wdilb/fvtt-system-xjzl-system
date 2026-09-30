@@ -191,7 +191,7 @@ function beginPlacement(params) {
                 );
             } catch (error) {
                 console.error("XJZL | auraQuick.place failed", error);
-                ui.notifications.error("光环创建失败，请查看控制台。");
+                ui.notifications.error(game.i18n.localize("XJZL.Aura.CreateFailed"));
             }
             resolve(region ?? null);
         };
@@ -318,9 +318,16 @@ export class AuraQuickCreator extends HandlebarsApplicationMixin(ApplicationV2) 
             const tokenId = String(read("tokenId") || "");
             const token = canvas.scene.tokens.get(tokenId);
             if (!token) return ui.notifications.warn(game.i18n.localize("XJZL.UI.AuraQuick.InvalidToken"));
-            await game.xjzl.aura.create(token, params);
-            ui.notifications.info(game.i18n.format("XJZL.UI.AuraQuick.Created", {name: displayName}));
-            this.close();
+            // 管理器返回 null 表示未创建；保留弹窗供重试，异常另行提示。
+            try {
+                const region = await game.xjzl.aura.create(token, params);
+                if (!region) return;
+                ui.notifications.info(game.i18n.localize("XJZL.UI.AuraQuick.Created", {name: displayName}));
+                this.close();
+            } catch (error) {
+                console.error("XJZL | auraQuick follow create failed", error);
+                ui.notifications.error(game.i18n.localize("XJZL.Aura.CreateFailed"));
+            }
         } else {
             // 固定模式进入画布放置：弹窗立即关闭，避免遮挡画布视野
             this.close();

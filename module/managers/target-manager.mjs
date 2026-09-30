@@ -24,7 +24,6 @@ export class TargetManager {
         if (!canvas.ready || !canvas.tokens) return;
 
         // 3. 获取鼠标下的 Token
-        // V13 标准获取方式
         const hoveredToken = canvas.tokens.hover;
 
         // 如果没有 Token，或者 Token 不可见，不拦截，交给 Foundry 处理（比如框选）

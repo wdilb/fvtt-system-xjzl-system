@@ -1077,7 +1077,7 @@ export class ChatCardManager {
         // 4. 玩家交互弹窗 (Configuration Dialog)
         // =====================================================
 
-        // 生成唯一 ID 用于 DOM 锚定 (遵循 V13 最佳实践)
+        // 生成唯一 ID 用于 DOM 锚定
         const formId = `defend-config-${foundry.utils.randomID()}`;
 
         // 渲染弹窗内容 (HBS)
@@ -1610,7 +1610,7 @@ export class ChatCardManager {
             if (isCrit) hasCrit = true;
 
             // E. 执行攻击者脚本 (Trigger: HIT)
-            // 现在我们可以把“实际伤害”传给攻击者了 (比如：吸血逻辑，当然我们侠界的吸血是高贵的吸收没有减免的伤害)
+            // 将本目标的结算结果传给攻击侧 HIT 脚本。
             const hitContext = {
                 ...resultEntry, // 展开上面的结果
                 attacker: attacker,

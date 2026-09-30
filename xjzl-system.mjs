@@ -104,7 +104,7 @@ Hooks.once("init", async function () {
   // 是否启用侠界自定义距离
   game.settings.register("xjzl-system", "customDistanceRule", {
     name: "启用侠界自定义距离规则 (1-2-2-2)",
-    hint: "开启后，移动和测量将遵循：直行1，第一步斜行1，后续斜行2的规则，并针对V13地形消耗进行了修正。\n如果关闭，将使用FVTT核心设置（如欧几里得或5-10-5）进行计算。建议开启以获得最佳体验。",
+    hint: "开启后，移动和测量将遵循：直行1，第一步斜行1，后续斜行2的规则，并按核心地形消耗倍率折算。仅对场景网格对角线规则为「等效 Equidistant (1)」的场景生效，其他对角线规则下沿用核心原生计算。\n如果关闭，将使用FVTT核心设置（如欧几里得或5-10-5）进行计算。建议开启以获得最佳体验。",
     scope: "world",      // 世界级设置，保持同步
     config: true,        // 显示在菜单里
     default: true,       // 默认开启
@@ -126,16 +126,20 @@ Hooks.once("init", async function () {
     // ==========================================
     // 第一部分：Token 拖拽计算
     // ==========================================
-    // 2. 保存原始方法 (说不定后面要用到)
+    // 保留核心测量，以取得路径段结构和原生地形成本。
     const originalMeasurePath = SquareGrid.prototype.measurePath;
 
-    // 3. 修改原型 (Prototype)，这会影响所有基于方形网格的场景
+    /**
+     * 等效对角方格按家规改写每段距离/成本与总距离；其他规则返回核心结果。
+     * 家规分支要求路径点含画布像素 x/y；总 cost 与路径点累计值保留核心语义。
+     */
     SquareGrid.prototype.measurePath = function (waypoints, options = {}) {
 
       // 调用原始方法获取 segments 结构
       const result = originalMeasurePath.call(this, waypoints, options);
 
       if (!result || !result.segments || result.segments.length === 0) return result;
+      if (this.diagonals !== CONST.GRID_DIAGONALS.EQUIDISTANT) return result;
 
       const d = canvas.dimensions;
       let globalDiagonalCount = 0; // 全局斜向计数 (跨越多个线段累加)
@@ -178,7 +182,8 @@ Hooks.once("init", async function () {
 
         // 计算距离数值
         const finalSegCost = segGridCost * terrainMultiplier;
-        const finalSegDistance = finalSegCost * d.distance;
+        // 核心 cost 已含每格单位距离，不能在地形倍率折算后再次相乘。
+        const finalSegDistance = finalSegCost;
 
         // 回写数据
         s.distance = finalSegDistance;
@@ -203,18 +208,22 @@ Hooks.once("init", async function () {
     // ==========================================
     //  第二部分：测量尺 (快捷键 R) 的表现层劫持补丁
     // ==========================================
-    // V13 中，独立的测量标尺 (Ruler) 被设计为测量纯物理距离，完全绕过了 measurePath
-    // 这导致它会产生 0.5 这样的小数，且不受 1-2-2-2 规则约束。
-    // 我们在此拦截标尺生成数字标签的函数，提取它的坐标，重新计算！
+    // 标尺会调用 measurePath（每段 distance/cost 已被劫持重写），但其标签
+    // 读取的路径点累计距离不随劫持改写，多段斜线路径下与家规值不一致。
+    // 在此拦截标签生成函数，按路径坐标以家规重新计算显示值。
     if (CONFIG.Canvas?.rulerClass?.prototype?._getWaypointLabelContext) {
       const originalGetLabel = CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext;
 
       CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext = function (waypoint, state) {
+        // 非等效对角设置下测量沿用核心原生值，标签同样不做家规覆写
+        if (canvas.grid?.diagonals !== CONST.GRID_DIAGONALS.EQUIDISTANT) {
+          return originalGetLabel.call(this, waypoint, state);
+        }
         // 先获取原生渲染上下文
         const context = originalGetLabel.call(this, waypoint, state);
         if (!context) return context;
 
-        // 提取测量尺画出的所有路径点 (V13 API 存在 this.path 中)
+        // 提取测量尺画出的所有路径点（核心存于 this.path 中）
         const points = this.path || [];
         if (points.length < 2) return context;
         const d = canvas.dimensions;
@@ -249,11 +258,11 @@ Hooks.once("init", async function () {
             if (context.distance && typeof context.distance === "object") {
               context.distance.total = String(finalDist); // 修改内部的值
             } else {
-              // 兼容兜底：万一它没生成对象，我们给它补上
+              // 核心未提供距离对象时补齐同一结构，确保标签仍显示家规值。
               context.distance = { total: String(finalDist) };
             }
 
-            // 同理，保留 text 和 label 的同步更新（如果有的话），防范其他插件读取
+            // 同步已有的 label/text 字段，避免读取者取得不同的显示值。
             if (context.label !== undefined) {
               const unit = canvas.grid.units ? ` ${canvas.grid.units}` : "";
               context.label = `${finalDist}${unit}`;
@@ -271,15 +280,9 @@ Hooks.once("init", async function () {
     console.log("XJZL | 已成功应用自定义距离移动计算。");
   }
 
-  // 【V14 升级 S1.9】注销核心 AE 配置表，保持 V13 起的独占语义。注意两点：
-  // ① V14 的 unregisterSheet 第三参必须传 Sheet 类（内部取 .name 拼 id），传字符串会静默无效；
-  //    核心类导出位置为 foundry.applications.sheets.ActiveEffectConfig（apps 命名空间下没有）。
-  // ② 注册阶段（#registerSheet）只要设置里存有任何已保存项，makeDefault 即被忽略；注销后指向
-  //    core.ActiveEffectConfig 的陈旧设置无法在注册期解析，由 ready 钩子中的清理逻辑改写并持久化
-  //    （见 ready 内 S1.9 注释），保证系统表单最终为默认。
+  // unregisterSheet 须传表单类才能注销核心 AE 表；已保存的失效默认表设置在 ready 阶段修正。
   foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", foundry.applications.sheets.ActiveEffectConfig);
 
-  // 注册我们的表单
   foundry.applications.apps.DocumentSheetConfig.registerSheet(ActiveEffect, "xjzl-system", XJZLActiveEffectConfig, {
     makeDefault: true,
     label: "XJZL Active Effect Config"
@@ -306,10 +309,9 @@ Hooks.once("init", async function () {
   };
 
   // 2. 注册自定义 Document 类 (逻辑层)
-  // 告诉 Foundry 使用我们需要扩展的类，而不是默认的 Actor/Item
   CONFIG.Actor.documentClass = XJZLActor;
   CONFIG.Item.documentClass = XJZLItem;
-  // 注册 ActiveEffect 类，用来处理装备的自动抑制和其他我们自定义的AE规则
+  // ActiveEffect 子类承接装备抑制及系统效果规则。
   CONFIG.ActiveEffect.documentClass = XJZLActiveEffect;
   // 使用核心过期事件物理删除特效，避免与系统回合逻辑重复清理。
   CONFIG.ActiveEffect.expiryAction = "delete";
@@ -347,7 +349,7 @@ Hooks.once("init", async function () {
   // 注销默认 Sheet，注册我们需要用来渲染的 AppV2 Sheet
   Actors.unregisterSheet("core", ActorSheet);
 
-  // 注意：V13 中虽然推荐 AppV2，但注册方式仍需兼容 DocumentSheetConfig
+  // AppV2 Sheet 仍通过 DocumentSheetConfig 注册。
   Actors.registerSheet("xjzl-system", XJZLCharacterSheet, {
     types: ["character", "npc"],
     makeDefault: true,
@@ -672,12 +674,8 @@ Hooks.once("ready", async function () {
   // 监听聊天消息渲染，绑定按钮事件
   Hooks.on("renderChatMessageHTML", ChatCardManager.onRenderChatMessage);
 
-  // 【V14 升级 S1.9】修正旧世界遗留的 AE 默认表设置。
-  // V14 的 #registerSheet 逻辑：设置里存有任何已保存项（即使指向已注销的表）时，makeDefault 即被
-  // 忽略（isDefault = existingDefault === id）。旧世界若保存过 core.ActiveEffectConfig，我们的表会
-  // 注册成 default:false，无任何表带默认标记时解析回退到"第一个可配置表"，可能被其他模块抢走。
-  // 修正规则：逐子类型检查，仅改写指向已注销/不存在表单的陈旧项，指向有效表单的项尊重用户选择；
-  // 内存 default 标记先行修正（不依赖写入成功），持久化失败仅记录错误——绝不中断 ready 初始化。
+  // 已保存的 core.ActiveEffectConfig 注销后不可解析，且会使注册时的 makeDefault 被忽略。
+  // 仅修正失效表单引用，保留有效选择；先修正内存默认标记，持久化失败不阻断初始化。
   {
     const ours = "xjzl-system.XJZLActiveEffectConfig";
     const saved = game.settings.get("core", "sheetClasses");
@@ -711,7 +709,7 @@ Hooks.once("ready", async function () {
   //目标选择管理器，修改为按下ALT后左键点击选择目标
   TargetManager.init();
 
-  //为了避免isGM没有初始化读取失败，把API容器的定义挪到这里
+  // ready 后 game.user 已就绪，再初始化公开 API 容器。
   // 1. 初始化全局 API 容器
   // 注意：防止重复定义，先判断是否存在
   if (!game.xjzl) game.xjzl = {};
@@ -1023,7 +1021,7 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
  * 用于注入 "江湖万卷阁" 按钮
  */
 Hooks.on("renderItemDirectory", (app, html, data) => {
-  // 1. V13 兼容性处理：确保获取原生 DOM 元素
+  // 兼容原生 DOM 和 jQuery 包装形态，供下方 DOM 查询使用。
   const element = html instanceof HTMLElement ? html : html[0];
 
   // 2. 查找插入点 (.header-actions)
@@ -1127,10 +1125,7 @@ Hooks.on("renderActorDirectory", (app, html, data) => {
  * 用于修复自定义 Loot Card 的拖拽功能
  */
 Hooks.on("renderChatMessageHTML", (message, html) => {
-  // html 参数现在直接就是 HTMLElement，不需要 jQuery 转换
-
-  // 使用事件委托
-  // 我们只给这一条消息的容器绑定一个监听器
+  // 在消息容器上委托拖拽事件，覆盖动态插入的战利品条目。
   html.addEventListener("dragstart", (event) => {
     // 检查被拖动的元素是不是我们的 loot-item
     const target = event.target.closest(".loot-item[draggable='true']");
@@ -1314,8 +1309,7 @@ function renderEncounterTrackerControls(app, html) {
   else root.prepend(controls);
 }
 
-// 【V14 升级 S1.8 实测】renderCombatTrackerHTML 在 V14 不派发（实测仅 renderCombatTracker 以
-// (CombatTracker, HTMLElement, context, options) 触发），删除冗余绑定。
+// 战斗追踪器按钮通过 V14 的 renderCombatTracker 钩子注入。
 Hooks.on("renderCombatTracker", renderEncounterTrackerControls);
 // 删除战局 Item 时只清理“未关联”的失效按钮；已关联战斗持有独立快照副本，不受源 Item 删除影响。
 // 保留 linked 按钮是为了让已关联战斗的战局副本继续可访问、可运行。
@@ -1875,6 +1869,6 @@ async function preloadHandlebarsTemplates() {
     //暂停按钮的界面
     "systems/xjzl-system/templates/system/pause.hbs",
   ];
-  // 严格 V13 写法：使用命名空间
+  // 使用命名空间访问，避免依赖全局 loadTemplates
   return foundry.applications.handlebars.loadTemplates(templatePaths);
 }

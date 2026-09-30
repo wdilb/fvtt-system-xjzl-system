@@ -11,7 +11,6 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
         classes: ["xjzl-window", "item", "general", "theme-dark"],
         position: { width: 800, height: 600 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -158,7 +157,6 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
    */
     async _onDropManualTarget(event) {
         event.preventDefault();
-        // 1. 解析拖拽数据 (V13 标准写法)
         let data;
         try {
             data = JSON.parse(event.dataTransfer.getData("text/plain"));

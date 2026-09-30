@@ -81,7 +81,7 @@ export class ActionTracker extends HandlebarsApplicationMixin(ApplicationV2) {
             if (!this.currentActor.getFlag("xjzl-system", "actions")) {
                 this.resetActions(this.currentActor);
             }
-            // V13 AppV2 的 render 会自动处理更新，不需要删 DOM
+            // AppV2 的 render 会自动处理更新，不需要删 DOM
             this.instance.render({ force: true });
         } else {
             this.currentToken = null;

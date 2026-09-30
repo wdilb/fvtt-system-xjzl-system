@@ -136,18 +136,18 @@ S2.2 同步清理 [active-effect.mjs](../module/documents/active-effect.mjs) 的
 
 ### 3.2 MeasuredTemplate 功能迁移记录
 
-V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层）。下表记录迁移前实现和设计归宿，实施结果见 [`V14_AURA_PLAN.md`](V14_AURA_PLAN.md) AURA-12；宏包残留见 [`V14_PLAN.md`](V14_PLAN.md) S5.8。
+V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层）。下表记录迁移前实现和设计归宿，实施结果见 [`V14_AURA_PLAN.md`](V14_AURA_PLAN.md) AURA-12；宏包残留已随 [`V14_PLAN.md`](V14_PLAN.md) S5.8 清理（区域宏改用 `game.xjzl.auraQuick.place`）。
 
 | 原功能 | 原实现 | 设计归宿 |
 |---|---|---|
 | AOE 圆圈创建（静态/跟随两种模式） | `module/applications/aoe-creator.mjs` 中的 `createEmbeddedDocuments("MeasuredTemplate")` | 创建圆形 Region；跟随模式用 `attachment.token` |
 | 跟随同步（粘性模板随 Token 移动） | [xjzl-system.mjs](../xjzl-system.mjs) `updateToken` 钩子手写同步 | `attachment.token` 原生替代，**删除手写同步** |
-| Token 删除时自动清理 | `deleteToken` 钩子 | 验证核心是否自动清理附着区域；若不自动清理，再补充 Region 删除逻辑 |
-| 自定义标签显示 | 模板 flag `label` + `measured-template.mjs` 自绘文字 | Region 名称/显示测量选项 |
-| 1-2-2-2 网格高亮（圆形按格覆盖算法） | `XJZLMeasuredTemplate._getGridHighlightPositions` | 与 `GridShapeData` 结合重做，或先降级为核心高亮（待设计） |
-| `tokens` 接口（AoE 自动化预留，暂无调用方） | `XJZLMeasuredTemplate.tokens` | Region 事件/查询 API 重新设计 |
-| 工具栏 AOE 按钮 | 注入 `controls.templates` 层 | templates 层已删除；按钮迁至 token 层或 region 层 |
-| 跟随光环宏 | [data/macros/utility.json](../data/macros/utility.json) | 改写为 Region 版，或并入光环系统（§3.3） |
+| Token 删除时自动清理 | `deleteToken` 钩子 | 核心原生接管：源 Token 删除时自动删除附着 Region 并对区域内 token 补发 exit（`TokenDocument._onDeleteOperation`，AURA-01 ③ 源码核实＋实机复验） |
+| 自定义标签显示 | 模板 flag `label` + `measured-template.mjs` 自绘文字 | `XJZLAuraRegionObject` 自绘显示名标签（`module/region/xjzl-aura-quick.mjs`：PIXI.Text 白字黑边、点击穿透，随 Region bounds 跟随刷新；仅光环 Region 显示名称） |
+| 1-2-2-2 网格高亮（圆形按格覆盖算法） | `XJZLMeasuredTemplate._getGridHighlightPositions` | 核心按 Region grid 形状的 GridShapeData offsets 原生渲染阶梯格子高亮；AURA-07 在其上叠加圆轮廓与粒子（光环专项计划决策 47） |
+| `tokens` 接口（AoE 自动化预留，暂无调用方） | `XJZLMeasuredTemplate.tokens` | 删除无调用方接口；需要即时范围查询时用返回 `Actor[]` 的 `AuraManager.queryTokens`，按标签管理区域时用 `query`/`queryLabels`/`dismiss` |
+| 工具栏 AOE 按钮 | 注入 `controls.templates` 层 | 光环快建按钮注入区域控件组（`controls.regions.tools.auraQuick`），与区域编辑入口同组 |
+| 跟随光环宏 | [data/macros/utility.json](../data/macros/utility.json) | 并入光环系统（§3.3）：改写为光环快建工具入口宏（AURA-06）；区域放置宏改用 `game.xjzl.auraQuick.place`（S5.8） |
 | `CONFIG.MeasuredTemplate.objectClass` 注册 + `module/measured-template.mjs` | 整文件 | 删除 |
 
 > 摘除动作（静态 import、CONFIG 注册、`scene.templates` 相关钩子与 AOE 创建调用）已在 M1 完成：14.368 兼容层下旧代码仍可运行，摘除并非启动所必需，而是**不基于弃用 API 继续开发**（兼容层将在未来版本移除，届时再摘即为启动阻断）；本节的 Region 重建设计属于 M3。
@@ -170,9 +170,9 @@ V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层）�
 
 ### 3.4 1-2-2-2 距离的保留与验证
 
-- `SquareGrid.prototype.measurePath` 劫持（[xjzl-system.mjs](../xjzl-system.mjs) init 内）：V14 未标记破坏，但属于内部 API，实机验证；V14 新增 `BaseGrid#getLine/getRectangle/getEllipse` 等接口，若 measurePath 行为变化需重适配。
-- 标尺劫持 `CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext`：V14 TokenRuler 有改动（路径点标签支持中间航点等），需重适配。
-- 若 §3.2 的网格高亮改用 `GridShapeData`，圆形"按 1-2-2-2 覆盖哪些格"可直接复用我们已有的遍历+剪枝算法输出格子集合。
+- `SquareGrid.prototype.measurePath`（[xjzl-system.mjs](../xjzl-system.mjs)）：启用 `customDistanceRule` 且方格场景使用等效对角规则时，将每段 `distance`/`cost` 和总 `distance` 按 1-2-2-2 折算；其他对角规则直接返回核心结果。核心 `cost` 已含每格单位距离，折算后不得重复相乘。总 `cost` 与路径点累计值保留核心结果，因为拖拽会将累计成本回传为后续测量的预定成本。
+- `CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext`：独立标尺会调用 `measurePath`，但标签读取的路径点累计距离未随劫持更新，因此仅在等效对角规则下按家规重算显示值；其他规则沿用核心标签。
+- 圆形光环的 Region grid offsets 由 1-2-2-2 范围算法生成，决定实际覆盖格；实现与回归见 [`V14_AURA_PLAN.md`](V14_AURA_PLAN.md)。
 
 ---
 
@@ -226,7 +226,7 @@ V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层）�
 
 ## 7. 实机验证清单（V14 未标破坏，但我们踩在内部 API 上）
 
-**画布原型劫持**：`SquareGrid.prototype.measurePath`（1-2-2-2 计费）；`rulerClass.prototype._getWaypointLabelContext`（标尺）。回合标记由 V14 `TokenTurnMarker` 负责；系统仅配置 `CONFIG.Combat.fallbackTurnMarker`，标记图和动画可由核心战斗设置及 Token 设置覆盖。
+**画布原型劫持**：回归 `SquareGrid.prototype.measurePath` 的等效对角家规距离、每格非 1 单位距离和非等效规则的核心直通；确认总 `cost` 与路径点累计值未被改写。回归 `CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext` 的多路点标尺标签及非等效规则标签。回合标记由 V14 `TokenTurnMarker` 负责；系统仅配置 `CONFIG.Combat.fallbackTurnMarker`，标记图和动画可由核心战斗设置及 Token 设置覆盖。
 
 **画布 API**：`canvas.interface.createScrollingText`；`CONST.TEXT_ANCHOR_POINTS`；`actor.getActiveTokens`；`canvas.tokens.hover/controlled`。
 

@@ -11,7 +11,6 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         classes: ["xjzl-window", "item", "equipment", "theme-dark"],
         position: { width: 800, height: 650 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
             submitOnChange: true,
             closeOnSubmit: false
