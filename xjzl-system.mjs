@@ -46,6 +46,7 @@ import { XJZLEncounterSheet } from "./module/sheets/encounter-sheet.mjs";
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
 import { TargetManager } from "./module/managers/target-manager.mjs";
+import { CombatReorderManager } from "./module/managers/combat-reorder-manager.mjs";
 import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs";
 import { CombatStatsManager } from "./module/managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./module/managers/encounter-manager.mjs";
@@ -711,6 +712,9 @@ Hooks.once("ready", async function () {
 
   //目标选择管理器，修改为按下ALT后左键点击选择目标
   TargetManager.init();
+
+  //战斗追踪器先攻拖拽重排：GM 拖拽条目直接调整先攻顺序（整数取值，挤开级联）
+  CombatReorderManager.init();
 
   // ready 后 game.user 已就绪，再初始化公开 API 容器。
   // 1. 初始化全局 API 容器

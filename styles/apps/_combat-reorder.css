@@ -1,0 +1,89 @@
+/* ==========================================
+   战斗追踪器先攻拖拽重排
+========================================== */
+/* 仅作用于核心战斗追踪器列表（侧栏 #combat 与弹出窗 #combat-popout）内、
+   带 xjzl-reorder 前缀的类，不触碰框架管理的窗口定位属性。
+   指示线用 ::after 伪元素绘制，不改变行盒尺寸，避免拖拽过程中列表抖动
+   与插入判定的反馈回路；::before 被核心 .combatant.active 用于当前回合
+   描边，本文件所有效果均不得占用它。 */
+
+/* --- 悬停提示：可抓取（draggable 仅对 GM 装配，玩家端不显示） ---
+   用左缘向右衰减的内阴影柔光 + 头像金晕传达"可拿起"，不占用伪元素、
+   不加边框线条，与核心当前回合描边共存 */
+#combat ol.combat-tracker li.combatant[draggable="true"],
+#combat-popout ol.combat-tracker li.combatant[draggable="true"] {
+    cursor: grab;
+    position: relative;
+}
+
+#combat ol.combat-tracker li.combatant[draggable="true"]:hover,
+#combat-popout ol.combat-tracker li.combatant[draggable="true"]:hover {
+    box-shadow: inset 55px 0 45px -42px rgba(203, 160, 82, 0.55);
+}
+
+#combat ol.combat-tracker li.combatant[draggable="true"]:hover img.token-image,
+#combat-popout ol.combat-tracker li.combatant[draggable="true"]:hover img.token-image {
+    filter: brightness(1.12) drop-shadow(0 0 5px rgba(203, 160, 82, 0.85));
+    transition: filter 0.15s ease;
+}
+
+/* --- 拖拽进行中：整列表降调，让落点指示成为唯一视觉焦点 --- */
+#combat ol.combat-tracker.xjzl-reorder-active,
+#combat-popout ol.combat-tracker.xjzl-reorder-active {
+    cursor: grabbing;
+}
+
+#combat ol.combat-tracker.xjzl-reorder-active li.combatant,
+#combat-popout ol.combat-tracker.xjzl-reorder-active li.combatant {
+    opacity: 0.55;
+    transition: opacity 0.12s ease, filter 0.12s ease;
+}
+
+/* 来源条目：深度半透明 + 虚线残影，表达"它已离开原位" */
+#combat ol.combat-tracker.xjzl-reorder-active li.combatant.xjzl-reorder-dragging,
+#combat-popout ol.combat-tracker.xjzl-reorder-active li.combatant.xjzl-reorder-dragging {
+    opacity: 0.3;
+    filter: saturate(0.4);
+    outline: 1px dashed var(--c-highlight, #cba052);
+    outline-offset: -2px;
+}
+
+/* 落点两侧条目恢复全亮，与降调背景拉开对比 */
+#combat ol.combat-tracker.xjzl-reorder-active li.combatant.xjzl-reorder-line-top,
+#combat-popout ol.combat-tracker.xjzl-reorder-active li.combatant.xjzl-reorder-line-top,
+#combat ol.combat-tracker.xjzl-reorder-active li.combatant.xjzl-reorder-line-bottom,
+#combat-popout ol.combat-tracker.xjzl-reorder-active li.combatant.xjzl-reorder-line-bottom {
+    opacity: 1;
+}
+
+/* --- 插入指示线：金色发光插槽，两端圆点端点，形似文本插入光标 --- */
+#combat ol.combat-tracker li.combatant::after,
+#combat-popout ol.combat-tracker li.combatant::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    height: 8px;
+    pointer-events: none;
+    display: none;
+    /* 三层背景：主体横线 + 左右端点圆 */
+    background:
+        radial-gradient(circle, var(--c-highlight, #cba052) 0 2.5px, transparent 3.5px) left center / 8px 8px no-repeat,
+        radial-gradient(circle, var(--c-highlight, #cba052) 0 2.5px, transparent 3.5px) right center / 8px 8px no-repeat,
+        linear-gradient(var(--c-highlight, #cba052), var(--c-highlight, #cba052)) center / calc(100% - 20px) 3px no-repeat;
+    filter: drop-shadow(0 0 3px var(--c-highlight, #cba052)) drop-shadow(0 0 8px rgba(203, 160, 82, 0.6));
+}
+
+/* 插入到该条目上方：指示线贴其顶缘 */
+#combat ol.combat-tracker li.combatant.xjzl-reorder-line-top::after,
+#combat-popout ol.combat-tracker li.combatant.xjzl-reorder-line-top::after {
+    display: block;
+    top: -4px;
+}
+
+/* 插入到该条目下方（列表末尾）：指示线贴其底缘 */
+#combat ol.combat-tracker li.combatant.xjzl-reorder-line-bottom::after,
+#combat-popout ol.combat-tracker li.combatant.xjzl-reorder-line-bottom::after {
+    display: block;
+    bottom: -4px;
+}
