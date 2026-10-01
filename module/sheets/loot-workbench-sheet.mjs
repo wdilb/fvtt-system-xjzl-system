@@ -11,6 +11,7 @@ const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
 const NON_TRANSFERABLE_ITEM_TYPES = new Set(["neigong", "wuxue", "art_book", "background", "personality"]);
 const XP_POOL_KEYS = ["general", "neigong", "wuxue", "arts"];
 const activeNeedPrompts = new Set();
+const activeConcedePrompts = new Set();
 const CONTAINER_DIALOG_CLASSES = Object.freeze(["xjzl-container-dialog"]);
 
 /**
@@ -86,20 +87,46 @@ Hooks.on("xjzl.containerNeedPrompt", payload => {
         .finally(() => activeNeedPrompts.delete(payload.needId));
 });
 
+Hooks.on("xjzl.containerConcedePrompt", payload => {
+    if (!payload?.needId || payload.concedeSeq == null) return;
+    const promptKey = `${payload.needId}:${Number(payload.concedeSeq)}`;
+    // 新轮次广播先于资格判断清理：被淘汰玩家不在 tieUserIds 中，只能在这里收掉旧轮窗口。
+    // keepSeq 保留当前有效轮次，避免重复广播把正开着的窗口关掉。
+    closeStaleConcedeDialogs(String(payload.needId), Number(payload.concedeSeq));
+    if (activeConcedePrompts.has(promptKey)) return;
+    // 广播面向全员，只有并列最高分的当事玩家需要弹窗；错过弹窗时超时默认为坚持，不损失权益。
+    if (game.user.isGM || !payload.tieUserIds?.includes(game.user.id)) return;
+    activeConcedePrompts.add(promptKey);
+    showContainerConcedePrompt(payload)
+        .catch(err => {
+            console.error("XJZL | 打开战利品谦让界面失败:", { needId: payload.needId, err });
+            ui.notifications.error(game.i18n.localize("XJZL.Container.TransactionFailed"));
+        })
+        .finally(() => activeConcedePrompts.delete(promptKey));
+});
+
 Hooks.on("xjzl.containerNeedResult", payload => {
     if (!payload?.needId) return;
+    // 需求已到终态：关闭该需求全部残留的谦让弹窗，无论最终结果是什么。
+    closeStaleConcedeDialogs(String(payload.needId));
     const winner = payload.winnerUserId ? game.users.get(payload.winnerUserId) : null;
     const outcome = payload.outcome || (winner ? "awarded" : "noNeed");
     const messageKey = {
         awarded: "XJZL.Container.NeedResultAwarded",
         noNeed: "XJZL.Container.NeedResultNoNeed",
+        allConceded: "XJZL.Container.NeedResultAllConceded",
+        splitAwarded: "XJZL.Container.NeedResultSplit",
         itemUnavailable: "XJZL.Container.NeedResultUnavailable",
         cancelled: "XJZL.Container.NeedResultCancelled",
         failed: "XJZL.Container.NeedResultFailed"
     }[outcome] || "XJZL.Container.NeedResultFailed";
+    const winners = Array.isArray(payload.winners)
+        ? payload.winners.map(entry => game.users.get(entry.userId)?.name || entry.actorName || "").filter(Boolean).join("、")
+        : "";
     const message = game.i18n.localize(messageKey, {
         item: payload.itemName,
-        winner: winner?.name || ""
+        winner: winner?.name || "",
+        winners
     });
     ui.notifications[outcome === "failed" ? "error" : "info"](message);
     // 从 AppV2 实例注册表刷新本节点已打开的窗口。
@@ -183,6 +210,105 @@ async function showContainerNeedPrompt(payload) {
             needId: payload.needId,
             actorUuid: value.choice === "need" ? value.actorUuid : null,
             choice: value.choice,
+            operationId: foundry.utils.randomID()
+        });
+        if (!result?.ok) {
+            ui.notifications.error(result?.error?.message || game.i18n.localize("XJZL.Container.TransactionFailed"));
+        }
+    } finally {
+        window.clearInterval(countdown);
+    }
+}
+
+/**
+ * 关闭指定需求早前轮次的谦让弹窗：被淘汰玩家、最终结算和新轮次广播都无法
+ * 通过"再弹一轮"触达旧窗口，必须显式收掉，让各窗口的 finally 清理计时器与去重键。
+ * keepSeq 用于保留当前有效轮次（同轮重复广播时不能把正开着的窗口关掉）。
+ */
+function closeStaleConcedeDialogs(needId, keepSeq = null) {
+    const prefix = `${needId}-`;
+    for (const application of foundry.applications.instances.values()) {
+        if (!(application instanceof foundry.applications.api.DialogV2)) continue;
+        const root = application.element?.querySelector(`[data-concede-roll-id^="${prefix}"]`);
+        if (!root) continue;
+        if (keepSeq != null && root.dataset.concedeRollId === `${prefix}${keepSeq}`) continue;
+        application.close().catch(err => {
+            console.error("XJZL | 关闭旧谦让弹窗失败:", { needId, err });
+        });
+    }
+}
+
+/**
+ * 并列最高分的谦让抉择弹窗：谦让者退出本次分配，坚持者进入加骰决胜。
+ * 弹窗结构与需求投掷一致；关闭或超时未答视为坚持，由 GM 端默认处理。
+ */
+async function showContainerConcedePrompt(payload) {
+    if (game.user.isGM) return;
+    const needId = foundry.utils.escapeHTML(String(payload.needId));
+    const concedeSeq = Number(payload.concedeSeq);
+    // DOM 标识携带轮次号：连续并列时新旧弹窗可能短暂并存，倒计时必须各更新各的窗口。
+    const promptDomId = `${needId}-${concedeSeq}`;
+    const itemName = foundry.utils.escapeHTML(String(payload.itemName || game.i18n.localize("XJZL.Container.Loot")));
+    const itemImg = foundry.utils.escapeHTML(String(payload.itemImg || ""));
+    const parsedScore = Number(payload.tieScore);
+    const tieScore = Number.isFinite(parsedScore) ? parsedScore : "";
+    const rivals = (payload.tieUserIds || [])
+        .filter(userId => userId !== game.user.id)
+        .map(userId => game.users.get(userId)?.name)
+        .filter(Boolean)
+        .map(name => foundry.utils.escapeHTML(name))
+        .join("、") || game.i18n.localize("XJZL.Container.ConcedeUnknownRival");
+    const parsedExpiresIn = Number(payload.expiresIn);
+    const expiresIn = Number.isFinite(parsedExpiresIn) ? Math.max(0, parsedExpiresIn) : 30000;
+    const countdownDuration = Math.max(1, expiresIn);
+    const expiresAt = Date.now() + expiresIn;
+    const countdown = window.setInterval(() => {
+        const root = document.querySelector(`[data-concede-roll-id="${promptDomId}"]`);
+        if (!root) return;
+        const remaining = Math.max(0, expiresAt - Date.now());
+        const ratio = Math.max(0, Math.min(1, remaining / countdownDuration));
+        const fill = root.querySelector(".need-roll-timer-fill");
+        const label = root.querySelector(".need-roll-timer-label");
+        const seconds = root.querySelector(".need-roll-timer-seconds");
+        if (fill) fill.style.transform = `scaleX(${ratio})`;
+        if (label) label.textContent = remaining > 0
+            ? game.i18n.localize("XJZL.Container.NeedRollRemaining", { seconds: Math.ceil(remaining / 1000) })
+            : game.i18n.localize("XJZL.Container.NeedRollExpired");
+        if (seconds) seconds.textContent = remaining > 0 ? `${Math.ceil(remaining / 1000)}` : "0";
+        root.classList.toggle("is-urgent", remaining > 0 && remaining <= 10000);
+        root.classList.toggle("is-expired", remaining <= 0);
+    }, 100);
+    try {
+        const value = await promptContainerDialog({
+            title: game.i18n.localize("XJZL.Container.ConcedePromptTitle"),
+            icon: "fas fa-hand-holding-heart",
+            width: 440,
+            extraClasses: ["xjzl-container-need-dialog"],
+            content: `<div class="need-roll-popup" data-concede-roll-id="${promptDomId}">
+                    <div class="need-roll-item" tabindex="0" aria-label="${itemName}">
+                        <div class="need-roll-item-icon">${itemImg ? `<img src="${itemImg}" alt="">` : `<i class="fas fa-gem" aria-hidden="true"></i>`}</div>
+                        <div class="need-roll-item-copy"><span class="need-roll-item-kicker">${game.i18n.localize("XJZL.Container.ConcedeRollKicker")}</span><b>${itemName}</b><small>${game.i18n.localize("XJZL.Container.ConcedeInstruction", { score: tieScore, rivals })}</small></div>
+                    </div>
+                    <div class="need-roll-timer" aria-live="polite"><div class="need-roll-timer-track"><span class="need-roll-timer-fill"></span></div><div class="need-roll-timer-meta"><span class="need-roll-timer-label">${game.i18n.localize("XJZL.Container.NeedRollRemaining", { seconds: Math.ceil(expiresIn / 1000) })}</span><b class="need-roll-timer-seconds">${Math.ceil(expiresIn / 1000)}</b></div></div>
+                    <div class="need-roll-controls is-concede">
+                        <div class="need-roll-choice-group" role="radiogroup" aria-label="${game.i18n.localize("XJZL.Container.ConcedeChoice")}">
+                            <label class="need-roll-choice is-selected"><input type="radio" name="choice" value="contest" checked><span><i class="fas fa-dice-d20" aria-hidden="true"></i>${game.i18n.localize("XJZL.Container.Contest")}</span></label>
+                            <label class="need-roll-choice"><input type="radio" name="choice" value="concede"><span><i class="fas fa-hand-holding-heart" aria-hidden="true"></i>${game.i18n.localize("XJZL.Container.Concede")}</span></label>
+                        </div>
+                    </div>
+                    <p class="need-roll-hint"><i class="fas fa-circle-info" aria-hidden="true"></i>${game.i18n.localize("XJZL.Container.ConcedeHint")}</p>
+                </div>`,
+            label: game.i18n.localize("XJZL.Container.SubmitConcede"),
+            callback: (dialogEvent, button) => button.form.elements.choice.value
+        });
+        if (!value) return;
+        const result = await xjzlSocket.executeAsGM("executeContainerTransaction", {
+            action: "concedeChoice",
+            containerUuid: payload.containerUuid,
+            itemId: payload.itemId,
+            needId: payload.needId,
+            concedeSeq: Number(payload.concedeSeq),
+            choice: value,
             operationId: foundry.utils.randomID()
         });
         if (!result?.ok) {

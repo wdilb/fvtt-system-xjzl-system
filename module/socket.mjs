@@ -33,6 +33,7 @@ export function setupSocket() {
     xjzlSocket.register("useEncounterSupport", _socketUseEncounterSupport);
     xjzlSocket.register("executeContainerTransaction", _socketExecuteContainerTransaction);
     xjzlSocket.register("containerNeedPrompt", _socketContainerNeedPrompt);
+    xjzlSocket.register("containerConcedePrompt", _socketContainerConcedePrompt);
     xjzlSocket.register("containerNeedResult", _socketContainerNeedResult);
 
     Hooks.on("xjzl.containerNeedTimeout", async request => {
@@ -44,7 +45,7 @@ export function setupSocket() {
                 needId: request.needId,
                 operationId: foundry.utils.randomID()
             }, game.user.id);
-            if (result?.action === "needResult") xjzlSocket.executeForEveryone("containerNeedResult", result);
+            broadcastContainerTransactionData(result);
         } catch (err) {
             console.error("XJZL | 战利品需求超时结算失败:", { request, err });
         }
@@ -471,8 +472,26 @@ function _socketContainerNeedPrompt(payload) {
     Hooks.callAll("xjzl.containerNeedPrompt", payload);
 }
 
+function _socketContainerConcedePrompt(payload) {
+    Hooks.callAll("xjzl.containerConcedePrompt", payload);
+}
+
 function _socketContainerNeedResult(payload) {
     Hooks.callAll("xjzl.containerNeedResult", payload);
+}
+
+/**
+ * 将 GM 端事务产出的需求提示/结果按类型广播给全部客户端。
+ * 超时结算与普通事务入口共用，保证超时产生的谦让询问同样能送达玩家。
+ */
+function broadcastContainerTransactionData(data) {
+    if (data?.action === "needStart") {
+        xjzlSocket.executeForEveryone("containerNeedPrompt", data);
+    } else if (data?.action === "concedePrompt") {
+        xjzlSocket.executeForEveryone("containerConcedePrompt", data);
+    } else if (data?.action === "needResult") {
+        xjzlSocket.executeForEveryone("containerNeedResult", data);
+    }
 }
 
 /**
@@ -491,11 +510,7 @@ async function _socketExecuteContainerTransaction(request) {
                 this.socketdata.userId
             )
         };
-        if (response.data?.action === "needStart") {
-            xjzlSocket.executeForEveryone("containerNeedPrompt", response.data);
-        } else if (response.data?.action === "needResult") {
-            xjzlSocket.executeForEveryone("containerNeedResult", response.data);
-        }
+        broadcastContainerTransactionData(response.data);
         return response;
     } catch (err) {
         if (err?.name !== "XJZLContainerTransactionError") {

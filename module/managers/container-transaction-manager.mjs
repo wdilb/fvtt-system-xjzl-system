@@ -8,6 +8,9 @@ const completedOperations = new Map();
 const pendingNeedRolls = new Map();
 const MAX_COMPLETED_OPERATIONS = 256;
 const NEED_ROLL_TIMEOUT = 30_000;
+const CONCEDE_TIMEOUT = 30_000;
+// 并列加骰最多进行这么多个决胜轮；仍并列说明是天定缘分，直接复制发放人人有份。
+const MAX_TIEBREAK_ROUNDS = 5;
 const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
 const NON_TRANSFERABLE_ITEM_TYPES = new Map([
     ["neigong", "内功"],
@@ -98,6 +101,8 @@ export class XJZLContainerTransactionManager {
                     return this.#needStart(lockedNode, normalized);
                 case "needChoice":
                     return this.#needChoice(lockedNode, lockedParticipant, normalized);
+                case "concedeChoice":
+                    return this.#concedeChoice(lockedNode, normalized);
                 case "claimXp": {
                     const result = await this.#claimXp(lockedNode, lockedParticipant, normalized);
                     await this.#updateNodeStatus(lockedNode, "take");
@@ -261,7 +266,7 @@ export class XJZLContainerTransactionManager {
             return;
         }
 
-        if (["needStart", "needChoice"].includes(action)) {
+        if (["needStart", "needChoice", "concedeChoice"].includes(action)) {
             if (node.system.mode !== "loot") {
                 throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以发起需求。");
             }
@@ -668,7 +673,12 @@ export class XJZLContainerTransactionManager {
         const existing = [...pendingNeedRolls.values()].find(roll => (
             roll.containerUuid === node.uuid && roll.itemId === sourceItem.id
         ));
-        if (existing) return this.#needPromptResult(existing, sourceItem);
+        // 进行中的需求按阶段返回对应提示：谦让阶段返回谦让询问，避免玩家拿到过期需求弹窗。
+        if (existing) {
+            return existing.phase === "conceding" && existing.activeGroup?.length
+                ? this.#concedePromptPayload(existing, existing.activeGroup)
+                : this.#needPromptResult(existing, sourceItem);
+        }
 
         const permissionDocument = node.isToken ? node.token?.baseActor || node : node;
         const eligibleUserIds = [...game.users]
@@ -686,7 +696,15 @@ export class XJZLContainerTransactionManager {
             choices: new Map(),
             timer: null,
             expiresAt: Date.now() + NEED_ROLL_TIMEOUT,
-            resolving: false
+            resolving: false,
+            // 需求状态机：choosing（提交需求/放弃）→ conceding（并列谦让）→ 决胜或终态。
+            phase: "choosing",
+            tieRound: 0,
+            rankedCandidates: [],
+            activeGroup: [],
+            concededUserIds: new Set(),
+            concedeChoices: new Map(),
+            concedeTimer: null
         };
         roll.timer = setTimeout(() => Hooks.callAll("xjzl.containerNeedTimeout", {
             needId,
@@ -718,6 +736,9 @@ export class XJZLContainerTransactionManager {
         if (!roll || roll.containerUuid !== node.uuid || roll.itemId !== request.itemId) {
             throw new XJZLContainerTransactionError("NEED_EXPIRED", "这次需求已经结束或不存在。");
         }
+        if (roll.phase !== "choosing") {
+            throw new XJZLContainerTransactionError("NEED_EXPIRED", "这次需求的投骰已经结束。");
+        }
         if (!roll.eligibleUserIds.includes(request.userId)) {
             throw new XJZLContainerTransactionError("NEED_NOT_ELIGIBLE", "你不能参与这次需求。");
         }
@@ -746,13 +767,17 @@ export class XJZLContainerTransactionManager {
 
     static async #needTimeout(node, request) {
         const roll = pendingNeedRolls.get(request.needId);
-        if (!roll || roll.containerUuid !== node.uuid) return null;
-        if (node.system.mode !== "loot" || !node.system.isOpen) {
-            return this.#cancelNeedRoll(roll, "nodeUnavailable");
+        if (!roll || roll.containerUuid !== node.uuid || roll.resolving) return null;
+        if (roll.phase === "conceding") {
+            // 谦让询问超时：未响应者按坚持争夺处理，立即恢复结算。
+            roll.resolving = true;
+            if (roll.concedeTimer) clearTimeout(roll.concedeTimer);
+            return this.#runNeedSettlement(node, roll, () => this.#resumeAfterConcede(node, roll));
         }
         return this.#finishNeedRoll(node, roll);
     }
 
+    /** 主骰结算入口：全员提交或超时后公开掷骰定序，随后交给裁决循环。 */
     static async #finishNeedRoll(node, roll) {
         if (!pendingNeedRolls.has(roll.needId) || roll.resolving) return null;
         if (node.system.mode !== "loot" || !node.system.isOpen) {
@@ -760,10 +785,11 @@ export class XJZLContainerTransactionManager {
         }
         roll.resolving = true;
         if (roll.timer) clearTimeout(roll.timer);
-        try {
+        return this.#runNeedSettlement(node, roll, async () => {
             const candidates = [...roll.choices.values()].filter(choice => choice.choice === "need");
             if (candidates.length === 0) {
                 await this.#postNeedChat(`<p><strong>战利品需求结束</strong>：${foundry.utils.escapeHTML(roll.itemName)} 无人选择需求，物品保留在节点中。</p>`, [], "end");
+                pendingNeedRolls.delete(roll.needId);
                 return this.#makeNeedResult(roll, "noNeed", { candidateCount: 0 });
             }
 
@@ -779,45 +805,19 @@ export class XJZLContainerTransactionManager {
                     participant
                 });
             }
-            const highScore = Math.max(...rolledCandidates.map(candidate => candidate.total));
-            const topCandidates = rolledCandidates.filter(candidate => candidate.total === highScore);
-            const winner = topCandidates[Math.floor(Math.random() * topCandidates.length)];
             await this.#postNeedRollChat(roll.itemName, rolledCandidates);
+            roll.rankedCandidates = rolledCandidates;
+            roll.concededUserIds = new Set();
+            roll.tieRound = 0;
+            roll.activeGroup = this.#topGroup(rolledCandidates);
+            return this.#advanceNeedRoll(node, roll);
+        });
+    }
 
-            let mutation;
-            try {
-                mutation = await this.#lootItem(node, winner.participant, {
-                    userId: winner.userId,
-                    itemId: roll.itemId,
-                    quantity: 1
-                });
-            } catch (err) {
-                if (err?.code !== "ITEM_UNAVAILABLE") throw err;
-                await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`, [], "result");
-                return this.#makeNeedResult(roll, "itemUnavailable", {
-                    candidateCount: candidates.length,
-                    rollResults: rolledCandidates.map(candidate => ({
-                        userId: candidate.userId,
-                        actorUuid: candidate.actorUuid,
-                        actorName: candidate.actorName,
-                        total: candidate.total
-                    }))
-                });
-            }
-
-            await this.#updateNodeStatus(node, "take");
-            await this.#postNeedChat(
-                `<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 由 ${foundry.utils.escapeHTML(winner.actorName)} 获得（${winner.total}）。</p>`,
-                [],
-                "result"
-            );
-            return this.#makeNeedResult(roll, "awarded", {
-                winnerUserId: winner.userId,
-                winnerActorUuid: winner.actorUuid,
-                candidateCount: candidates.length,
-                winnerTotal: winner.total,
-                quantity: mutation.result.quantity
-            });
+    /** 统一兜底需求结算异常：把残留的待结算记录清理成明确的 failed 终态，避免卡死在等待中。 */
+    static async #runNeedSettlement(node, roll, operation) {
+        try {
+            return await operation();
         } catch (err) {
             console.error("XJZL | 战利品需求结算失败:", {
                 needId: roll.needId,
@@ -825,10 +825,298 @@ export class XJZLContainerTransactionManager {
                 err
             });
             await this.#postNeedChat(`<p><strong>需求结算失败</strong>：${foundry.utils.escapeHTML(roll.itemName)} 未发放，请由 GM 检查后重新处理。</p>`, [], "end");
-            return this.#makeNeedResult(roll, "failed");
-        } finally {
             pendingNeedRolls.delete(roll.needId);
+            return this.#makeNeedResult(roll, "failed");
         }
+    }
+
+    /** 取并列最高分组；加骰决胜轮按决胜分比较，顺延按主骰 total 比较保持原始排名。 */
+    static #topGroup(candidates, scoreKey = "total") {
+        const highScore = Math.max(...candidates.map(candidate => candidate[scoreKey]));
+        return candidates.filter(candidate => candidate[scoreKey] === highScore);
+    }
+
+    /**
+     * 需求裁决循环：当前争夺组唯一最高则发奖；并列则发起谦让询问；
+     * 全员谦让清空争夺组时，按主骰点数顺延到下一位有缘人。
+     * 返回 needResult 终态，或 concedePrompt（结算暂停，等待玩家提交谦让选择）。
+     */
+    static async #advanceNeedRoll(node, roll) {
+        if (node.system.mode !== "loot" || !node.system.isOpen) {
+            return this.#cancelResolvingRoll(roll, "nodeUnavailable");
+        }
+        if (!roll.activeGroup || roll.activeGroup.length === 0) {
+            const remaining = roll.rankedCandidates.filter(candidate => !roll.concededUserIds.has(candidate.userId));
+            if (remaining.length === 0) {
+                await this.#postNeedChat(`<p><strong>战利品需求结束</strong>：${foundry.utils.escapeHTML(roll.itemName)} 众人皆行谦让，宝物留于原地，静待有缘人。</p>`, [], "end");
+                pendingNeedRolls.delete(roll.needId);
+                return this.#makeNeedResult(roll, "allConceded", { candidateCount: roll.rankedCandidates.length });
+            }
+            roll.activeGroup = this.#topGroup(remaining);
+        }
+        const group = roll.activeGroup;
+        if (group.length === 1) return this.#awardNeedRoll(node, roll, group[0]);
+        return this.#beginConcedePrompt(node, roll, group);
+    }
+
+    /** 广播谦让询问并暂停结算；未响应者在超时后按坚持争夺处理。 */
+    static async #beginConcedePrompt(node, roll, group) {
+        roll.phase = "conceding";
+        roll.concedeSeq = (roll.concedeSeq || 0) + 1;
+        roll.concedeChoices = new Map();
+        roll.concedeExpiresAt = Date.now() + CONCEDE_TIMEOUT;
+        if (roll.concedeTimer) clearTimeout(roll.concedeTimer);
+        roll.concedeTimer = setTimeout(() => Hooks.callAll("xjzl.containerNeedTimeout", {
+            needId: roll.needId,
+            containerUuid: roll.containerUuid
+        }), CONCEDE_TIMEOUT);
+        const names = group.map(candidate => foundry.utils.escapeHTML(candidate.actorName)).join("、");
+        await this.#postNeedChat(`<p><strong>点数并列</strong>：${names} 均掷出 ${this.#candidateScore(group[0])} 点，棋逢对手！且看是否有人拱手相让。</p>`, [], "event");
+        // 结算在此让路：谦让选择经 concedeChoice 事务恢复，节点锁随当前事务释放，不阻塞玩家操作。
+        roll.resolving = false;
+        return this.#concedePromptPayload(roll, group);
+    }
+
+    /** 生成谦让询问载荷；concedeSeq 标识询问轮次，供客户端去重和服务端校验过期提交。 */
+    static #concedePromptPayload(roll, group) {
+        return {
+            action: "concedePrompt",
+            needId: roll.needId,
+            containerUuid: roll.containerUuid,
+            itemId: roll.itemId,
+            itemName: roll.itemName,
+            itemImg: roll.itemImg,
+            tieUserIds: group.map(candidate => candidate.userId),
+            tieScore: this.#candidateScore(group[0]),
+            tieRound: roll.tieRound,
+            concedeSeq: roll.concedeSeq,
+            // 重开提示（needStart）复用已保存的截止时间，保证倒计时与真实剩余时间一致。
+            expiresIn: Math.max(0, (roll.concedeExpiresAt || Date.now()) - Date.now())
+        };
+    }
+
+    /** 候选的当前有效分：参与过加骰用决胜分，否则用主骰分。 */
+    static #candidateScore(candidate) {
+        return candidate.tieBreakTotal ?? candidate.total;
+    }
+
+    /** 记录并列玩家的谦让/坚持选择；全员表态后立刻恢复结算。 */
+    static async #concedeChoice(node, request) {
+        const roll = pendingNeedRolls.get(request.needId);
+        if (!roll || roll.containerUuid !== node.uuid || roll.itemId !== request.itemId) {
+            throw new XJZLContainerTransactionError("NEED_EXPIRED", "这次需求已经结束或不存在。");
+        }
+        if (roll.phase !== "conceding") {
+            throw new XJZLContainerTransactionError("NEED_EXPIRED", "现在不是谦让抉择阶段。");
+        }
+        // 过期弹窗（旧一轮询问）的提交直接拒绝，避免旧选择污染当前轮次。
+        if (request.concedeSeq == null || Number(request.concedeSeq) !== Number(roll.concedeSeq)) {
+            throw new XJZLContainerTransactionError("NEED_EXPIRED", "这一轮谦让抉择已经结束。");
+        }
+        const group = roll.activeGroup || [];
+        if (!group.some(candidate => candidate.userId === request.userId)) {
+            throw new XJZLContainerTransactionError("NEED_NOT_ELIGIBLE", "你没有参与这一轮谦让抉择。");
+        }
+        if (roll.concedeChoices.has(request.userId)) {
+            throw new XJZLContainerTransactionError("NEED_ALREADY_CHOSEN", "你已经提交过谦让选择了。");
+        }
+        if (!["concede", "contest"].includes(request.choice)) {
+            throw new XJZLContainerTransactionError("INVALID_NEED_CHOICE", "谦让选择无效。");
+        }
+        roll.concedeChoices.set(request.userId, request.choice);
+        if (!group.every(candidate => roll.concedeChoices.has(candidate.userId))) {
+            return { action: "concedeChoice", needId: roll.needId, containerUuid: node.uuid, accepted: true };
+        }
+        if (roll.resolving) {
+            throw new XJZLContainerTransactionError("NEED_EXPIRED", "谦让结果正在结算中。");
+        }
+        roll.resolving = true;
+        if (roll.concedeTimer) clearTimeout(roll.concedeTimer);
+        return this.#runNeedSettlement(node, roll, () => this.#resumeAfterConcede(node, roll));
+    }
+
+    /** 恢复谦让结算：谦让者出局，剩余者直接加骰；全员谦让则顺延次高分竞争者。 */
+    static async #resumeAfterConcede(node, roll) {
+        if (node.system.mode !== "loot" || !node.system.isOpen) {
+            return this.#cancelResolvingRoll(roll, "nodeUnavailable");
+        }
+        const group = roll.activeGroup || [];
+        const choices = roll.concedeChoices;
+        const conceders = group.filter(candidate => choices.get(candidate.userId) === "concede");
+        const remainers = group.filter(candidate => choices.get(candidate.userId) !== "concede");
+        if (conceders.length === group.length) {
+            const names = group.map(candidate => foundry.utils.escapeHTML(candidate.actorName)).join("、");
+            await this.#postNeedChat(`<p><strong>君子相让</strong>：${names} 竟相互谦让，谁也不肯先收下这份宝物。</p>`, [], "event");
+            // 决胜组全员谦让视为历轮决赛全部作废：清除所有候选的决胜分（含早先落败者），
+            // 顺延回归主骰原始排名与分数，避免最后一轮参与者的清分遗漏早先轮次。
+            for (const candidate of roll.rankedCandidates) delete candidate.tieBreakTotal;
+            for (const candidate of conceders) roll.concededUserIds.add(candidate.userId);
+            roll.activeGroup = [];
+            return this.#advanceNeedRoll(node, roll);
+        }
+        if (conceders.length > 0) {
+            const concederNames = conceders.map(candidate => foundry.utils.escapeHTML(candidate.actorName)).join("、");
+            const remainerNames = remainers.map(candidate => foundry.utils.escapeHTML(candidate.actorName)).join("、");
+            await this.#postNeedChat(`<p><strong>谦谦君子</strong>：${concederNames} 拱手相让，退出争夺。宝物将在 ${remainerNames} 之间决出！</p>`, [], "event");
+            for (const candidate of conceders) roll.concededUserIds.add(candidate.userId);
+            roll.activeGroup = remainers;
+            if (remainers.length === 1) return this.#awardNeedRoll(node, roll, remainers[0]);
+            return this.#rollTieBreak(node, roll, remainers);
+        }
+        const names = group.map(candidate => foundry.utils.escapeHTML(candidate.actorName)).join("、");
+        await this.#postNeedChat(`<p><strong>互不相让</strong>：${names} 皆不肯退——既如此，手底下见真章！</p>`, [], "event");
+        return this.#rollTieBreak(node, roll, group);
+    }
+
+    /** 加骰决胜一轮：并列者重新掷骰，唯一最高者得宝；五轮后仍并列则触发宝物复制。 */
+    static async #rollTieBreak(node, roll, group) {
+        roll.tieRound += 1;
+        const rolled = [];
+        for (const candidate of group) {
+            const participant = await this.#loadActor(candidate.actorUuid);
+            const candidateRoll = await new Roll("1d100").evaluate();
+            candidate.participant = participant;
+            candidate.actorName = participant.name;
+            // 决胜分独立记录，主骰 total 保持不变；谦让出局后的顺延仍按主骰原始排名进行。
+            candidate.tieBreakTotal = Number(candidateRoll.total) || 0;
+            candidate.roll = candidateRoll;
+            rolled.push(candidate);
+        }
+        await this.#postNeedRollChat(roll.itemName, rolled, `加骰决胜 · 第 ${roll.tieRound} 轮`);
+        const top = this.#topGroup(rolled, "tieBreakTotal");
+        roll.activeGroup = top;
+        if (top.length === 1) return this.#awardNeedRoll(node, roll, top[0]);
+        if (roll.tieRound >= MAX_TIEBREAK_ROUNDS) return this.#splitAwardNeedRoll(node, roll, top);
+        return this.#advanceNeedRoll(node, roll);
+    }
+
+    /** 发放物品给胜者；物品被并发取走时以 itemUnavailable 终态收场。 */
+    static async #awardNeedRoll(node, roll, winner) {
+        const participant = await this.#loadActor(winner.actorUuid);
+        winner.participant = participant;
+        winner.actorName = participant.name;
+        let mutation;
+        try {
+            mutation = await this.#lootItem(node, winner.participant, {
+                userId: winner.userId,
+                itemId: roll.itemId,
+                quantity: 1
+            });
+        } catch (err) {
+            if (err?.code !== "ITEM_UNAVAILABLE") throw err;
+            await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`, [], "result");
+            pendingNeedRolls.delete(roll.needId);
+            return this.#makeNeedResult(roll, "itemUnavailable", {
+                candidateCount: roll.rankedCandidates.length,
+                rollResults: this.#needRollResults(roll)
+            });
+        }
+        await this.#updateNodeStatus(node, "take");
+        await this.#postNeedChat(
+            `<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 由 ${foundry.utils.escapeHTML(winner.actorName)} 获得（${this.#candidateScore(winner)}）。</p>`,
+            [],
+            "result"
+        );
+        pendingNeedRolls.delete(roll.needId);
+        return this.#makeNeedResult(roll, "awarded", {
+            winnerUserId: winner.userId,
+            winnerActorUuid: winner.actorUuid,
+            candidateCount: roll.rankedCandidates.length,
+            winnerTotal: this.#candidateScore(winner),
+            quantity: mutation.result.quantity
+        });
+    }
+
+    /**
+     * 五轮决胜仍并列的天选终局：宝物复制发放，并列者人手一份。
+     * 复制终局只消耗一份库存：首位赢家正常领取，其余赢家领取天道复制出的副本。
+     */
+    static async #splitAwardNeedRoll(node, roll, group) {
+        const sourceItem = node.items.get(roll.itemId);
+        if (!sourceItem) {
+            await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`, [], "result");
+            pendingNeedRolls.delete(roll.needId);
+            return this.#makeNeedResult(roll, "itemUnavailable", {
+                candidateCount: roll.rankedCandidates.length,
+                rollResults: this.#needRollResults(roll)
+            });
+        }
+        // 副本数据取自领取前的节点物品快照；后续并列者直接用快照发放，不依赖节点库存。
+        const itemData = foundry.utils.deepClone(sourceItem.toObject());
+        const winners = [];
+        const undos = [];
+        try {
+            for (const [index, candidate] of group.entries()) {
+                const participant = await this.#loadActor(candidate.actorUuid);
+                candidate.participant = participant;
+                candidate.actorName = participant.name;
+                let mutation;
+                if (index === 0) {
+                    try {
+                        mutation = await this.#lootItem(node, participant, {
+                            userId: candidate.userId,
+                            itemId: roll.itemId,
+                            quantity: 1
+                        });
+                    } catch (err) {
+                        if (err?.code !== "ITEM_UNAVAILABLE") throw err;
+                        await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`, [], "result");
+                        pendingNeedRolls.delete(roll.needId);
+                        return this.#makeNeedResult(roll, "itemUnavailable", {
+                            candidateCount: roll.rankedCandidates.length,
+                            rollResults: this.#needRollResults(roll)
+                        });
+                    }
+                } else {
+                    mutation = await this.#addItemDataToActor(participant, itemData, 1);
+                }
+                undos.push(mutation.undo);
+                winners.push({
+                    userId: candidate.userId,
+                    actorUuid: candidate.actorUuid,
+                    actorName: candidate.actorName
+                });
+            }
+        } catch (err) {
+            for (const undo of undos.reverse()) {
+                try {
+                    await undo();
+                } catch (rollbackError) {
+                    console.error("XJZL | 宝物复制发放回滚失败:", { needId: roll.needId, rollbackError });
+                }
+            }
+            throw err;
+        }
+        await this.#updateNodeStatus(node, "take");
+        const names = group.map(candidate => foundry.utils.escapeHTML(candidate.actorName)).join("、");
+        await this.#postNeedChat(
+            `<p><strong>棋逢对手，将遇良才！</strong></p>`
+            + `<p>${names} 连赌五轮，点数竟分毫不差——这已不是运气，而是天定的缘分！天道也不忍再见相争，袖袍一挥："既然有缘，何必伤了和气！"但闻铮然清鸣，宝物金光乍现，竟一分为${group.length}——${names} 各得其一，皆大欢喜，江湖从此又多一段佳话。</p>`,
+            [],
+            "result"
+        );
+        pendingNeedRolls.delete(roll.needId);
+        return this.#makeNeedResult(roll, "splitAwarded", {
+            winners,
+            candidateCount: roll.rankedCandidates.length
+        });
+    }
+
+    /** 汇总各需求者的投骰结果，供 itemUnavailable 终态向客户端说明局面。 */
+    static #needRollResults(roll) {
+        return roll.rankedCandidates.map(candidate => ({
+            userId: candidate.userId,
+            actorUuid: candidate.actorUuid,
+            actorName: candidate.actorName,
+            total: candidate.total
+        }));
+    }
+
+    /** 结算流程内的取消终态：节点在谦让或决胜中途失效。 */
+    static async #cancelResolvingRoll(roll, reason) {
+        await this.#postNeedChat(`<p><strong>战利品需求已取消</strong>：${foundry.utils.escapeHTML(roll.itemName)} 所在节点已关闭、切换模式或被删除。</p>`, [], "end");
+        pendingNeedRolls.delete(roll.needId);
+        return this.#makeNeedResult(roll, "cancelled", { reason });
     }
 
     /** 取消已失去有效节点上下文的需求，并返回可广播的明确终态。 */
@@ -836,12 +1124,8 @@ export class XJZLContainerTransactionManager {
         if (!pendingNeedRolls.has(roll.needId) || roll.resolving) return null;
         roll.resolving = true;
         if (roll.timer) clearTimeout(roll.timer);
-        try {
-            await this.#postNeedChat(`<p><strong>战利品需求已取消</strong>：${foundry.utils.escapeHTML(roll.itemName)} 所在节点已关闭、切换模式或被删除。</p>`, [], "end");
-            return this.#makeNeedResult(roll, "cancelled", { reason });
-        } finally {
-            pendingNeedRolls.delete(roll.needId);
-        }
+        if (roll.concedeTimer) clearTimeout(roll.concedeTimer);
+        return this.#cancelResolvingRoll(roll, reason);
     }
 
     /** 构造需求公共终态，避免不同失败分支让客户端误判为“无人需求”。 */
@@ -856,6 +1140,7 @@ export class XJZLContainerTransactionManager {
             winnerUserId: null,
             winnerActorUuid: null,
             candidateCount: 0,
+            winners: [],
             ...details
         };
     }
@@ -877,12 +1162,13 @@ export class XJZLContainerTransactionManager {
         }
     }
 
-    static async #postNeedRollChat(itemName, candidates) {
+    static async #postNeedRollChat(itemName, candidates, title = "需求投骰") {
+        // 参与过加骰的候选展示最新决胜分，主骰候选展示原始分。
         const rollSummary = candidates
-            .map(candidate => `${foundry.utils.escapeHTML(candidate.actorName)}：${candidate.total}`)
+            .map(candidate => `${foundry.utils.escapeHTML(candidate.actorName)}：${candidate.tieBreakTotal ?? candidate.total}`)
             .join("、");
         await this.#postNeedChat(
-            `<p><strong>需求投骰</strong>：${foundry.utils.escapeHTML(itemName)}</p><p>${rollSummary}</p>`,
+            `<p><strong>${foundry.utils.escapeHTML(title)}</strong>：${foundry.utils.escapeHTML(itemName)}</p><p>${rollSummary}</p>`,
             candidates.map(candidate => candidate.roll),
             "roll"
         );
@@ -897,9 +1183,15 @@ export class XJZLContainerTransactionManager {
         return Math.floor(Math.max(0, Number(item.system.price) || 0) * discount);
     }
 
+    /** 商铺购买等场景的物品发放入口；复制发放等数据源场景直接用 #addItemDataToActor。 */
     static async #addItemToActor(actor, sourceItem, quantity) {
-        const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
-        const stackKey = stackable ? this.#getStackKey(sourceItem) : null;
+        return this.#addItemDataToActor(actor, sourceItem.toObject(), quantity);
+    }
+
+    /** 向角色添加一份物品数据（可堆叠时并入同栈），返回可撤销的变更记录。 */
+    static async #addItemDataToActor(actor, itemData, quantity) {
+        const stackable = STACKABLE_ITEM_TYPES.has(itemData.type);
+        const stackKey = stackable ? this.#getStackKey(itemData) : null;
         const destinationItem = stackKey
             ? Array.from(actor.items).find(item => this.#getStackKey(item) === stackKey)
             : null;
@@ -909,12 +1201,12 @@ export class XJZLContainerTransactionManager {
         let createdItem = null;
         if (destinationItem) await destinationItem.update({ "system.quantity": destinationQuantity + quantity });
         else {
-            const itemData = foundry.utils.deepClone(sourceItem.toObject());
-            itemData.flags?.["xjzl-system"] && delete itemData.flags["xjzl-system"].containerHidden;
-            itemData.flags?.["xjzl-system"] && delete itemData.flags["xjzl-system"].shop;
-            if (stackable) itemData.system.quantity = quantity;
-            createdItem = (await actor.createEmbeddedDocuments("Item", [itemData]))?.[0] || null;
-            if (!createdItem) throw new Error("未能创建购买物品。");
+            const copy = foundry.utils.deepClone(itemData);
+            copy.flags?.["xjzl-system"] && delete copy.flags["xjzl-system"].containerHidden;
+            copy.flags?.["xjzl-system"] && delete copy.flags["xjzl-system"].shop;
+            if (stackable) copy.system.quantity = quantity;
+            createdItem = (await actor.createEmbeddedDocuments("Item", [copy]))?.[0] || null;
+            if (!createdItem) throw new Error("未能创建物品副本。");
         }
         return {
             undo: async () => {
