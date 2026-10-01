@@ -1209,7 +1209,8 @@ export class XJZLItem extends Item {
     }
 
     // =====================================================
-    // 提前武器匹配判定 (虚招计算和后续伤害计算都需要)
+    // 提前武器匹配判定 (仅用于伤害计算：武器基础伤害与武器等级增伤；
+    // 虚招值已改为直接读取武器等级，不再要求装备匹配武器)
     // =====================================================
     let isWeaponMatch = false; // 标记：是否满足武器条件
     if (actor.itemTypes.weapon && move.weaponType && move.weaponType !== 'none') {
@@ -1240,9 +1241,9 @@ export class XJZLItem extends Item {
         base = lvlFeint * feintCoef;
       }
 
-      // 武器等级加成 (虚招吃武器等级加成)
+      // 武器等级加成 (虚招吃武器等级加成；不要求装备匹配武器，直接读取该招式武器类型的等级)
       let wRankVal = 0;
-      if (isWeaponMatch && move.weaponType && actor.system.combat?.weaponRanks) {
+      if (move.weaponType && actor.system.combat?.weaponRanks) {
         wRankVal = actor.system.combat.weaponRanks[move.weaponType]?.total || 0;
       }
 
@@ -1544,9 +1545,9 @@ export class XJZLItem extends Item {
       }
     }
 
+    // 未匹配武器只影响伤害(武器基础伤害与等级增伤)；虚招值已直接读取武器等级，不再追加该提示
     if (!isWeaponMatch && move.weaponType && move.weaponType !== 'none') {
       breakdownText += `\n(⚠️ 未装备匹配武器)`;
-      feintBreakdown += `\n(⚠️ 未装备匹配武器)`;
     }
 
     // 返回结果包
