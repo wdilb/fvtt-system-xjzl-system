@@ -640,7 +640,50 @@ await game.xjzl.api.effects.removeEffect(args.target, "prone", 1);
 
 `addEffect(actor, effectDataOrId, count = 1)` 接受系统状态 ID 或 AE 数据，负责权限委托、本地化、slug 匹配、叠层和刷新，返回 `Promise<ActiveEffect|undefined>`。`removeEffect(actor, effectIdOrSlug, amount = 1)` 按文档 ID 或 slug 移除/减层；成功删除时返回删除结果，减层时通常返回 `undefined`。对可叠层效果，`removeEffect` 的 `amount` 默认只减一层；需要整体移除时传入不小于当前层数的数值。
 
+`addEffect` 返回 `undefined` 不等同于免疫：忍耐完全豁免剧痛、颤手转缴械、心火转走火入魔以及未创建成功也会走此返回路径。汇总结果只能表述为“未直接施加”；具体原因由结算提示说明，特殊转化可能已施加替代状态。
+
+消耗品的 `autoReplace` 按整份同类药效互斥：新 AE 全部被免疫时保留旧药效；只有部分被免疫时仍替换旧药效并施加允许的新效果，避免同时保留两份互斥药效。恢复资源、使用脚本和物品数量扣减仍按使用流程执行。
+
+### 系统状态免疫
+
+免疫以 `CONFIG.statusEffects` 中的状态 slug 为准，不匹配显示名称。固定免疫写在来源 AE 的顶层 flags：
+
+```json
+{
+  "flags": {
+    "xjzl-system": {
+      "slug": "wuxue_example_immunity",
+      "immunities": ["blind", "prone"]
+    }
+  }
+}
+```
+
+Actor 每次派生数据时从已应用 AE 重建内存中的免疫缓存，再执行 `passive` 脚本。来源被禁用、抑制、移除或到期后，其免疫随下一次派生计算失效；多份来源声明同一免疫时保留全部来源。免疫结果不写入 Actor 持久 flags。
+
+依赖当前运功内功、阶段或其他来源条件时，在已有门控的 `passive` 脚本中调用同步方法；不要给提示标记叠加无条件免疫：
+
+```javascript
+actor.registerEffectImmunities(["blind", "prone"]);
+```
+
+`registerEffectImmunities(slugs, source = null)` 接受单个 slug 或 slug 数组，只注册当前派生周期的免疫。省略 `source` 时从当前脚本上下文取得来源，显式传入时使用来源文档名称；未知 slug 会忽略，同一 Actor 实例对同一未知值只告警一次。不要在 `attack` 等异步脚本中用它创建持续免疫，应施加带 `immunities` 的来源 AE。
+
+| 查询 | 返回值 |
+|---|---|
+| `actor.hasEffectImmunity(slug)` | 是否免疫该系统状态，`boolean` |
+| `actor.getEffectImmunitySources(slug)` | 来源名称数组副本，未声明时为 `[]` |
+| `actor.effectImmunities` | 面板摘要数组，元素为 `{ slug, name, sources }`；`name` 为本地化状态名，`sources` 为名称数组副本 |
+
+`addEffect` 在叠层、刷新、忍耐豁免和特殊转化前拦截被免疫的系统状态，返回 `undefined`。直接由 Foundry 创建 Actor AE 时也有兜底检查，Item 内的 AE 模板不受拦截。免疫仅阻止后续施加，不移除或抑制角色已有状态；规则要求清除已有状态时仍需调用 `removeEffect`。
+
+免疫仅覆盖完整的系统状态 AE。伤害、击退、击飞、毒药类别、敌我来源、状态品阶或被施加状态的时长限制需要各自的结算逻辑，不能由此字段表达。“不受醉倒的负面影响”也不能录成 `immunities: ["zuidao"]`，因为状态本身仍须施加；这类局部影响按既有变更或手动规则处理。
+
+### 时长与 AE 数据
+
 限时效果的源数据使用 `duration: { value, units, expiry }`，例如持续 3 回合、在 `turnStart` 事件到期时设为 `{ value: 3, units: "rounds", expiry: "turnStart" }`。不限时设为 `{ value: null, expiry: null }`；新建效果不需要填写 `start`，由系统在施加时初始化。
+
+一时辰等长时效果及“持续到战斗脱离”的效果不设置自动过期的 `duration`，由玩家按规则清理，不用 99 回合等大数模拟。规则原文保留持续时间，`automationNote` 无需重复常规清理提示。需要随架招解除的来源 AE 使用下文的 `tiedToStance`，无需额外编写清理脚本。
 
 AE 数据使用 `img`、`system.changes` 和字符串变更类型 `type`（如 `"add"`、`"override"`）。自行构造非被动的施加型效果时，显式设置 `transfer: false` 和 `showIcon: 2`，使无时长效果的图标也能常显：
 

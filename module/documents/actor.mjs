@@ -879,6 +879,14 @@ export class XJZLActor extends Actor {
     // - 内功的固定属性加成已生效
     super.prepareDerivedData();
 
+    // 免疫只保存在本次派生计算的内存缓存中，避免把由装备/内功产生的结果写回 Actor 数据。
+    // 先扫描已应用的 AE，再执行 passive 脚本，保证两种声明方式都能在本轮生效。
+    this._effectImmunities = new Map();
+    for (const effect of this.appliedEffects ?? []) {
+      const immunities = effect.getFlag?.("xjzl-system", "immunities");
+      if (immunities) this.registerEffectImmunities(immunities, effect);
+    }
+
     // 初始化状态字典
     // 现在可以在其他地方直接写 if (this.xjzlStatuses.exposed) { ... } 
     // 而不需要写难看的 if (this.getFlag("xjzl-system", "exposed")) { ... }
@@ -926,6 +934,80 @@ export class XJZLActor extends Actor {
     // 因为脚本可能修改了 stats.mod，我们需要重新跑一遍公式。
     // 调用我们在 DataModel 里新写的 recalculate()。
     this.system.recalculate();
+  }
+
+  /**
+   * 注册当前派生周期内的系统状态免疫；仅接受 CONFIG.statusEffects 中存在的 slug。
+   * @param {string|string[]} slugs - 系统状态 slug 或 slug 数组
+   * @param {object|null} [source=null] - 免疫来源文档，用于 UI 说明
+   * @returns {void}
+   */
+  registerEffectImmunities(slugs, source = null) {
+    const values = Array.isArray(slugs)
+      ? slugs
+      : slugs instanceof Set
+        ? [...slugs]
+        : slugs && typeof slugs === "object"
+          ? Object.values(slugs)
+          : [slugs];
+    if (!this._effectImmunities) this._effectImmunities = new Map();
+
+    const stack = this._scriptContextStack;
+    const context = source ?? stack?.[stack.length - 1]?.item ?? stack?.[stack.length - 1]?.effect;
+    const sourceDocument = context?.documentName === "ActiveEffect"
+      && context.parent?.documentName === "Item"
+      ? context.parent
+      : context;
+    const sourceLabel = sourceDocument?.name || "未知来源";
+
+    for (const rawSlug of values) {
+      const slug = typeof rawSlug === "string" ? rawSlug : String(rawSlug ?? "");
+      if (!slug) continue;
+      if (!CONFIG.statusEffects?.[slug]) {
+        // 同一 Actor 实例只警告同一错误一次，避免每次派生计算反复刷屏。
+        this._warnedUnknownImmunitySlugs ??= new Set();
+        if (!this._warnedUnknownImmunitySlugs.has(slug)) {
+          this._warnedUnknownImmunitySlugs.add(slug);
+          console.warn(`XJZL | 忽略未知系统状态免疫 slug: ${slug}`, {
+            actor: this.name,
+            source: sourceLabel
+          });
+        }
+        continue;
+      }
+      if (!this._effectImmunities.has(slug)) this._effectImmunities.set(slug, new Set());
+      this._effectImmunities.get(slug).add(sourceLabel);
+    }
+  }
+
+  /**
+   * 判断 Actor 是否免疫指定系统状态。
+   * @param {string} slug - CONFIG.statusEffects 中的系统状态 slug
+   * @returns {boolean}
+   */
+  hasEffectImmunity(slug) {
+    return Boolean(slug && this._effectImmunities?.has(slug));
+  }
+
+  /**
+   * 获取指定免疫的来源名称，返回副本以防止外部修改缓存。
+   * @param {string} slug - 系统状态 slug
+   * @returns {string[]}
+   */
+  getEffectImmunitySources(slug) {
+    return [...(this._effectImmunities?.get(slug) ?? [])];
+  }
+
+  /**
+   * 提供给角色面板的只读免疫摘要。
+   * @returns {{slug: string, name: string, sources: string[]}[]}
+   */
+  get effectImmunities() {
+    return [...(this._effectImmunities ?? [])].map(([slug, sources]) => ({
+      slug,
+      name: game.i18n.localize(CONFIG.statusEffects?.[slug]?.name ?? slug),
+      sources: [...sources]
+    }));
   }
 
   /**

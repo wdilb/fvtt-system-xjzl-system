@@ -522,7 +522,10 @@ export class AuraLedger {
     // update 不换文档 id，若保留对象惰性读数，before 会读到施加后的层数。
     const before = findEffectBySlug(actor, effect.slug);
     const beforeStacks = before ? stackCount(before) : 0;
-    await game.xjzl.api.effects.addEffect(actor, effect.data, 1);
+    const applied = await game.xjzl.api.effects.addEffect(actor, effect.data, 1);
+    // 免疫或其他创建失败不会产生本次 owner 的贡献；已有账目继续保留，
+    // 防止把未实际施加的效果写入清理账本。
+    if (!applied) return existing ?? null;
     // 施加后重查实际 AE：免疫/转化/失败时不建虚假 owner 或虚假贡献。
     const after = findEffectBySlug(actor, effect.slug);
     if (!after) return null;

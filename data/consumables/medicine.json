@@ -10,16 +10,17 @@
             "type": "medicine",
             "description": "<p>以丹参为主材，加入三七、赤芍等药材增加疗效，可调节心脉气血，减缓内脏剧痛。</p><hr><p><strong>效果：</strong>你免疫“剧痛”效果的影响，持续一个时辰。</p>",
             "usageScript": "await game.xjzl.api.effects.removeEffect(actor, 'pain');",
-            "automationNote": "部分自动化：免疫效果为文本提示，需手动处理。"
+            "automationNote": "完全自动化：剧痛状态免疫随药剂效果生效。"
         },
         "effects": [
             {
                 "name": "复方丹参药剂",
                 "transfer": false,
-                "description": "免疫“剧痛”（仅提示）",
+                "description": "自动免疫剧痛。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-danshen",
+                        "immunities": ["pain"],
                         "stackable": false
                     }
                 },
@@ -981,16 +982,17 @@
             "quality": 2,
             "type": "medicine",
             "description": "<p>由熊胆、泽泻、地黄、黄芩、栀子等药所制，散风止痛，用于阵痛、风热或肝经引起的眼疾等病症。</p><hr><p><strong>效果：</strong>你免疫“目盲”、“剧痛”，且暴击骰-3，持续一个时辰。</p>",
-            "automationNote": "完全自动化 (免疫为文本提示)"
+            "automationNote": "完全自动化：目盲和剧痛状态免疫随药剂效果生效。"
         },
         "effects": [
             {
                 "name": "熊胆片",
                 "transfer": false,
-                "description": "全暴击骰-3,免疫目盲/剧痛（仅提示）",
+                "description": "全暴击骰-3，自动免疫目盲、剧痛。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-xiongdan",
+                        "immunities": ["blind", "pain"],
                         "stackable": false
                     }
                 },
@@ -1317,7 +1319,7 @@
             "type": "medicine",
             "description": "<p>神风帮秘药，以乳香、没药行气化瘀，配伍朱砂、蜈蚣、全蝎镇惊息风。</p><hr><p><strong>效果：</strong>你免疫拉扯、击退、击飞、倒地，持续十回合。<br>副作用：你陷入“倒地”、“禁足”一回合。</p>",
             "usageScript": "const _stProne = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('prone'));\n_stProne.statuses = [\"prone\"]; // 保证 actor.statuses 能检测到该状态\nfoundry.utils.setProperty(_stProne, \"flags.core.overlay\", true);\nawait game.xjzl.api.effects.addEffect(actor, _stProne);\nconst _stRoot = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n_stRoot.statuses = [\"root\"]; // 保证 actor.statuses 能检测到该状态\nawait game.xjzl.api.effects.addEffect(actor, _stRoot);",
-            "automationNote": "部分自动化：免疫位移需手动判定。副作用自动施加。"
+            "automationNote": "部分自动化：副作用自动施加，拉扯、击退、击飞和倒地免疫需手动。"
         },
         "effects": [
             {
@@ -2036,7 +2038,7 @@
             "type": "medicine",
             "description": "<p>百草古方，此方能散寒积，食积，气积，血积，痰积，故名五积，应用极广。</p><hr><p><strong>效果：</strong>醉意-30，饱食度-30，杀戮值-30；<br>·免疫“流血”“气虚”状态，持续十回合。</p>",
             "usageScript": "const res = actor.system.resources;\nconst updates = {};\nif (res.alcohol) updates['system.resources.alcohol.value'] = Math.max(0, res.alcohol.value - 30);\nif (res.satiety) updates['system.resources.satiety.value'] = Math.max(0, res.satiety.value - 30);\nif (res.shalu) updates['system.resources.shalu.value'] = Math.max(0, res.shalu.value - 30);\nif (!foundry.utils.isEmpty(updates)) await actor.update(updates);",
-            "automationNote": "完全自动化 (免疫为文本提示)"
+            "automationNote": "完全自动化：流血和气虚状态免疫随药效生效。"
         },
         "effects": [
             {
@@ -2047,10 +2049,11 @@
                     "units": "rounds",
                     "expiry": "turnStart"
                 },
-                "description": "免疫流血/气虚 (请DM手动裁定)",
+                "description": "自动免疫流血、气虚。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-wuji",
+                        "immunities": ["bleed_stack", "qixu"],
                         "stackable": false
                     }
                 },
@@ -2214,7 +2217,7 @@
                 "hp": 150
             },
             "usageScript": "await game.xjzl.api.effects.removeEffect(actor, 'bleed_stack', 99);",
-            "automationNote": "部分自动化：清除流血自动。后续免疫为文本提示。"
+            "automationNote": "完全自动化：流血状态免疫随药效生效。"
         },
         "effects": [
             {
@@ -2225,10 +2228,11 @@
                     "units": "rounds",
                     "expiry": "turnStart"
                 },
-                "description": "免疫流血 (仅提示)",
+                "description": "自动免疫流血。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-jinchuang",
+                        "immunities": ["bleed_stack"],
                         "stackable": false
                     }
                 },
@@ -2508,7 +2512,7 @@
                 "hp": 50
             },
             "usageScript": "const slugs = ['pain', 'bleed_stack', 'sielie', 'bloodloss'];\nfor (const s of slugs) await game.xjzl.api.effects.removeEffect(actor, s, 99);",
-            "automationNote": "部分自动化：清除状态自动。后续免疫为文本提示。"
+            "automationNote": "完全自动化：剧痛、流血、血流不止和失血状态免疫随药效生效。"
         },
         "effects": [
             {
@@ -2519,10 +2523,11 @@
                     "units": "rounds",
                     "expiry": "turnStart"
                 },
-                "description": "免疫剧痛/流血等 (仅提示)",
+                "description": "自动免疫剧痛、流血、血流不止、失血。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-shujin",
+                        "immunities": ["pain", "bleed_stack", "endless_bleed", "bloodloss"],
                         "stackable": false
                     }
                 },
@@ -2925,7 +2930,7 @@
             "recovery": {
                 "hp": 300
             },
-            "automationNote": "部分自动化：免疫为文本提示。"
+            "automationNote": "完全自动化：流血状态免疫随药效生效。"
         },
         "effects": [
             {
@@ -2936,10 +2941,11 @@
                     "units": "rounds",
                     "expiry": "turnStart"
                 },
-                "description": "免疫流血 (仅提示)",
+                "description": "自动免疫流血。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-jiuzhuan",
+                        "immunities": ["bleed_stack"],
                         "stackable": false
                     }
                 },
@@ -3850,16 +3856,17 @@
             "type": "medicine",
             "description": "<p>以决明子、苍术等药制作，有增强五感之效果。</p><hr><p><strong>效果：</strong>你免疫“目盲”，[探查]、[洞察]等级+10，持续一个时辰。</p>",
             "usageScript": "await game.xjzl.api.effects.removeEffect(actor, 'blind');",
-            "automationNote": "完全自动化 (免疫为文本提示)"
+            "automationNote": "完全自动化：目盲免疫随药效生效。"
         },
         "effects": [
             {
                 "name": "相柳振听",
                 "transfer": false,
-                "description": "探查/洞察+10，免疫目盲(手动)",
+                "description": "探查/洞察+10，自动免疫目盲。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-xiangliu",
+                        "immunities": ["blind"],
                         "stackable": false
                     }
                 },
@@ -5210,13 +5217,13 @@
             "recovery": {
                 "hp": 400
             },
-            "automationNote": "自动回复气血并获得免疫流血标记，实际免疫流血的伤害减免需玩家收到流血伤害时手动处理。"
+            "automationNote": "完全自动化：气血回复和流血状态免疫随药效生效。"
         },
         "effects": [
             {
                 "name": "免疫流血",
                 "transfer": false,
-                "description": "免疫流血伤害（需手动处理）。",
+                "description": "自动免疫流血状态，持续十回合。",
                 "duration": {
                     "value": 10,
                     "units": "rounds",
@@ -5225,6 +5232,7 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "immune-bleed",
+                        "immunities": ["bleed_stack"],
                         "stackable": false
                     }
                 },

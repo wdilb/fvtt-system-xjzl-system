@@ -11,7 +11,7 @@ import { XJZLActiveEffect } from "../../documents/active-effect.mjs";
 /**
  * 准备特效数据，把 AE 分为 temporary（非被动）与 passive（被动）两类。
  * @param {object} sheet  Sheet 实例（取 sheet.actor）
- * @param {object} context  模板上下文（写入 temporaryEffects / passiveEffects）
+ * @param {object} context  模板上下文（写入 temporaryEffects / passiveEffects / effectImmunities）
  */
 export function prepareEffects(sheet, context) {
     const temporaryEffects = [];
@@ -66,6 +66,10 @@ export function prepareEffects(sheet, context) {
 
     context.temporaryEffects = temporaryEffects;
     context.passiveEffects = passiveEffects;
+    context.effectImmunities = (sheet.actor.effectImmunities ?? []).map(immunity => ({
+        ...immunity,
+        sourcesLabel: immunity.sources.join("、")
+    }));
 }
 
 /**

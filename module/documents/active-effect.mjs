@@ -172,6 +172,30 @@ export class XJZLActiveEffect extends ActiveEffect {
   }
 
   /**
+   * 从 AE 数据中解析系统状态 slug；只用于免疫判定，不把自定义效果归类为系统状态。
+   * @param {object} effectData - 待创建或叠加的 AE 数据
+   * @returns {string|null} 系统状态 slug，无法识别时返回 null
+   */
+  static getSystemStatusSlug(effectData) {
+    // 原生路径可能把 statuses 保留为 Set，表单/旧数据也可能留下伪数组对象。
+    const rawStatuses = effectData?.statuses;
+    const statuses = Array.isArray(rawStatuses)
+      ? rawStatuses
+      : rawStatuses instanceof Set
+        ? [...rawStatuses]
+        : rawStatuses && typeof rawStatuses === "object"
+          ? Object.values(rawStatuses)
+          : [];
+    for (const status of statuses) {
+      if (CONFIG.statusEffects?.[status]) return status;
+    }
+
+    if (effectData?.id && CONFIG.statusEffects?.[effectData.id]) return effectData.id;
+    const slug = this.getSlug(effectData);
+    return CONFIG.statusEffects?.[slug] ? slug : null;
+  }
+
+  /**
    * ---------------------------------------------------------------
    * Life Cycle: 数据生命周期钩子
    * ---------------------------------------------------------------
@@ -183,9 +207,24 @@ export class XJZLActiveEffect extends ActiveEffect {
    * 1. 确保有 slug (如果没有，用 name 生成或随机生成)
    * 2. 确保有 baseChanges 快照 (用于后续乘法计算)
    * 3. 初始化 stacks
+   * 4. 拦截 Actor 的系统状态免疫；Item 内嵌模板不参与判定
+   * @returns {Promise<boolean|void>} 免疫或父类取消时返回 false
    */
   async _preCreate(data, options, user) {
-    await super._preCreate(data, options, user);
+    const allowed = await super._preCreate(data, options, user);
+    if (allowed === false) return false;
+
+    // addEffect 已完成检查时带上内部标记；其他原生创建路径仍在这里兜底，
+    // 防止 toggleStatusEffect 或外部 createEmbeddedDocuments 绕过统一入口。
+    const actor = this.parent;
+    if (!options?.xjzlImmunityChecked && actor instanceof Actor) {
+      const statusSlug = XJZLActiveEffect.getSystemStatusSlug(data);
+      if (statusSlug && actor.hasEffectImmunity?.(statusSlug)) {
+        const statusName = game.i18n.localize(CONFIG.statusEffects[statusSlug]?.name ?? statusSlug);
+        actor.showFloatyText?.(`免疫 ${statusName}`, { fill: "#ffffff" });
+        return false;
+      }
+    }
 
     // 1. 初始化 Flags 容器
     const flags = data.flags?.["xjzl-system"] || {};

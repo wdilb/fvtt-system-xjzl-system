@@ -1077,7 +1077,7 @@
             "subSect": "miaomiao",
             "description": "传说上古时，猫有灵性，其灵有九，系“通、灵、静、正、觉、光、精、气、神”。每修炼九年得一灵性，待八十一年后，修成九命。有喜猫者钻研一生，悟得此道，练之大成，行无影，路无声，伤势须臾即合，历百劫而难一死。",
             "requirement": "悟性 11",
-            "automationNote": "残疾检定加成需手动。速度压制伤害自动处理并发送战报卡片。",
+            "automationNote": "圆满运功时自动免疫血流不止；速度压制伤害自动，残疾和死亡检定加成需手动。免疫标记无需拖拽，角色已有该标记请手动移除。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1129,6 +1129,12 @@
                             "trigger": "preDamage",
                             "script": "if (args.source === \"basic\") return;\nif (args.target && attacker.system.combat.speedTotal > args.target.system.combat.speedTotal) {\n    args.config.amount += 20;\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: attacker}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230,126,34,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-wind\"></i> 九命灵猫 - 速度压制</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">你的速度快于目标，招式伤害提升 <span style=\"color:#e67e22; font-weight:bold;\">20</span> 点！</div></div></div>` });\n}",
                             "active": true
+                        },
+                        {
+                            "label": "九命灵猫免疫",
+                            "trigger": "passive",
+                            "script": "actor.registerEffectImmunities([\"endless_bleed\"]);",
+                            "active": true
                         }
                     ]
                 }
@@ -1158,7 +1164,7 @@
         "effects": [
             {
                 "name": "血流不止免疫",
-                "description": "免疫血流不止（请手动参考此标记不执行血流不止）",
+                "description": "圆满运功时自动免疫血流不止，切换内功后失效。本标记仅供查看，不提供免疫，无需拖拽。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "immune_bloodloss",
@@ -1614,7 +1620,7 @@
             "subSect": "duanshi",
             "description": "此功以道入法，取天地之气融于血脉，通于百穴，贯于内海，化于天灵，大成之时，内劲直通奇经八脉，可抵御外邪侵袭，循序渐进，直至吞纳天地，气满乾坤。",
             "requirement": "悟性 11",
-            "automationNote": "免疫需要手动。命中自动施加下盘不稳/禁足。",
+            "automationNote": "运功时按阶段自动免疫：领悟免疫下盘不稳，小成增加禁足，圆满增加倒地。命中无架招目标自动施加对应状态。免疫标记无需拖拽，角色已有该标记请手动移除。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1632,6 +1638,12 @@
                             "label": "天龙打击",
                             "trigger": "hit",
                             "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || !args.isHit || !args.target) return;\nif ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (!args.target.system.martial?.stanceActive) { const unstable = game.xjzl.api.effects.getStatus('unstable'); if(unstable) { const effect = {...unstable, duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}}; await game.xjzl.api.effects.addEffect(args.target, effect); } }",
+                            "active": true
+                        },
+                        {
+                            "label": "天龙免疫",
+                            "trigger": "passive",
+                            "script": "actor.registerEffectImmunities([\"unstable\"]);",
                             "active": true
                         }
                     ]
@@ -1653,6 +1665,12 @@
                             "trigger": "hit",
                             "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || !args.isHit || !args.target) return;\nif ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (!args.target.system.martial?.stanceActive) { const unstable = game.xjzl.api.effects.getStatus('unstable'); const root = game.xjzl.api.effects.getStatus('root'); if(unstable) await game.xjzl.api.effects.addEffect(args.target, {...unstable, duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}}); if(root) await game.xjzl.api.effects.addEffect(args.target, {...root, duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}}); }",
                             "active": true
+                        },
+                        {
+                            "label": "天龙免疫",
+                            "trigger": "passive",
+                            "script": "actor.registerEffectImmunities([\"unstable\", \"root\"]);",
+                            "active": true
                         }
                     ]
                 },
@@ -1672,6 +1690,12 @@
                             "label": "天龙打击",
                             "trigger": "hit",
                             "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || !args.isHit || !args.target) return;\nif ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (!args.target.system.martial?.stanceActive) { const unstable = game.xjzl.api.effects.getStatus('unstable'); const root = game.xjzl.api.effects.getStatus('root'); if(unstable) await game.xjzl.api.effects.addEffect(args.target, {...unstable, duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}}); if(root) await game.xjzl.api.effects.addEffect(args.target, {...root, duration: {value: 1, units: \"rounds\", expiry: \"turnStart\"}}); }",
+                            "active": true
+                        },
+                        {
+                            "label": "天龙免疫",
+                            "trigger": "passive",
+                            "script": "actor.registerEffectImmunities([\"unstable\", \"root\", \"prone\"]);",
                             "active": true
                         }
                     ]
@@ -1698,7 +1722,7 @@
         "effects": [
             {
                 "name": "天龙免疫",
-                "description": "免疫下盘不稳、禁足、倒地（提示）",
+                "description": "运功时按阶段自动免疫：领悟免疫下盘不稳，小成增加禁足，圆满增加倒地；切换内功后失效。本标记仅供查看，不提供免疫，无需拖拽。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "tianlong_immune",
@@ -4431,7 +4455,7 @@
             "sect": "jianghushili",
             "description": "以吐纳之法，修习眼功，不论日夜，目光如炬，洞若观火。",
             "requirement": "悟性 2",
-            "automationNote": "手动。请玩家手动将物品内的‘幽瞳’状态拖拽给自己，以提示拥有夜视能力及免疫目盲（注意系统暂无免疫状态功能，需手动移除）。",
+            "automationNote": "圆满运功时自动免疫目盲，夜间攻击命中+5需手动处理；切换内功后失效。幽瞳标记无需拖拽，角色已有该标记请手动移除。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -4470,7 +4494,14 @@
                     },
                     "description": "圆满运功特效：免疫“目盲”状态，你在夜间攻击命中+5。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "幽瞳免疫",
+                            "trigger": "passive",
+                            "script": "actor.registerEffectImmunities([\"blind\"]);",
+                            "active": true
+                        }
+                    ]
                 }
             },
             "masteryEffect": "修满特效：修满[永久]：气血+10，内力+10，洞察+2，探查+2。",
@@ -4502,7 +4533,7 @@
         "effects": [
             {
                 "name": "幽瞳 (夜视/免疫目盲)",
-                "description": "夜视能力。免疫目盲。",
+                "description": "圆满运功时自动免疫目盲，夜间攻击命中+5需手动处理；切换内功后失效。本标记仅供查看，不提供免疫，无需拖拽。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {

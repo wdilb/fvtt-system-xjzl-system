@@ -556,7 +556,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
-     * 动作：应用通用状态
+     * 应用通用状态；无文档返回值只表示未直接施加，不能推断为免疫。
+     * @param {Event} event - 触发事件
+     * @param {HTMLElement} target - 含状态 slug 的动作元素
      */
     async _onApplyStatus(event, target) {
         const actors = EffectSelectionDialog.getControlledActors(this, { notify: true });
@@ -568,22 +570,36 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const statusData = CONFIG.statusEffects[slug];
         if (!statusData) return;
 
+        let appliedCount = 0;
+        let notAppliedCount = 0;
         for (const actor of actors) {
             // 深拷贝并应用
             const effectData = foundry.utils.deepClone(statusData);
-            await game.xjzl.api.effects.addEffect(actor, effectData);
+            const applied = await game.xjzl.api.effects.addEffect(actor, effectData);
+            if (applied) appliedCount += 1;
+            else notAppliedCount += 1;
         }
 
         await this._rememberStatus(statusData.id);
-        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.AppliedToTargets", {
-            count: actors.length,
-            name: game.i18n.localize(statusData.name)
-        }));
+        if (appliedCount > 0) {
+            ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+                count: appliedCount,
+                name: game.i18n.localize(statusData.name)
+            }));
+        }
+        if (notAppliedCount > 0) {
+            ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.NotAppliedToTargets", {
+                count: notAppliedCount,
+                name: game.i18n.localize(statusData.name)
+            }));
+        }
         this.render();
     }
 
     /**
-     * 动作：应用物品特效
+     * 应用物品特效；免疫、忍耐豁免和状态转化的原因由结算提示说明。
+     * @param {Event} event - 触发事件
+     * @param {HTMLElement} target - 含来源 AE UUID 的动作元素
      */
     async _onApplyItemEffect(event, target) {
         const actors = EffectSelectionDialog.getControlledActors(this, { notify: true });
@@ -601,17 +617,29 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         // 这样我们知道这个状态是 "Boss 的 毒掌" 造成的
         baseData.origin = sourceEffect.parent.uuid;
 
+        let appliedCount = 0;
+        let notAppliedCount = 0;
         for (const actor of actors) {
             // 注意：每次循环都要深拷贝一份，因为 addEffect 可能会修改数据
             const effectData = foundry.utils.deepClone(baseData);
-            await game.xjzl.api.effects.addEffect(actor, effectData);
+            const applied = await game.xjzl.api.effects.addEffect(actor, effectData);
+            if (applied) appliedCount += 1;
+            else notAppliedCount += 1;
         }
 
         await this._rememberSceneEffect(uuid);
-        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.AppliedToTargets", {
-            count: actors.length,
-            name: sourceEffect.name
-        }));
+        if (appliedCount > 0) {
+            ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+                count: appliedCount,
+                name: sourceEffect.name
+            }));
+        }
+        if (notAppliedCount > 0) {
+            ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.NotAppliedToTargets", {
+                count: notAppliedCount,
+                name: sourceEffect.name
+            }));
+        }
         this.render();
     }
 

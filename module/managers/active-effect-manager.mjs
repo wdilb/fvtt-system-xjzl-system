@@ -202,7 +202,7 @@ export class ActiveEffectManager {
      * @param {Actor} actor - 目标角色
      * @param {Object} effectDataOrId - 特效源数据 (普通 Object或者系统状态 ID)
      * @param {Number} [count=1] - 添加的层数，默认为 1
-     * @returns {Promise<ActiveEffect|undefined>} 返回更新或创建的特效文档
+     * @returns {Promise<ActiveEffect|undefined>} 返回更新或创建的特效；免疫、豁免、特殊转化或未施加时均可能返回 undefined
      */
     static async addEffect(actor, effectDataOrId, count = 1) {
         if (!actor || !effectDataOrId) return;
@@ -285,6 +285,15 @@ export class ActiveEffectManager {
         // =====================================================
         // 直接调用通用方法
         const lookupSlug = XJZLActiveEffect.getSlug(effectData);
+
+        // 免疫必须在叠层、刷新和特殊转化之前拦截，避免免疫状态仍然触发副作用。
+        // 这里只识别 CONFIG.statusEffects 中的系统状态；伤害、击退等非 AE 语义不在此处处理。
+        const statusSlug = XJZLActiveEffect.getSystemStatusSlug(effectData);
+        if (statusSlug && actor.hasEffectImmunity?.(statusSlug)) {
+            const statusName = game.i18n.localize(CONFIG.statusEffects[statusSlug]?.name ?? effectData.name ?? statusSlug);
+            this._showScrollingText(actor, `免疫 ${statusName}`, "neutral");
+            return;
+        }
 
         // =====================================================
         // 特殊规则：忍耐减免剧痛
@@ -376,10 +385,14 @@ export class ActiveEffectManager {
             }
             // 显式禁止系统默认飘字 (scrollingStatusText: false)
             // 创建时，核心会自动初始化顶层 start 锚点（当前世界时间与战斗位置）
-            const createdDocs = await actor.createEmbeddedDocuments("ActiveEffect", [effectData], { scrollingStatusText: false });
+            const createdDocs = await actor.createEmbeddedDocuments("ActiveEffect", [effectData], {
+                scrollingStatusText: false,
+                xjzlImmunityChecked: true
+            });
 
             // 手动调用我们的 Socket 飘字 (绿色 +)
             // 确保无论是第 1 层还是第 N 层，视觉效果统一且所有人可见
+            if (!createdDocs?.[0]) return;
             this._showScrollingText(actor, `+ ${displayLabel}`, "create");
             return createdDocs[0];
         }

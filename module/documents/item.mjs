@@ -6,6 +6,7 @@ import { ActionTracker } from "../applications/action-tracker.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
+import { XJZLActiveEffect } from "./active-effect.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 
@@ -183,7 +184,9 @@ export class XJZLItem extends Item {
   }
 
   /**
-   * 内部逻辑：使用消耗品
+   * 使用消耗品，按整份同类药效互斥替换；新 AE 全部被免疫时保留旧药效。
+   * @param {Actor} target - 接受恢复、AE 和使用脚本的角色，可通过 GM 代理处理
+   * @returns {Promise<void>} 完成结算与数量扣减；部分免疫仍按整份药效替换
    */
   async _useConsumable(target) {
 
@@ -240,7 +243,22 @@ export class XJZLItem extends Item {
     // 2. 应用特效 (互斥逻辑)
     // =====================================================
     const consumableType = config.type || "other";
-    if (config.autoReplace ?? true) {
+    const effectsToCreate = this.effects.map(e => {
+      const data = e.toObject();
+      foundry.utils.setProperty(data, "flags.xjzl-system.consumableType", consumableType);
+      data.transfer = false;
+      data.disabled = false;
+      // 如果物品即将销毁，Origin 必须指向使用者的 Actor，否则特效会因为来源丢失而报错
+      data.origin = willDestroy ? owner.uuid : this.uuid;
+      return data;
+    });
+
+    // 新 AE 全被免疫时保留旧药效；部分免疫仍整份替换，避免叠加两份互斥的同类药效。
+    const effectsAllImmune = effectsToCreate.length > 0 && effectsToCreate.every(effectData => {
+      const statusSlug = XJZLActiveEffect.getSystemStatusSlug(effectData);
+      return Boolean(statusSlug && target.hasEffectImmunity?.(statusSlug));
+    });
+    if ((config.autoReplace ?? true) && !effectsAllImmune) {
       // 找出目标身上同类型的旧消耗品特效
       const effectsToDelete = target.effects
         .filter(e => e.getFlag("xjzl-system", "consumableType") === consumableType)
@@ -258,23 +276,24 @@ export class XJZLItem extends Item {
     }
 
     // 创建新特效 (施加于目标)
-    const effectsToCreate = this.effects.map(e => {
-      const data = e.toObject();
-      foundry.utils.setProperty(data, "flags.xjzl-system.consumableType", consumableType);
-      data.transfer = false;
-      data.disabled = false;
-      // 如果物品即将销毁，Origin 必须指向使用者的 Actor，否则特效会因为来源丢失而报错
-      data.origin = willDestroy ? owner.uuid : this.uuid;
-      return data;
-    });
-
     if (effectsToCreate.length > 0) {
       // 借用我们强大的 Manager 自动处理添加与权限穿透 (Manager 内部自带 Socket)
+      const appliedNames = [];
+      const notAppliedNames = [];
       for (const eff of effectsToCreate) {
-        await game.xjzl.api.effects.addEffect(target, eff);
+        const applied = await game.xjzl.api.effects.addEffect(target, eff);
+        // 无返回值也可能是忍耐豁免或状态转化，汇总不推断具体原因。
+        (applied ? appliedNames : notAppliedNames).push(eff.name);
       }
-      resultLines.push(`应用状态: [${effectsToCreate.map(e => e.name).join(", ")}]`);
-      tags.push("状态");
+      if (appliedNames.length > 0) {
+        resultLines.push(`应用状态: [${appliedNames.join(", ")}]`);
+        tags.push("状态");
+      }
+      if (notAppliedNames.length > 0) {
+        resultLines.push(game.i18n.format("XJZL.UI.EffectsNotApplied", {
+          names: notAppliedNames.join(", ")
+        }));
+      }
     }
 
     // =====================================================
