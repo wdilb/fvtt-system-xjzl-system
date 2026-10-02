@@ -1045,7 +1045,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>三指执笔，腕掌皆平，开启架招。格挡成功时获得“笔势”，至多三层，持续到脱战。</p><p><strong>笔势：</strong>每层使笔法命中+10。持续到你更换其他武器的武学套路。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "格挡获笔势自动。全局被动加伤需在每个招式预览时处理。",
+                    "automationNote": "格挡获笔势自动。装备匕首类武器时，每层笔势自动加到人物卡的外功/内功命中上；更换其他武器套路后笔势需手动移除。全局被动加伤需在每个招式预览时处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -1243,24 +1243,26 @@
         "effects": [
             {
                 "name": "笔势",
-                "description": "笔法命中增加。",
+                "description": "装备匕首类武器时生效：每层使外功命中+10、内功命中+10。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "bishi_buff",
                         "stackable": true,
-                        "maxStacks": 3
+                        "maxStacks": 3,
+                        "scripts": [
+                            {
+                                "label": "笔势-笔法命中",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "// 笔势只在装备匕首类武器时生效（子类型录入不全，只判断大类）；\n// 直接修改底层命中修正值，人物卡的外功/内功命中面板实时可见。passive 阶段禁止 await。\nconst weapon = actor.itemTypes.weapon?.find(w => w.system.equipped === true);\nif (!weapon || weapon.system.type !== 'dagger') return;\nconst stacks = thisEffect.stacks || 1;\nS.combat.hit_waigong += 10 * stacks;\nS.combat.hit_neigong += 10 * stacks;"
+                            }
+                        ]
                     }
                 },
                 "img": "icons/skills/melee/strike-polearm-light-white.webp",
                 "system": {
-                    "changes": [
-                        {
-                            "key": "system.combat.hit_waigong",
-                            "value": "10",
-                            "type": "add"
-                        }
-                    ]
+                    "changes": []
                 },
                 "showIcon": 2
             }
