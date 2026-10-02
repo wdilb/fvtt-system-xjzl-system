@@ -2401,6 +2401,9 @@ export class XJZLActor extends Actor {
       isCrit: config.isCrit,    // 使用最终暴击状态
       isDying: isDying,
       isDead: isDead,
+      // 与 applyDamage 的 source 一致 (move, basic, both, dot, extra)；
+      // 防御侧脚本需要它区分“被攻击”与 dot 等非攻击性伤害。
+      source: source,
       move: move,
       item: item
     };

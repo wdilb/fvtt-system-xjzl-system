@@ -385,6 +385,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `hpLost` / `mpLost` / `hutiLost` | `number` | 只读 | 标准伤害部分造成的实际资源损失。 |
 | `isCrit` / `isBroken` | `boolean` | 只读 | 防御侧最终暴击和破架状态。 |
 | `isDying` / `isDead` | `boolean` | 只读 | 本次结算是否进入濒死或死亡。 |
+| `source` | `string` | 只读 | 伤害来源标识：`move`、`basic`、`both`、`dot` 或 `extra`；用于区分“被攻击”与 dot 等非攻击性伤害。 |
 | `move` / `item` | `Object` / `Item` / `null` | 只读 | 招式和物品来源。 |
 | `config` | `Object` | 只读 | 最终防御配置；可检查 `ignoreStance`、`isCrit` 等字段。 |
 
