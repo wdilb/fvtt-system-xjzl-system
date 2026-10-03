@@ -67,6 +67,7 @@ import { AuraManager } from "./module/region/xjzl-aura-manager.mjs";
 import { registerAuraQuick, openAuraQuick, placeAura } from "./module/region/xjzl-aura-quick.mjs";
 import { registerAuraFxSetting } from "./module/region/xjzl-aura-fx.mjs";
 import { registerCombatFxSetting } from "./module/managers/combat-fx-manager.mjs";
+import { registerUltimateFxSetting, openUltimatePreview, playUltimatePreview, stopAllUltimateEffects } from "./module/managers/ultimate-fx-manager.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
 import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
@@ -96,6 +97,8 @@ Hooks.once("init", async function () {
   registerAuraFxSetting();
   // 受击视觉反馈：每位玩家独立控制，开关切换无需刷新页面。
   registerCombatFxSetting();
+  // 绝招演出独立于受击反馈，客户端可随时关闭，不参与战斗事务。
+  registerUltimateFxSetting();
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
@@ -760,6 +763,9 @@ Hooks.once("ready", async function () {
 
   // 区域工具栏和脚本共用快建入口；脚本可用 place 等待玩家选点。
   game.xjzl.auraQuick = {open: openAuraQuick, place: placeAura};
+
+  // 宏可点播视觉预览；它不施展招式或更改角色资源，默认仅本机播放。
+  game.xjzl.ultimateEffects = {openPreview: openUltimatePreview, playPreview: playUltimatePreview, stop: stopAllUltimateEffects};
 
   // 3. 挂载 GM 专用 API (生成器)
   // 此时 game.user 已经不是 null 了，可以安全检查权限

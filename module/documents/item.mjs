@@ -5,6 +5,7 @@ import { createAutomaticDetailAccess } from "../utils/chat-detail-access.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { queueUltimateEffect } from "../managers/ultimate-fx-manager.mjs";
 import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { XJZLActiveEffect } from "./active-effect.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -2080,6 +2081,10 @@ export class XJZLItem extends Item {
         if (attackContext.flags.abortReason) ui.notifications.warn(attackContext.flags.abortReason);
         return;
       }
+
+      // 已通过资源与出招脚本检查，架招、攻击、治疗和增益共用此视觉入口。
+      // 广播在管理器内隔离且不等待，不改变后续掷骰、卡片和伤害流程。
+      queueUltimateEffect(actor, move, xjzlSocket);
 
       // ATTACK 允许脚本异步施加状态；后续目标计算必须使用更新后的被动状态。
       const postAttackStatuses = actor.xjzlStatuses || {};

@@ -4,6 +4,7 @@ import { XJZLContainerTransactionManager } from "./managers/container-transactio
 import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
 import { AuraLedger } from "./region/xjzl-aura-ledger.mjs";
 import { renderHitEffect } from "./managers/combat-fx-manager.mjs";
+import { renderUltimateEffect } from "./managers/ultimate-fx-manager.mjs";
 
 export let xjzlSocket;
 
@@ -56,6 +57,7 @@ export function setupSocket() {
     xjzlSocket.register("showScrollingText", _socketShowScrollingText);
     // 受击特效只在各客户端本地渲染，不参与权限结算。
     xjzlSocket.register("playHitEffect", _socketPlayHitEffect);
+    xjzlSocket.register("playUltimateEffect", renderUltimateEffect);
 
     // === 脚本执行路由 ===
     // 注册Actor脚本执行（用于战斗流转脚本路由到玩家端执行）
