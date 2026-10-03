@@ -751,24 +751,24 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 
 ## 光环 API
 
-`game.xjzl.aura` 在 `ready` 后提供 Region 光环管理。创建、重建和删除会写入场景文档，应在异步脚本时机调用并 `await`；`passive`、`calc` 不可使用。
+`game.xjzl.aura` 在 `ready` 后可用。创建、重建和删除会写入场景，须在异步脚本中 `await`，不能用于 `passive`、`calc`。
+
+### 方法速查
+
+下表中的 `{scene}` 默认使用当前画布场景。
 
 | 方法 | 用途与返回值 |
 |---|---|
-| `await game.xjzl.aura.create(source, params)` | 创建光环；同场景同 `label` 的旧光环先删除。返回 `RegionDocument`；缺少标签、源不可用、无网格或半径非法时返回 `null`。矩形尺寸、锚点非法时抛错。 |
-| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene})` | 按标签或 Region ID 删除光环，返回删除数量；返回 `0` 表示未删到。`scene` 默认当前画布场景。 |
-| `game.xjzl.aura.query(label, {scene})` | 查询同标签的 Region，返回数组。`scene` 默认当前画布场景。 |
-| `game.xjzl.aura.queryLabels({scene})` | 返回场景中去重后的光环标签数组。`scene` 默认当前画布场景。 |
+| `await game.xjzl.aura.create(source, params)` | 创建光环，先删除同场景同 `label` 的旧实例。返回 `RegionDocument`；缺标签、源不可用、无网格或半径非法时返回 `null`，矩形尺寸或锚点非法时抛错。 |
+| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene})` | 按标签或 Region ID 删除，返回删除数量；`0` 表示未删到。 |
+| `game.xjzl.aura.query(label, {scene})` | 返回同标签的 `RegionDocument[]`。 |
+| `game.xjzl.aura.queryLabels({scene})` | 返回去重后的标签数组。 |
 | `await game.xjzl.aura.refreshAura(label, overrides, {scene})` | 用已有实例的参数和覆盖项重建光环，返回新 Region；标签不存在或源失效时返回 `null`。 |
-| `await game.xjzl.aura.queryTokens(source, opts)` | 按范围即时查询，返回命中的 `Actor[]`，不创建 Region。一个关联 Actor 有多个命中 Token 时可重复出现。 |
+| `await game.xjzl.aura.queryTokens(source, opts)` | 即时查询范围内的 `Actor[]`，不创建 Region；同一关联 Actor 可因多个 Token 命中而重复出现。 |
 
-`source` 可传 `TokenDocument`、画布 `Token`、在当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随 Token，`follow: false` 可固定在创建位置；坐标源始终固定。创建坐标源光环时，若需按阵营过滤，可在 `params` 中传 `sourceActorUuid`，该角色须在当前画布上有活动 Token。
+### 创建示例
 
-范围以网格格数计，圆形使用非负整数 `radius`（默认 `0`），覆盖格始终按单段 1-2-2-2 计算，不随场景对角线规则或 `customDistanceRule` 开关变化。矩形设置 `shapeKind: "rect"`、`rectWidth`、`rectHeight`，可用 `anchorX`、`anchorY` 指定锚格。`quarterTurns` 为 90° 转数，传 `"auto"` 时按源 Token 朝向吸附。`displayName`、`color` 控制 Region 展示，`levelIds` 可指定楼层。
-
-`queryTokens` 还接受形状生成器输出的相对 `offsets`（`i` 为列、`j` 为行），此时无需创建光环；它仅按平面覆盖格查询，不按 `levelIds` 过滤。
-
-例如，在进行中的战斗内使用异步脚本创建跟随光环，使范围内的敌人获得系统状态，战斗结束时清理：
+在进行中的战斗内创建跟随光环，给范围内敌人施加目盲，战斗结束时清理：
 
 ```javascript
 const auraCombat = game.combat;
@@ -786,25 +786,110 @@ const region = await game.xjzl.aura.create(actor, {
 if (!region) ui.notifications.warn("光环未创建，请检查场景和光环参数。");
 ```
 
-`params.label` 必填。`faction` 可为 `"all"`、`"ally"` 或 `"enemy"`，`includeSelf` 控制是否包含源；按阵营过滤需要可解析的源 Token。`queryTokens` 使用坐标源时应采用 `"all"`，且无法识别自身；使用 Token/Actor 源时，`includeSelf: false` 按源 Actor 排除。持久光环的 `includeSelf: false` 同样按源 Actor 排除——同一 Actor 的多个关联 Token 都视为自身。
+### 源、范围与目标
 
-`"all"` 包含中立单位；源角色位于范围内时，`includeSelf: false` 会排除其 Actor。`"ally"`、`"enemy"` 按源与目标 Token 的阵营过滤，其中 `"enemy"` 不包含中立目标。需要作用于场上所有其他角色、但没有空间范围的效果，不应创建 Region。
+`source` 接受 `TokenDocument`、画布 `Token`、当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随；设 `follow: false` 固定在创建位置。坐标源始终固定。
 
-`payloadItemUuid` 和 `payloadEffectName` 指向源物品中的 AE；`payloadStatusId` 可直接引用 `CONFIG.statusEffects` 中的系统通用状态 ID（如 `bleed_stack`）。同时配置时优先使用 `payloadStatusId`，录入时应只选一种来源。`enterEnabled` 默认开启：配置 payload 后，目标**每次进入范围**都会挂载一次 AE，可叠层 AE 逐次累加层数、非叠层 AE 走覆盖/刷新；`enterAction` 可直接结算伤害或治疗，`moveWithin` 使区域内移动复用该动作（不重复挂载 AE）。`roundEnabled` 默认关闭；开启后按 `roundTiming`（`tokenRoundStart`、`tokenRoundEnd`、`tokenTurnStart` 或 `tokenTurnEnd`）执行 `roundAction`。`enterAction.kind` 可为 `"none"`、`"damage"` 或 `"healing"`；`roundAction.kind` 还可为 `"effect"`：每个对应时机都对区域内目标执行一次挂载，可叠层 AE 每轮累加一层，非叠层 AE 每轮刷新（覆盖数值与时长）。只需在回合时机挂载时，应设置 `enterEnabled: false`。`amount` 为伤害/治疗数值或按源角色数据计算的公式，`type` 为伤害类型或资源键；`pierce` 仅用于伤害。`enterEnabled` 与 `roundEnabled` 均关闭且未启用 `moveWithin` 时，光环仅标记范围。
+| 参数 | 说明 |
+|---|---|
+| `label` | 必填字符串，用于查询、更新和删除。 |
+| `radius` | 圆形半径，非负整数，默认 `0`；单位为格。覆盖始终按单段 1-2-2-2 计算，不受场景对角线规则或 `customDistanceRule` 影响。 |
+| `shapeKind: "rect"` | 改用矩形；`rectWidth`、`rectHeight` 为宽高格数，`anchorX`、`anchorY` 指定锚格。 |
+| `quarterTurns` | 90° 转数；`"auto"` 按源 Token 朝向吸附。 |
+| `displayName` / `color` | Region 显示名称与颜色。 |
+| `levelIds` | 指定楼层。 |
+| `faction` | 默认 `"all"`（含中立）；`"ally"` 为同阵营，`"enemy"` 为敌方（不含中立）。阵营过滤需要可解析的源 Token。 |
+| `includeSelf` | 默认 `true`；`false` 按源 Actor 排除自身，包括同一 Actor 的所有关联 Token。 |
 
-`throttlePerRound` 将同一目标的进入结算限制为每战斗轮一次，战斗外不节流；节流命中的进入不施加、不执行动作。要让进入与所选回合时机二选一结算，须同时开启 `enterEnabled`、`roundEnabled` 和 `oncePerRound`：同一目标在每个战斗轮只响应先发生的事件。进入事件执行 `enterAction`，回合事件执行 `roundAction`；配置 payload 时，先发生的事件挂载一次。`cleanupOnExit` 默认开启：光环记录可叠层 AE 的实际贡献层数，以及不可叠层 AE 的清理归属；目标离开时只释放对应记录。首次挂载前已有的同 slug AE 会保留，多个光环维护同一不可叠层 AE 时，最后一条清理记录结束后才决定是否移除。关闭后仍正常施加，但不建立清理记录，目标离开或光环删除时保留效果。已有清理记录期间更改开关不会改变该记录的清理语义；退出并重新进入后采用新值，关闭期间未记录的效果不会被追溯清理。`durationRounds` 控制存活轮数，仅在创建时已有进行中的战斗轮次时生效。`maintain: {resource, amount, perTarget}` 在绑定战斗的源角色回合末消耗资源；`perTarget` 是每名覆盖敌人的追加消耗。未显式传 `combatId` 时，管理器使用创建时的当前战斗。`lifecycle` 默认为 `"manual"`；`"combat"` 在所属战斗结束时清理，`"equip"` 在对应 `sourceItemUuid` 物品卸下或删除时清理，`"yungong"` 在源角色运功切换时清理，`"stance"` 在源角色解除或切换架招时清理。按源清理需要正确设置 `sourceActorUuid` 或 `sourceItemUuid`；Token/Actor 源会自动记录源角色 UUID。
+- **坐标源过滤**：创建光环时可传 `sourceActorUuid`，该角色须在当前画布有活动 Token；`queryTokens` 的坐标源应使用 `faction: "all"`，无法识别自身。
+- **即时查询**：`queryTokens` 也接受形状生成器的相对 `offsets`（`i` 为列、`j` 为行），仅查平面覆盖，不按 `levelIds` 过滤。
+- **无空间范围的效果**：若作用于场上所有其他角色，直接结算，无需创建 Region。
 
-使用 `oncePerRound` 时，进入路径须有 payload 或有效 `enterAction`，回合路径须有 payload 或有效 `roundAction`；空配置可能先占用本轮额度而不产生效果。
+### 效果与触发
 
-删除或重建光环会触发区域退出清理；需要按标签更新半径、动作或效果时使用 `refreshAura`。直接修改 Region 行为配置中的范围字段也会重算形状。已有清理记录期间更换 payload 引用不会立即切换，该目标继续使用旧引用直至退出；需要立即切换时调用 `refreshAura` 重建。`cleanupOnExit: false` 产生的效果没有清理记录，修改引用或重建光环都不会移除既有效果，调用方须自行处理。
+**效果来源（payload）只选一种**；同时配置时 `payloadStatusId` 优先。
 
-把移除某个光环作为招式前提时，先查询可选实例，再按选中的 Region ID 调用 `dismiss` 并检查返回值；查询后实例仍可能消失，返回 `0` 时应停止后续结算。若还需在扣费前取消施展，应在 `preAttack` 完成选择并按该阶段的资源检查规则处理。
+| 来源 | 参数 |
+|---|---|
+| 系统通用状态 | `payloadStatusId`：`CONFIG.statusEffects` 中的 ID，如 `bleed_stack`。 |
+| 物品中的 AE | `payloadItemUuid` + `payloadEffectName`：源物品 UUID 与效果名称。 |
 
-监听型光环可将无数值、`showIcon: 0` 的 AE 作为 payload，利用被挂角色的现有触发器响应事件。模板 AE 位于角色持有的物品且未预设 `origin` 时，管理器把复制品的 `origin` 设为模板 AE 的 UUID；脚本可用 `fromUuid(thisEffect.origin)` 找回模板，再从所属物品定位主人。退出清理只管理光环直接挂载且已记账的 payload；监听脚本另行添加的 AE 不会自动纳入光环账本。脚本反查目标脚下的光环时使用 Token 文档的 `regions` 集合——它是集合不是数组，须先展开（`[...(tokenDoc.regions ?? [])]`）再 `filter`/`some`。
+| 触发开关 | 默认 | 结算行为 |
+|---|---|---|
+| `enterEnabled` | `true` | 每次进入范围挂载一次 payload，再执行 `enterAction`。 |
+| `roundEnabled` | `false` | 在 `roundTiming` 指定的时机执行 `roundAction`；`kind: "effect"` 时挂载一次 payload。 |
+| `moveWithin` | `false` | 区域内移动复用 `enterAction`，不重复挂载 payload。 |
 
-区域工具栏的光环快建按钮和 `game.xjzl.auraQuick.open()` 会打开快建窗口。快建光环默认只标记范围；需要自动结算时，可编辑区域行为，或在异步脚本中使用 `game.xjzl.aura.create()` 传入结算参数。需要让玩家在画布选择固定光环落点时，使用 `await game.xjzl.auraQuick.place(params)`；参数为 `aura.create` 的 `params` 对象，落点由玩家点击决定，`follow` 固定为 `false`。成功时返回 `RegionDocument`，取消选点、无网格或创建失败时返回 `null`；坐标源按阵营过滤时应提供 `sourceActorUuid`。
+每次挂载时，可叠层 AE 按叠层规则累加，非叠层 AE 覆盖/刷新数值与时长。**仅需回合挂载**时，设 `enterEnabled: false`；三个开关均关闭时仅标记范围。
 
-规则指定“在自身周围生成、留在原地”时，以角色为 `source` 调用 `game.xjzl.aura.create`，并设置 `follow: false`；只有规则允许自行决定落点时才使用 `auraQuick.place`。选点流程不校验施展距离或格子占用，玩家按规则选择。持续流失、挂载状态等进出或回合效果由 Region 行为配置结算；不随离区撤销的状态可设置 `cleanupOnExit: false`，若无独立到期或清理机制则需手动移除。
+`roundTiming` 默认 `"tokenRoundEnd"`，可选时机：
+
+- 战斗轮开始/结束：`"tokenRoundStart"` / `"tokenRoundEnd"`。
+- 目标回合开始/结束：`"tokenTurnStart"` / `"tokenTurnEnd"`。
+
+`enterAction` 与 `roundAction` 使用以下字段：
+
+| 字段 | 说明 |
+|---|---|
+| `kind` | `"none"`、`"damage"`、`"healing"`；`roundAction` 另支持 `"effect"`。 |
+| `amount` | 伤害/治疗数值，或按源角色数据计算的公式。 |
+| `type` | 伤害类型或治疗资源键。 |
+| `pierce` | 仅用于伤害；开启后无视格挡、防御和最低伤害保底。 |
+
+### 每轮节流
+
+两个开关默认均为 `false`，战斗外不节流。
+
+| 参数 | 同一目标每战斗轮的行为 |
+|---|---|
+| `throttlePerRound` | 进入结算至多一次；后续进入不挂载效果、不执行动作。 |
+| `oncePerRound` | 进入与所选回合时机共用一次额度，先发生者结算；须同时开启 `enterEnabled`、`roundEnabled`。 |
+
+使用 `oncePerRound` 时，进入执行 `enterAction`，回合执行 `roundAction`；配置了 payload 则由先发生的事件挂载一次。**两条路径都须有实际效果**：进入须有 payload 或有效 `enterAction`，回合须有 payload 或有效 `roundAction`，避免空结算占用额度。
+
+### 时长与生命周期
+
+| 参数 | 说明 |
+|---|---|
+| `durationRounds` | 存活轮数，仅在创建时已有进行中的战斗轮次时生效。 |
+| `maintain: {resource, amount, perTarget}` | 绑定战斗的源角色回合末消耗：`amount + perTarget × 覆盖敌人数`，扣取 `resource`。 |
+| `combatId` | 所属战斗；需要绑定战斗而未显式传入时，使用创建时的当前战斗。 |
+| `sourceActorUuid` / `sourceItemUuid` | 按来源清理所需的角色/物品 UUID；Token/Actor 源自动记录角色 UUID。 |
+
+`lifecycle` 控制清理时机：
+
+| 值 | 清理时机 |
+|---|---|
+| `"manual"`（默认） | 手动管理；时长和战斗绑定仍生效。 |
+| `"combat"` | 所属战斗结束。 |
+| `"equip"` | `sourceItemUuid` 对应物品卸下或删除。 |
+| `"yungong"` | 源角色运功切换。 |
+| `"stance"` | 源角色解除或切换架招。 |
+
+### 退出清理与更新
+
+`cleanupOnExit` 默认 `true`，只管理光环直接挂载且已记账的 payload。
+
+- **开启**：记录可叠层 AE 的实际贡献层数、非叠层 AE 的清理归属；离区或删除/重建光环时只释放这些记录。首次挂载前已有的同 slug AE 保留；多个光环维护同一非叠层 AE 时，最后一条记录释放后才决定是否移除。
+- **关闭**：仍施加效果，但不记账；离区、删除或重建均保留效果。需另设到期机制或手动清理，后续开启不会追溯清理未记录的效果。
+- **中途改开关**：已有记录沿用原清理语义，退出并重新进入后采用新值。
+
+更新半径、动作或效果用 `refreshAura(label, overrides, {scene})` 重建；直接修改 Region 行为中的范围字段也会重算形状。已有清理记录时，更换 payload 引用仍沿用旧引用直至退出；需立即切换则用 `refreshAura`。未记账的旧效果须自行处理。
+
+### 快建与画布选点
+
+| 入口 | 用法 |
+|---|---|
+| 工具栏光环快建按钮 / `game.xjzl.auraQuick.open()` | 打开快建窗口，默认仅标记范围；自动结算需编辑区域行为，或用 `aura.create()` 传入结算参数。 |
+| `await game.xjzl.auraQuick.place(params)` | 使用 `aura.create` 的参数，由玩家点击落点，`follow` 固定为 `false`。返回 `RegionDocument`；取消、无网格或创建失败返回 `null`。阵营过滤需 `sourceActorUuid`。 |
+
+规则要求“自身周围生成、留在原地”时，用角色作为 `source` 创建并设 `follow: false`。规则允许自选落点时才用 `place`；选点不校验施展距离或格子占用，由玩家按规则选择。进出/回合效果仍由 Region 行为结算。
+
+### 进阶用法
+
+- **以移除光环为招式前提**：先查询，再按选定的 Region ID 调用 `dismiss`；查询后实例可能消失，返回 `0` 须停止结算。需要扣费前取消时，在 `preAttack` 完成选择并遵守该阶段的资源检查规则。
+- **监听型光环**：用无数值、`showIcon: 0` 的 AE 作为 payload，通过宿主角色的已有触发器响应。模板在角色持有的物品中且未设 `origin` 时，复制品自动以模板 AE UUID 为 `origin`；可用 `fromUuid(thisEffect.origin)` 找回模板及所属物品、主人。监听脚本另加的 AE 须自行清理。
+- **查目标脚下的光环**：Token 文档的 `regions` 是集合，先用 `[...(tokenDoc.regions ?? [])]` 展开，再调用 `filter` / `some`。
 
 ## Macros API
 
