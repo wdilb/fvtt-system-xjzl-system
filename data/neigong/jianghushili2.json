@@ -5204,7 +5204,7 @@
             "subSect": "caobang",
             "description": "<p>漕帮因着青衣而被称为“青帮”。此功圆满后，运功时指骨泛青，浑身上下青筋暴起，踏步成风，如青龙出海。</p><p><strong>青海：</strong>内力凝滞如水，区域范围内的所有人（包括友方和自己）视作处于水中。</p><p>·青海以你为中心跟随你移动，不同角色产生的青海范围重叠后，效果不可叠加。</p><p>·你在自己的每个回合末，必须消耗 10 内力维持‘青海’，否则该区域消失。</p>",
             "requirement": "悟性11",
-            "automationNote": "完全自动化：进战时自动以自身为中心生成跟随光环【青海】（半径按境界 1/2/3 米），范围内所有人（含己）自动获得对应档位的【水中战斗】状态。每回合末自动扣除 10 点内力维持，内力不足时光环自动消散并按账目摘除状态。切换运功内功或脱战时自动清理。",
+            "automationNote": "完全自动化：进战时自动以自身为中心生成跟随光环【青海】（半径按境界 1/2/3 米），范围内所有人（含己）自动获得【身处水中】标记，每回合末自动扣除 10 点内力维持，内力不足时光环自动消散并按账目摘除状态。切换运功内功或脱战时自动清理。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -5221,7 +5221,13 @@
                             "label": "青海光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 青海光环：全体含己视作处于水中（领悟 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(领悟)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                            "script": "// 青海光环：全体含己施加统一【身处水中】标记（in_water，与真实水域同口径、不可叠加），\n// 每回合末维持 10 内力（扣取由光环管理器单一归属结算，不足即散）；\n// 自身伤害/暴击修正不在 payload 里，由本境 passive 脚本按 in_water 触发。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"身处水中\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                        },
+                        {
+                            "label": "水中战斗加成",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "// 仅运功者本人：身处水中（真实水域或青海标记）时，招式伤害+5，暴击骰-1。\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\nS.combat.damages.skill.mod += 5;\nS.combat.crit_waigong -= 1;\nS.combat.crit_neigong -= 1;"
                         }
                     ]
                 },
@@ -5240,7 +5246,13 @@
                             "label": "青海光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 青海光环：全体含己视作处于水中（小成 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(小成)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                            "script": "// 青海光环：全体含己施加统一【身处水中】标记（in_water，与真实水域同口径、不可叠加），\n// 每回合末维持 10 内力（扣取由光环管理器单一归属结算，不足即散）；\n// 自身伤害/暴击修正不在 payload 里，由本境 passive 脚本按 in_water 触发。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 2,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"身处水中\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                        },
+                        {
+                            "label": "水中战斗加成",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "// 仅运功者本人：身处水中（真实水域或青海标记）时，招式伤害+5，暴击骰-2。\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\nS.combat.damages.skill.mod += 5;\nS.combat.crit_waigong -= 2;\nS.combat.crit_neigong -= 2;"
                         }
                     ]
                 },
@@ -5259,7 +5271,13 @@
                             "label": "青海光环",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "// 青海光环：全体含己视作处于水中（圆满 档 payload），每回合末维持 10 内力\n//（扣取由光环管理器单一归属结算，不足即散）。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"水中战斗(圆满)\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                            "script": "// 青海光环：全体含己施加统一【身处水中】标记（in_water，与真实水域同口径、不可叠加），\n// 每回合末维持 10 内力（扣取由光环管理器单一归属结算，不足即散）；\n// 自身伤害/暴击修正不在 payload 里，由本境 passive 脚本按 in_water 触发。\nawait game.xjzl.aura.create(actor, {\n    label: \"neigong-qinghai-\" + actor.id,\n    displayName: \"青海\",\n    follow: true,\n    radius: 3,\n    faction: \"all\",\n    includeSelf: true,\n    payloadItemUuid: thisItem.uuid,\n    payloadEffectName: \"身处水中\",\n    lifecycle: \"yungong\",\n    combatId: game.combat?.id ?? null,\n    maintain: {resource: \"mp\", amount: 10},\n    cleanupOnExit: true\n});"
+                        },
+                        {
+                            "label": "水中战斗加成",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "// 仅运功者本人：身处水中（真实水域或青海标记）时，招式伤害+10，暴击骰-3。\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\nS.combat.damages.skill.mod += 10;\nS.combat.crit_waigong -= 3;\nS.combat.crit_neigong -= 3;"
                         }
                     ]
                 }
@@ -5284,8 +5302,8 @@
         },
         "effects": [
             {
-                "name": "水中战斗(领悟)",
-                "description": "招式伤害+5，暴击骰-1。周遭 1 米形成青海。回合末需消耗 10 内力维持。",
+                "name": "身处水中",
+                "description": "标记：所处环境为水中（真实水域或青海光环视作水中）。水中作战类效果自动生效。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -5293,89 +5311,9 @@
                         "stackable": false
                     }
                 },
-                "img": "systems/xjzl-system/assets/icons/neigong/江湖4.png",
+                "img": "icons/magic/water/wave-water-blue.webp",
                 "system": {
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "value": "5",
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "value": -1,
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "value": -1,
-                            "type": "add"
-                        }
-                    ]
-                },
-                "showIcon": 2
-            },
-            {
-                "name": "水中战斗(小成)",
-                "description": "招式伤害+5，暴击骰-2。周遭 2 米形成青海。回合末需消耗 10 内力维持。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "in_water",
-                        "stackable": false
-                    }
-                },
-                "img": "systems/xjzl-system/assets/icons/neigong/江湖4.png",
-                "system": {
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "value": "5",
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "value": -2,
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "value": -2,
-                            "type": "add"
-                        }
-                    ]
-                },
-                "showIcon": 2
-            },
-            {
-                "name": "水中战斗(圆满)",
-                "description": "招式伤害+10，暴击骰-3。周遭 3 米形成青海。回合末需消耗 10 内力维持。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "in_water",
-                        "stackable": false
-                    }
-                },
-                "img": "systems/xjzl-system/assets/icons/neigong/江湖4.png",
-                "system": {
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "value": "10",
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "value": -3,
-                            "type": "add"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "value": -3,
-                            "type": "add"
-                        }
-                    ]
+                    "changes": []
                 },
                 "showIcon": 2
             }
