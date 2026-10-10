@@ -23,14 +23,14 @@
 
 | 项目 | 说明 |
 |---|---|
-| Foundry VTT | 最低版本 14，已验证版本 14（V13请使用2.0.0之前的版本） |
+| Foundry VTT | 最低版本 14，已验证版本 14（V13 请使用 2.0.0 之前的版本） |
 | 系统 ID | `xjzl-system` |
 | 界面语言 | 简体中文 |
 | 必需模组 | [socketlib](https://github.com/manuelVo/foundryvtt-socketlib) |
 | 源码版本 | 见 [`system.json`](system.json) |
 | 已发布版本 | 见 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) |
 
-系统仅面向 Foundry VTT V14（V13请使用2.0.0之前的版本）。玩家使用权限代理、物资交易及部分自动结算功能时，需要至少一名 GM 在线。
+系统仅面向 Foundry VTT V14（V13 请使用 2.0.0 之前的版本）。玩家使用权限代理、物资交易及部分自动结算功能时，需要至少一名 GM 在线。
 
 ## 主要功能
 

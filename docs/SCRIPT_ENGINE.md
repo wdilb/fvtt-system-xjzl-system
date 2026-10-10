@@ -825,11 +825,9 @@ if (!region) ui.notifications.warn("光环未创建，请检查场景和光环�
 
 例如要同时放多团烟雾，每团都使用 `label: "smoke"`、`uniqueness: "none"`，并传 `source: actor`。`label` 表示这一类烟雾的名字，具体哪一团由创建或查询得到的区域对象决定：
 
-- **查询自己放了多少团**：`game.xjzl.aura.query("smoke", {source: actor})` 返回全部匹配区域，结果的 `.length` 就是团数。有数量上限的招式，应先检查这个数量再放置。
+- **查询自己放了多少团**：`game.xjzl.aura.query("smoke", {source: actor})` 的 `.length` 就是团数；有数量上限的招式应先检查再放置。
 - **只移除选定的一团**：拿到该区域对象 `region` 后，调用 `await game.xjzl.aura.dismiss(region.id, {scene: region.parent, source: actor})`。返回 `1` 表示删除成功；返回 `0` 表示没有删到，不能继续计算“消耗这团烟雾”的伤害或加值。修改这一团的范围或效果也用它的 `id` 调用 `refreshAura`。
 - **清除自己的全部烟雾**：调用 `await game.xjzl.aura.dismiss("smoke", {source: actor})`。省略 `source` 会清除当前场景中所有人的同标签烟雾。
-
-`queryLabels` 只列光环名称：即使有五团 `"smoke"`，也只列一次 `"smoke"`。数区域数量时请用 `query`。
 
 ### 效果与触发
 
