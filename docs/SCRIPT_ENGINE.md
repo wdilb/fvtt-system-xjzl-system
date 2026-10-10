@@ -751,23 +751,25 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 
 ## 光环 API
 
-`game.xjzl.aura` 在 `ready` 后可用。创建、重建和删除会写入场景，须在异步脚本中 `await`，不能用于 `passive`、`calc`。
+光环用于持续存在的范围效果，例如跟随角色的增益、留在地上的烟雾、走入后触发的陷阱。可以在角色周围创建，也可以让玩家在画布上选择落点。
+
+`game.xjzl.aura` 在 `ready` 后可用。创建、重建和删除时须使用 `await`，不能用于 `passive`、`calc`。创建成功后返回区域对象（RegionDocument）；它的 `id` 可用于单独操作这个区域。
 
 ### 方法速查
 
-`{scene}` 默认使用当前画布场景。`{source}` 可传 TokenDocument、画布 Token、Actor 或 Token UUID，用于查询、删除和重建自己的实例。合成 Actor 使用自身 Token，世界 Actor 使用画布上的首个活动 Token。
+省略 `{scene}` 时，操作当前画布场景。查询、删除或重建时传 `{source: actor}`，可只处理这个角色施放的光环；省略 `source` 则不限施放者。也可以传具体 Token、TokenDocument 或 Token UUID。Actor 有自己的 Token 时使用该 Token，否则使用画布上的首个活动 Token；需要区分同一角色的多个 Token 时，请指定具体 Token。
 
 | 方法 | 用途与返回值 |
 |---|---|
-| `await game.xjzl.aura.create(source, params)` | 创建并返回 RegionDocument；替换范围由 `uniqueness` 决定。无网格、非法半径、模式或来源返回 `null`；矩形参数及文档写入异常抛出。 |
-| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene, source})` | 按标签或 Region ID 删除（ID 优先），可限定来源。返回删除数量，`0` 表示未命中或来源无效。 |
-| `game.xjzl.aura.query(label, {scene, source})` | 返回匹配标签和来源的 RegionDocument 数组；未命中或来源无效时为空。 |
-| `game.xjzl.aura.queryLabels({scene, source})` | 返回去重后的标签数组；枚举实例数量应使用 `query`。 |
-| `await game.xjzl.aura.refreshAura(labelOrRegionId, overrides, {scene, source})` | 用当前行为配置和覆盖参数重建选定实例。标签只定位首个匹配实例，多实例用 ID。返回新 RegionDocument；目标已失效、来源不匹配或跟随源已删除时返回 `null`。固定区域可在源 Token 删除后继续重建。 |
-| `game.xjzl.aura.exists(label, source, {scene})` | 是否已有该来源的实例；source 省略时不限来源。用于补建判断，需要改变范围或效果时直接创建或重建。 |
-| `await game.xjzl.aura.queryTokens(source, opts)` | 即时返回范围内的 Actor 数组，不创建 Region；同一关联 Actor 可因多个 Token 命中而重复出现。 |
+| `await game.xjzl.aura.create(source, params)` | 创建光环，返回区域对象；是否替换已有光环由 `uniqueness` 决定。缺少标签、场景无网格、半径或来源等参数无效时返回 `null`；矩形参数及文档写入异常抛出。 |
+| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene, source})` | 传标签可删除全部匹配区域，传某个区域的 `id` 只删除它（ID 优先）。返回实际删除数量，`0` 表示没有删到。 |
+| `game.xjzl.aura.query(label, {scene, source})` | 返回符合标签和施放者条件的区域数组；没有匹配区域时为空数组。数组的 `.length` 就是区域数量。 |
+| `game.xjzl.aura.queryLabels({scene, source})` | 列出有哪些光环标签，每个标签只列一次；统计区域数量请用 `query`。 |
+| `await game.xjzl.aura.refreshAura(labelOrRegionId, overrides, {scene, source})` | 根据当前配置和 `overrides` 重建区域，返回新区域对象。传标签只处理第一个匹配区域；要指定某个区域，传它的 `id`。目标不存在、来源不匹配或跟随的源 Token 已删除时返回 `null`；固定区域仍可在源 Token 删除后重建。 |
+| `game.xjzl.aura.exists(label, source, {scene})` | 检查这个施放者是否已有该标签的光环，返回布尔值；省略 `source` 时不限施放者。改变已有光环的范围或效果，请用 `create` 或 `refreshAura`。 |
+| `await game.xjzl.aura.queryTokens(source, opts)` | 查询指定范围内的角色，返回 Actor 数组，不创建区域。同一关联 Actor 有多个 Token 在范围内时，数组中可能多次出现这个 Actor。 |
 
-`create`、`refreshAura` 和 `auraQuick.place` 在 GM 已提交、但本地文档同步未完成时抛出异常：`error.code === "AURA_SYNC_PENDING"`，`error.regionUuid` 是已创建区域的 UUID。此时不能按“未创建”直接重试；可稍后通过 `fromUuid(error.regionUuid)` 获取文档，再决定继续使用或按 Region ID 清理。`null` 不表示这种已提交状态。
+如果 `create`、`refreshAura` 或 `auraQuick.place` 抛出的异常中，`error.code` 为 `"AURA_SYNC_PENDING"`，表示区域已经创建，只是当前客户端还没有收到它。不要立即重新创建，否则可能重复放置。异常的 `error.regionUuid` 保存了这个区域的 UUID；稍后可用 `fromUuid(error.regionUuid)` 获取区域对象，再用它的 `id` 继续操作或删除。返回 `null` 表示本次没有创建新区域，不表示这种同步延迟。
 
 ### 创建示例
 
@@ -789,29 +791,49 @@ const region = await game.xjzl.aura.create(actor, {
 if (!region) ui.notifications.warn("光环未创建，请检查场景和光环参数。");
 ```
 
-### 源、范围与目标
+### 创建位置、范围与目标
 
-位置源接受 TokenDocument、画布 Token、Actor，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随；`follow: false` 固定在创建位置。坐标源始终固定，使用 `params.source` 指定施展者 Token/Actor 或 Token UUID。
+创建时，第一个参数决定光环放在哪里：传 Actor、TokenDocument 或画布 Token，默认跟随该 Token 移动；加上 `follow: false` 则留在创建位置。传像素坐标 `{scene, x, y}` 时，光环固定在该处；另用 `params.source` 指定是谁施放的，可以传 Actor、TokenDocument、画布 Token 或 Token UUID。
 
 | 参数 | 说明 |
 |---|---|
-| `label` | 必填业务标签；同标签的不同来源通过 `{source}` 区分，无需依赖 `actor.id`。 |
-| `uniqueness` | `"source"` 替换同标签同源实例；`"scene"` 替换同标签全部实例；`"none"` 保留多实例。默认有来源时为 `"source"`，无来源坐标区域为 `"scene"`。显式 `"source"` 必须有源 Token。 |
+| `label` | 给这一类光环起的查找名称，例如 `"smoke"`；查询和删除时使用同一个名称。必填，画布上显示的名字另填 `displayName`。 |
+| `uniqueness` | 再次创建相同 `label` 的光环时如何处理旧区域，见下方“数量与替换”。 |
 | `radius` | 圆形半径，非负整数，默认 `0`；单位为格。覆盖始终按单段 1-2-2-2 计算，不受场景对角线规则或 `customDistanceRule` 影响。 |
 | `shapeKind: "rect"` | 改用矩形；`rectWidth`、`rectHeight` 为宽高格数，`anchorX`、`anchorY` 指定锚格。 |
 | `quarterTurns` | 90° 转数；`"auto"` 按源 Token 朝向吸附。 |
 | `displayName` / `color` | Region 显示名称与颜色。 |
-| `levelIds` | 指定楼层。 |
-| `faction` | 默认 `"all"`（含中立）；`"ally"` 为同阵营，`"enemy"` 为敌方（不含中立）。阵营过滤需要可解析的源 Token。 |
-| `includeSelf` | 默认 `true`；`false` 按源 Actor 排除自身，包括同一 Actor 的所有关联 Token。 |
+| `levelIds` | 指定光环生效的楼层 ID 列表。 |
+| `faction` | `"all"`（默认）影响全体，含中立；`"ally"` 只影响施放者的同阵营单位；`"enemy"` 只影响敌方，不含中立。后两种需要指定施放者，并能找到其 Token。 |
+| `includeSelf` | 默认 `true`，包含施放者；设为 `false` 可排除自身，使用同一 Actor 的所有关联 Token 也会一起排除。 |
 
-- **坐标来源**：`params.source` 或 `sourceActorUuid` 指定有 Token 的施展者，供归属、阵营、自身过滤和来源结算使用。`queryTokens` 的坐标源不识别施展者，应使用 `faction: "all"`。
+- **坐标放置的施放者**：在创建参数中填 `source: actor`，也可提供 `sourceActorUuid`，该角色须有可用 Token。这样才能按施放者查询区域、判断敌友和排除自身。`queryTokens` 直接查询坐标范围时不识别施放者，请使用 `faction: "all"`。
 - **即时查询**：`queryTokens` 也接受形状生成器的相对 `offsets`（`i` 为列、`j` 为行），仅查平面覆盖，不按 `levelIds` 过滤。
 - **无空间范围的效果**：若作用于场上所有其他角色，直接结算，无需创建 Region。
 
+### 数量与替换
+
+先按规则决定“再次施放时，旧光环应该保留还是消失”。下表只比较同一场景中、`label` 相同的光环：
+
+| 规则需要 | 创建时填写 | 再次施放的结果 |
+|---|---|---|
+| 每个施放者只能保留一个 | `uniqueness: "source"` | 替换这个施放者的旧区域，其他人的保留；必须有施放者 Token。 |
+| 整个场景只能保留一个，例如互斥天候 | `uniqueness: "scene"` | 替换场景中所有同标签的旧区域，不区分施放者。 |
+| 同一个施放者可以放多个，例如烟雾或陷阱 | `uniqueness: "none"` | 每次新增一个区域，保留已有区域。 |
+
+这里的“施放者”以指定的 Token 为准，同一角色的不同 Token 可以各自放置。脚本省略 `uniqueness` 时，有施放者 Token 的光环默认每个施放者一个；未指定施放者的坐标区域默认整个场景一个。手动快建窗口默认“允许多个”，可在窗口中改选。
+
+例如要同时放多团烟雾，每团都使用 `label: "smoke"`、`uniqueness: "none"`，并传 `source: actor`。`label` 表示这一类烟雾的名字，具体哪一团由创建或查询得到的区域对象决定：
+
+- **查询自己放了多少团**：`game.xjzl.aura.query("smoke", {source: actor})` 返回全部匹配区域，结果的 `.length` 就是团数。有数量上限的招式，应先检查这个数量再放置。
+- **只移除选定的一团**：拿到该区域对象 `region` 后，调用 `await game.xjzl.aura.dismiss(region.id, {scene: region.parent, source: actor})`。返回 `1` 表示删除成功；返回 `0` 表示没有删到，不能继续计算“消耗这团烟雾”的伤害或加值。修改这一团的范围或效果也用它的 `id` 调用 `refreshAura`。
+- **清除自己的全部烟雾**：调用 `await game.xjzl.aura.dismiss("smoke", {source: actor})`。省略 `source` 会清除当前场景中所有人的同标签烟雾。
+
+`queryLabels` 只列光环名称：即使有五团 `"smoke"`，也只列一次 `"smoke"`。数区域数量时请用 `query`。
+
 ### 效果与触发
 
-**效果来源（payload）只选一种**；同时配置时 `payloadStatusId` 优先。
+要让区域中的角色获得状态，选择下面一种状态来源（payload）。同时填写时，`payloadStatusId` 优先。
 
 | 来源 | 参数 |
 |---|---|
@@ -820,11 +842,11 @@ if (!region) ui.notifications.warn("光环未创建，请检查场景和光环�
 
 | 触发开关 | 默认 | 结算行为 |
 |---|---|---|
-| `enterEnabled` | `true` | 每次进入范围挂载一次 payload，再执行 `enterAction`。 |
-| `roundEnabled` | `false` | 在 `roundTiming` 指定的时机执行 `roundAction`；`kind: "effect"` 时挂载一次 payload。 |
-| `moveWithin` | `false` | 区域内移动复用 `enterAction`，不重复挂载 payload。 |
+| `enterEnabled` | `true` | 每次进入范围施加一次上面配置的状态，再执行 `enterAction`。 |
+| `roundEnabled` | `false` | 在 `roundTiming` 指定的时机执行 `roundAction`；`kind: "effect"` 时施加一次上面配置的状态。 |
+| `moveWithin` | `false` | 在区域内部移动时也执行 `enterAction`，但不再次施加上面配置的状态。 |
 
-每次挂载时，可叠层 AE 按叠层规则累加，非叠层 AE 覆盖/刷新数值与时长。**仅需回合挂载**时，设 `enterEnabled: false`；三个开关均关闭时仅标记范围。
+每次施加状态时，可叠层效果按其规则增加层数，不可叠层效果刷新数值与时长。只想在回合时施加状态，设置 `enterEnabled: false`、`roundEnabled: true`、`roundAction: {kind: "effect"}`。只想显示范围，则关闭 `enterEnabled`、`roundEnabled` 和 `moveWithin`。
 
 `roundTiming` 默认 `"tokenRoundEnd"`，可选时机：
 
@@ -840,25 +862,25 @@ if (!region) ui.notifications.warn("光环未创建，请检查场景和光环�
 | `type` | 伤害类型或治疗资源键。 |
 | `pierce` | 仅用于伤害；开启后无视格挡、防御和最低伤害保底。 |
 
-### 每轮节流
+### 限制重复触发
 
-两个开关默认均为 `false`，战斗外不节流。
+两个开关默认均为 `false`；战斗外不限制每轮触发次数。
 
 | 参数 | 同一目标每战斗轮的行为 |
 |---|---|
-| `throttlePerRound` | 进入结算至多一次；后续进入不挂载效果、不执行动作。 |
-| `oncePerRound` | 进入与所选回合时机共用一次额度，先发生者结算；须同时开启 `enterEnabled`、`roundEnabled`。 |
+| `throttlePerRound` | 同一目标在一轮内反复进出，只在第一次进入时施加状态并执行 `enterAction`。 |
+| `oncePerRound` | 首次进入和所选回合时机合计只触发一次，先发生哪个就执行哪个的效果。 |
 
-使用 `oncePerRound` 时，进入执行 `enterAction`，回合执行 `roundAction`；配置了 payload 则由先发生的事件挂载一次。**两条路径都须有实际效果**：进入须有 payload 或有效 `enterAction`，回合须有 payload 或有效 `roundAction`，避免空结算占用额度。
+要实现“首次进入或在范围内开始回合时触发，每轮只触发一次”，同时开启 `enterEnabled`、`roundEnabled`、`oncePerRound`，并设置 `roundTiming: "tokenTurnStart"`。进入时配置 `enterAction`，回合时配置 `roundAction`；两者可以共用上面的状态来源。两边都要配置实际效果，否则没有效果的一次触发也可能使另一边本轮不再生效。
 
 ### 时长与生命周期
 
 | 参数 | 说明 |
 |---|---|
-| `durationRounds` | 存活轮数，仅在创建时已有进行中的战斗轮次时生效。 |
-| `maintain: {resource, amount, perTarget}` | 绑定战斗的源角色回合末消耗：`amount + perTarget × 覆盖敌人数`，扣取 `resource`。 |
+| `durationRounds` | 持续多少轮；创建时战斗已经开始才会计时，到期自动移除。 |
+| `maintain: {resource, amount, perTarget}` | 在施放者回合末扣取 `resource`：固定消耗 `amount`，再按范围内每名敌方追加 `perTarget`。实际扣取不足时光环消失。 |
 | `combatId` | 所属战斗；需要绑定战斗而未显式传入时，使用创建时的当前战斗。 |
-| `sourceActorUuid` / `sourceItemUuid` | 按来源清理所需的角色/物品 UUID；Token/Actor 源自动记录角色 UUID。 |
+| `sourceActorUuid` / `sourceItemUuid` | 分别指定施放者角色、来源物品的 UUID，供运功、架招或装备变化时清理光环。用 Token/Actor 创建时会自动记录角色 UUID，装备光环还需提供来源物品 UUID。 |
 
 `lifecycle` 控制清理时机：
 
@@ -872,13 +894,13 @@ if (!region) ui.notifications.warn("光环未创建，请检查场景和光环�
 
 ### 退出清理与更新
 
-`cleanupOnExit` 默认 `true`，只管理光环直接挂载且已记账的 payload。
+`cleanupOnExit` 决定角色离开范围、或光环被删除/重建后，是否撤销光环施加的状态。默认开启；只处理上面指定的状态来源，不撤销已经造成的伤害或治疗，也不清理监听脚本额外添加的效果。
 
-- **开启**：记录可叠层 AE 的实际贡献层数、非叠层 AE 的清理归属；离区或删除/重建光环时只释放这些记录。首次挂载前已有的同 slug AE 保留；多个光环维护同一非叠层 AE 时，最后一条记录释放后才决定是否移除。
-- **关闭**：仍施加效果，但不记账；离区、删除或重建均保留效果。需另设到期机制或手动清理，后续开启不会追溯清理未记录的效果。
-- **中途改开关**：已有记录沿用原清理语义，退出并重新进入后采用新值。
+- **开启**：离开范围或光环消失时，撤销这个光环提供的效果。角色进入前已有的同一状态保留；可叠层状态只减去这个光环增加的层数。同一不可叠层状态还有其他光环提供时，会继续保留。
+- **关闭**：离开范围或光环消失后，状态仍然保留。请为状态设置自己的到期时间，或安排手动清理；之后再开启此选项，也不会自动清除之前保留的效果。
+- **中途改开关**：已经由光环管理的效果仍按原设置清理。要让新设置应用到当前所有目标，可重建区域，或让角色离开后重新进入；此前保留的效果仍须单独处理。
 
-更新半径、动作或效果用 `refreshAura(label, overrides, {scene, source})` 重建；直接修改 Region 行为中的范围字段也会重算形状。已有清理记录时，更换 payload 引用仍沿用旧引用直至退出；需立即切换则用 `refreshAura`。未记账的旧效果须自行处理。
+用 `refreshAura(region.id, overrides, {scene: region.parent, source: actor})` 可以改变指定光环的半径、动作或状态。也可以直接在区域配置页修改范围。若角色已经获得这个光环提供的可清理状态，配置页更换状态来源后，他仍保留原状态直到离开；要立即换用新状态，请重建区域。此前设置为保留的旧效果不会因重建而自动移除。
 
 ### 快建与画布选点
 
