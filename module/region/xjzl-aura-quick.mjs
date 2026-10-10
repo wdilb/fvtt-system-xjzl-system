@@ -120,6 +120,7 @@ let placement = null;
  * 进入画布放置模式，供快建窗口和公共选点 API 共用。
  * @param {object} params - 传给 AuraManager.create 的参数（label/radius/color 等）
  * @returns {Promise<RegionDocument|null>} 创建的 Region；取消、无网格或创建失败时为 null
+ *   已提交但未同步时抛出带 regionUuid 的 AURA_SYNC_PENDING 异常
  */
 function beginPlacement(params) {
     cancelPlacement();
@@ -128,7 +129,7 @@ function beginPlacement(params) {
         return Promise.resolve(null);
     }
 
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
         const grid = canvas.scene.grid;
         const radiusPx = (params.radius ?? 0) * (canvas.dimensions.size ?? 100);
         const preview = new PIXI.Graphics();
@@ -190,6 +191,11 @@ function beginPlacement(params) {
                     {...params, follow: false}
                 );
             } catch (error) {
+                // 提交已成功的异常须保留 UUID，不能让批量放置按 null 回滚或重试。
+                if (error.code === "AURA_SYNC_PENDING") {
+                    reject(error);
+                    return;
+                }
                 console.error("XJZL | auraQuick.place failed", error);
                 ui.notifications.error(game.i18n.localize("XJZL.Aura.CreateFailed"));
             }
@@ -243,7 +249,7 @@ export class AuraQuickCreator extends HandlebarsApplicationMixin(ApplicationV2) 
     };
 
     /**
-     * @override 弹窗数据：token 列表（跟随模式选择源）、默认当前选中 token。
+     * @override 弹窗数据：跟随或同源替换时选择来源 Token，默认允许同名光环并存。
      * @param {object} _options
      * @returns {Promise<object>}
      */
@@ -260,17 +266,23 @@ export class AuraQuickCreator extends HandlebarsApplicationMixin(ApplicationV2) 
             duration: 0,
             color: DEFAULT_COLOR,
             defaultMode: defaultToken ? "follow" : "static",
+            defaultUniqueness: "none",
             allTokens,
             selectedTokenId: defaultToken?.document?.id ?? allTokens[0]?.id ?? "",
             modes: {
                 static: game.i18n.localize("XJZL.UI.AuraQuick.StaticMode"),
                 follow: game.i18n.localize("XJZL.UI.AuraQuick.FollowMode")
+            },
+            uniquenessModes: {
+                none: game.i18n.localize("XJZL.UI.AuraQuick.UniquenessNone"),
+                source: game.i18n.localize("XJZL.UI.AuraQuick.UniquenessSource"),
+                scene: game.i18n.localize("XJZL.UI.AuraQuick.UniquenessScene")
             }
         };
     }
 
     /**
-     * 表单提交：跟随模式以所选 Token 为源直接创建；固定模式进入画布放置。
+     * 表单提交：跟随模式直接创建，固定模式选点；同源替换必须选择来源 Token。
      * @param {Event} event
      * @param {HTMLElement} target
      */
@@ -290,15 +302,19 @@ export class AuraQuickCreator extends HandlebarsApplicationMixin(ApplicationV2) 
             return ui.notifications.warn(game.i18n.localize("XJZL.UI.AuraQuick.DurationInvalid"));
         }
         const duration = durationRaw > 0 ? durationRaw : 0;
+        const uniqueness = String(read("uniqueness") || "none");
+        if (!["none", "source", "scene"].includes(uniqueness)) {
+            return ui.notifications.warn(game.i18n.localize("XJZL.UI.AuraQuick.UniquenessInvalid"));
+        }
         // mark 模式零结算：显式关闭全部结算开关（管理器默认 enterEnabled
         // 为 true，不显式传会带出进入结算），需要结算的经核心 Region
         // 配置页在行为中后补。
-        // label 是单实例替换键（同 label 先删旧再建新）——手动创建必须
-        // 互不覆盖，用内部唯一值；用户输入只作 displayName（画布标签与
-        // 区域名）。"替换"语义留给数据脚本按业务 label 精确控制。
+        // 同名手动光环共用业务标签，替换模式才能找到旧实例；默认 none
+        // 保留并存行为，前缀避免与招式脚本的标签混用。
         const params = {
-            label: `aura-quick-${foundry.utils.randomID(8)}`,
+            label: `aura-quick-${displayName}`,
             displayName,
+            uniqueness,
             radius,
             color: String(read("color") || DEFAULT_COLOR),
             follow: read("mode") === "follow",
@@ -314,10 +330,13 @@ export class AuraQuickCreator extends HandlebarsApplicationMixin(ApplicationV2) 
                 ui.notifications.warn(game.i18n.localize("XJZL.UI.AuraQuick.DurationNoCombat"));
             }
         }
-        if (params.follow) {
+        let token = null;
+        if (params.follow || uniqueness === "source") {
             const tokenId = String(read("tokenId") || "");
-            const token = canvas.scene.tokens.get(tokenId);
+            token = canvas.scene.tokens.get(tokenId);
             if (!token) return ui.notifications.warn(game.i18n.localize("XJZL.UI.AuraQuick.InvalidToken"));
+        }
+        if (params.follow) {
             // 管理器返回 null 表示未创建；保留弹窗供重试，异常另行提示。
             try {
                 const region = await game.xjzl.aura.create(token, params);
@@ -326,26 +345,38 @@ export class AuraQuickCreator extends HandlebarsApplicationMixin(ApplicationV2) 
                 this.close();
             } catch (error) {
                 console.error("XJZL | auraQuick follow create failed", error);
+                if (error.code === "AURA_SYNC_PENDING") {
+                    ui.notifications.warn(game.i18n.localize("XJZL.Aura.SyncPending"));
+                    this.close();
+                    return;
+                }
                 ui.notifications.error(game.i18n.localize("XJZL.Aura.CreateFailed"));
             }
         } else {
+            if (token) params.source = token;
             // 固定模式进入画布放置：弹窗立即关闭，避免遮挡画布视野
             this.close();
-            placeAura(params);
+            placeAura(params).catch(error => {
+                console.error("XJZL | auraQuick placement failed", error);
+                if (error.code === "AURA_SYNC_PENDING") ui.notifications.warn(game.i18n.localize("XJZL.Aura.SyncPending"));
+                else ui.notifications.error(game.i18n.localize("XJZL.Aura.CreateFailed"));
+            });
         }
     }
 
-    /** @override 模式切换显隐 token 选择。 */
+    /** @override 跟随或同源替换需要 Token；其他固定区域不要求来源。 */
     _onRender(context, options) {
         super._onRender(context, options);
         const modeSelect = this.element.querySelector('select[name="mode"]');
+        const uniquenessSelect = this.element.querySelector('select[name="uniqueness"]');
         const tokenGroup = this.element.querySelector("#aura-token-select-group");
-        if (!modeSelect || !tokenGroup) return;
+        if (!modeSelect || !uniquenessSelect || !tokenGroup) return;
         const toggle = () => {
-            tokenGroup.style.display = modeSelect.value === "follow" ? "flex" : "none";
+            tokenGroup.style.display = modeSelect.value === "follow" || uniquenessSelect.value === "source" ? "flex" : "none";
         };
         toggle();
         modeSelect.addEventListener("change", toggle);
+        uniquenessSelect.addEventListener("change", toggle);
     }
 }
 
@@ -389,6 +420,7 @@ export function openAuraQuick() {
  * 打开固定光环的画布选点流程，供招式脚本复用。
  * @param {object} params - AuraManager.create 的参数；位置由玩家点击选择，follow 会被固定为 false
  * @returns {Promise<RegionDocument|null>} 创建的 Region；取消、无网格或创建失败时为 null
+ *   已提交但未同步时抛出带 regionUuid 的 AURA_SYNC_PENDING 异常
  */
 export function placeAura(params) {
     if (!params || typeof params !== "object" || Array.isArray(params)) {

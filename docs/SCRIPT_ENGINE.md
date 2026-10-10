@@ -755,16 +755,19 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 
 ### 方法速查
 
-下表中的 `{scene}` 默认使用当前画布场景。
+`{scene}` 默认使用当前画布场景。`{source}` 可传 TokenDocument、画布 Token、Actor 或 Token UUID，用于查询、删除和重建自己的实例。合成 Actor 使用自身 Token，世界 Actor 使用画布上的首个活动 Token。
 
 | 方法 | 用途与返回值 |
 |---|---|
-| `await game.xjzl.aura.create(source, params)` | 创建光环，先删除同场景同 `label` 的旧实例。返回 `RegionDocument`；缺标签、源不可用、无网格或半径非法时返回 `null`，矩形尺寸或锚点非法时抛错。 |
-| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene})` | 按标签或 Region ID 删除，返回删除数量；`0` 表示未删到。 |
-| `game.xjzl.aura.query(label, {scene})` | 返回同标签的 `RegionDocument[]`。 |
-| `game.xjzl.aura.queryLabels({scene})` | 返回去重后的标签数组。 |
-| `await game.xjzl.aura.refreshAura(label, overrides, {scene})` | 用已有实例的参数和覆盖项重建光环，返回新 Region；标签不存在或源失效时返回 `null`。 |
-| `await game.xjzl.aura.queryTokens(source, opts)` | 即时查询范围内的 `Actor[]`，不创建 Region；同一关联 Actor 可因多个 Token 命中而重复出现。 |
+| `await game.xjzl.aura.create(source, params)` | 创建并返回 RegionDocument；替换范围由 `uniqueness` 决定。无网格、非法半径、模式或来源返回 `null`；矩形参数及文档写入异常抛出。 |
+| `await game.xjzl.aura.dismiss(labelOrRegionId, {scene, source})` | 按标签或 Region ID 删除（ID 优先），可限定来源。返回删除数量，`0` 表示未命中或来源无效。 |
+| `game.xjzl.aura.query(label, {scene, source})` | 返回匹配标签和来源的 RegionDocument 数组；未命中或来源无效时为空。 |
+| `game.xjzl.aura.queryLabels({scene, source})` | 返回去重后的标签数组；枚举实例数量应使用 `query`。 |
+| `await game.xjzl.aura.refreshAura(labelOrRegionId, overrides, {scene, source})` | 用当前行为配置和覆盖参数重建选定实例。标签只定位首个匹配实例，多实例用 ID。返回新 RegionDocument；目标已失效、来源不匹配或跟随源已删除时返回 `null`。固定区域可在源 Token 删除后继续重建。 |
+| `game.xjzl.aura.exists(label, source, {scene})` | 是否已有该来源的实例；source 省略时不限来源。用于补建判断，需要改变范围或效果时直接创建或重建。 |
+| `await game.xjzl.aura.queryTokens(source, opts)` | 即时返回范围内的 Actor 数组，不创建 Region；同一关联 Actor 可因多个 Token 命中而重复出现。 |
+
+`create`、`refreshAura` 和 `auraQuick.place` 在 GM 已提交、但本地文档同步未完成时抛出异常：`error.code === "AURA_SYNC_PENDING"`，`error.regionUuid` 是已创建区域的 UUID。此时不能按“未创建”直接重试；可稍后通过 `fromUuid(error.regionUuid)` 获取文档，再决定继续使用或按 Region ID 清理。`null` 不表示这种已提交状态。
 
 ### 创建示例
 
@@ -774,7 +777,7 @@ AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`
 const auraCombat = game.combat;
 if (!auraCombat?.round) return ui.notifications.warn("需要进行中的战斗。");
 const region = await game.xjzl.aura.create(actor, {
-  label: `blind-aura-${actor.id}`,
+  label: "blind-aura",
   displayName: "目盲光环",
   radius: 2,
   faction: "enemy",
@@ -788,11 +791,12 @@ if (!region) ui.notifications.warn("光环未创建，请检查场景和光环�
 
 ### 源、范围与目标
 
-`source` 接受 `TokenDocument`、画布 `Token`、当前画布有活动 Token 的 `Actor`，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随；设 `follow: false` 固定在创建位置。坐标源始终固定。
+位置源接受 TokenDocument、画布 Token、Actor，或像素坐标 `{scene, x, y}`。Token/Actor 源默认跟随；`follow: false` 固定在创建位置。坐标源始终固定，使用 `params.source` 指定施展者 Token/Actor 或 Token UUID。
 
 | 参数 | 说明 |
 |---|---|
-| `label` | 必填字符串，用于查询、更新和删除。 |
+| `label` | 必填业务标签；同标签的不同来源通过 `{source}` 区分，无需依赖 `actor.id`。 |
+| `uniqueness` | `"source"` 替换同标签同源实例；`"scene"` 替换同标签全部实例；`"none"` 保留多实例。默认有来源时为 `"source"`，无来源坐标区域为 `"scene"`。显式 `"source"` 必须有源 Token。 |
 | `radius` | 圆形半径，非负整数，默认 `0`；单位为格。覆盖始终按单段 1-2-2-2 计算，不受场景对角线规则或 `customDistanceRule` 影响。 |
 | `shapeKind: "rect"` | 改用矩形；`rectWidth`、`rectHeight` 为宽高格数，`anchorX`、`anchorY` 指定锚格。 |
 | `quarterTurns` | 90° 转数；`"auto"` 按源 Token 朝向吸附。 |
@@ -801,7 +805,7 @@ if (!region) ui.notifications.warn("光环未创建，请检查场景和光环�
 | `faction` | 默认 `"all"`（含中立）；`"ally"` 为同阵营，`"enemy"` 为敌方（不含中立）。阵营过滤需要可解析的源 Token。 |
 | `includeSelf` | 默认 `true`；`false` 按源 Actor 排除自身，包括同一 Actor 的所有关联 Token。 |
 
-- **坐标源过滤**：创建光环时可传 `sourceActorUuid`，该角色须在当前画布有活动 Token；`queryTokens` 的坐标源应使用 `faction: "all"`，无法识别自身。
+- **坐标来源**：`params.source` 或 `sourceActorUuid` 指定有 Token 的施展者，供归属、阵营、自身过滤和来源结算使用。`queryTokens` 的坐标源不识别施展者，应使用 `faction: "all"`。
 - **即时查询**：`queryTokens` 也接受形状生成器的相对 `offsets`（`i` 为列、`j` 为行），仅查平面覆盖，不按 `levelIds` 过滤。
 - **无空间范围的效果**：若作用于场上所有其他角色，直接结算，无需创建 Region。
 
@@ -874,14 +878,14 @@ if (!region) ui.notifications.warn("光环未创建，请检查场景和光环�
 - **关闭**：仍施加效果，但不记账；离区、删除或重建均保留效果。需另设到期机制或手动清理，后续开启不会追溯清理未记录的效果。
 - **中途改开关**：已有记录沿用原清理语义，退出并重新进入后采用新值。
 
-更新半径、动作或效果用 `refreshAura(label, overrides, {scene})` 重建；直接修改 Region 行为中的范围字段也会重算形状。已有清理记录时，更换 payload 引用仍沿用旧引用直至退出；需立即切换则用 `refreshAura`。未记账的旧效果须自行处理。
+更新半径、动作或效果用 `refreshAura(label, overrides, {scene, source})` 重建；直接修改 Region 行为中的范围字段也会重算形状。已有清理记录时，更换 payload 引用仍沿用旧引用直至退出；需立即切换则用 `refreshAura`。未记账的旧效果须自行处理。
 
 ### 快建与画布选点
 
 | 入口 | 用法 |
 |---|---|
-| 工具栏光环快建按钮 / `game.xjzl.auraQuick.open()` | 打开快建窗口，默认仅标记范围；自动结算需编辑区域行为，或用 `aura.create()` 传入结算参数。 |
-| `await game.xjzl.auraQuick.place(params)` | 使用 `aura.create` 的参数，由玩家点击落点，`follow` 固定为 `false`。返回 `RegionDocument`；取消、无网格或创建失败返回 `null`。阵营过滤需 `sourceActorUuid`。 |
+| 工具栏光环快建按钮 / `game.xjzl.auraQuick.open()` | 选择固定/跟随及同名手动光环的处理方式：允许多个（默认）、同源替换、全场替换。同源替换须选择来源 Token。默认仅标记范围，自动结算需配置区域行为。 |
+| `await game.xjzl.auraQuick.place(params)` | 使用创建参数，由玩家点击落点，`follow` 固定为 `false`。返回 RegionDocument；取消、无网格或创建失败返回 `null`。用 `params.source` 声明施展者可按阵营和自身过滤。 |
 
 规则要求“自身周围生成、留在原地”时，用角色作为 `source` 创建并设 `follow: false`。规则允许自选落点时才用 `place`；选点不校验施展距离或格子占用，由玩家按规则选择。进出/回合效果仍由 Region 行为结算。
 

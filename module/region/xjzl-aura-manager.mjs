@@ -15,6 +15,9 @@
  * region flags `xjzl-system.aura` 持久化：label、lifecycle、源物品/Actor/Token
  * uuid、战斗 ID、到期轮次、维持状态与创建参数快照（refreshAura 重建依据）；
  * 施加账本与节流记录由 AuraLedger 维护。
+ *
+ * sourceTokenUuid 是归属与源过滤的唯一标识；uniqueness 决定同标签
+ * 实例的替换范围，避免同模板的非关联 Token 因 actor.id 相同互相覆盖。
  */
 
 import {AuraLedger} from "./xjzl-aura-ledger.mjs";
@@ -34,8 +37,9 @@ export class AuraManager {
     static #currentActors = new Map();
     /** @type {boolean} 钩子只注册一次。 */
     static #initialized = false;
-    /** @type {Promise<void>} 并行创建会覆盖 Region 的 Token 包含跟踪，故串行创建。 */
-    static #createChain = Promise.resolve();
+    /** @type {Promise<void>} GM 文档写入串行链；账本清理须在链外等待，
+     *  否则结算脚本反向 await 光环 API 时会形成循环等待。 */
+    static #mutationChain = Promise.resolve();
 
     /* -------------------------------------------- */
     /*  钩子注册                                     */
@@ -115,35 +119,25 @@ export class AuraManager {
     /* -------------------------------------------- */
 
     /**
-     * 创建光环 region（单实例标签：同 label 先删旧再建新）。
-     * @param {TokenDocument|Token|Actor|{scene: Scene, x: number, y: number}} source
-     *   光环源：跟随/定位型传 Token（或 Actor 取其活动 Token），放置型传场景像素坐标。
-     * @param {object} params - 光环参数（形状同行为 schema 平铺字段，另有管理器字段）：
-     *   {label(必填), displayName?, color?, follow?, radius, shapeKind, rectWidth, rectHeight,
-     *    anchorX, anchorY, quarterTurns(number|"auto"), faction, includeSelf,
-     *    payloadItemUuid?, payloadEffectName?, payloadStatusId?, enterAction?, moveWithin?, throttlePerRound?, oncePerRound?,
-     *    roundTiming?, roundAction?, cleanupOnExit?, enterEnabled?, roundEnabled?,
-     *    durationRounds?, maintain?, lifecycle?, sourceActorUuid?, sourceItemUuid?, levelIds?}
-     *   maintain: {resource("mp"/"hp"/…), amount(每回合固定), perTarget(每名覆盖敌人的追加消耗,
-     *   如 20 表达"按人数×20")}
-     * @returns {Promise<RegionDocument|null>} 创建的 region；无网格/参数非法返回 null
+     * 创建光环；同标签实例按 uniqueness 的 source、scene 或 none 模式处理。
+     * @param {TokenDocument|Token|Actor|{scene: Scene, x: number, y: number}} source - 位置源
+     * @param {object} params - 形状、结算及生命周期参数；坐标放置可用 source 声明来源
+     * @returns {Promise<RegionDocument|null>} 无网格、非法半径或来源不可用时返回 null；
+     *   矩形参数和文档写入异常向调用方抛出；已提交但未同步抛出
+     *   code 为 AURA_SYNC_PENDING、带 regionUuid 的异常
      */
     static create(source, params) {
-        // 并发创建会使核心 token→region 跟踪互相覆盖，先完成的 Region
-        // 可能没有 tokens、无法派发行为事件；逐个创建消除该窗口。
-        const run = this.#createChain.catch(err => console.error("XJZL | 前序光环创建失败:", err))
-            .then(() => this.#createImpl(source, params));
-        this.#createChain = run.then(() => undefined, () => undefined);
-        return run;
+        return this.#createImpl(source, params);
     }
 
     /**
-     * create 的实际执行体（经 #createChain 串行调用）。
-     * @param {TokenDocument|Token|Actor|{scene: Scene, x: number, y: number}} source - 光环源
-     * @param {object} params - 光环参数（见 create）
+     * 在发起端解析位置和参数，再交由活动 GM 串行替换与创建。
+     * @param {object} source - 位置源
+     * @param {object} params - 创建参数
+     * @param {object|null} [replacement] - 刷新目标 {id, sourceTokenUuid, sourceActorUuid}
      * @returns {Promise<RegionDocument|null>}
      */
-    static async #createImpl(source, params) {
+    static async #createImpl(source, params, replacement = null) {
         if (!params?.label || typeof params.label !== "string") {
             console.warn("XJZL | 光环创建被拒绝：label 必填。", params);
             return null;
@@ -153,163 +147,278 @@ export class AuraManager {
         if (!scene) return null;
         if (scene.grid?.isGridless || !scene.grid) {
             ui.notifications?.warn(game.i18n.localize("XJZL.Aura.NoGrid"));
-            console.warn(`XJZL | 场景「${scene.name}」无网格，已禁用光环创建。`);
             return null;
         }
-        // 半径以格计；拒绝小数，避免范围被静默截断。
         const radius = params.radius ?? 0;
         if (params.shapeKind !== "rect" && (!Number.isInteger(radius) || radius < 0)) {
-            console.warn(`XJZL | 光环半径必须为 ≥0 的整数（格），收到：${radius}，创建被拒绝。`);
+            console.warn("XJZL | 光环半径必须为非负整数：", radius);
             return null;
         }
-
-        // 生成器输出相对偏移（i=列、j=行），写入时按核心 GridShapeData
-        // 约定做轴映射并叠加锚格（核心 i=行(y)、j=列(x)）。
-        // quarterTurns "auto" 按源 Token 朝向（rotation）吸附 90°。
+        const sourceInfo = await this.#resolveSourceInfo(resolved, params, replacement);
+        if (!sourceInfo) return null;
+        const uniqueness = params.uniqueness ?? (sourceInfo.sourceTokenUuid ? "source" : "scene");
+        if (!["source", "scene", "none"].includes(uniqueness)
+            || (uniqueness === "source" && !sourceInfo.sourceTokenUuid)) {
+            console.warn("XJZL | 光环唯一性模式无效或缺少源 Token：", params.label, uniqueness);
+            return null;
+        }
         const quarterTurns = params.quarterTurns === "auto"
             ? snapDirectionToQuarterTurns(resolved.tokenDoc?._source?.rotation ?? 0)
             : Math.trunc(params.quarterTurns ?? 0);
         const offsets = this.#buildOffsets(params, quarterTurns, resolved.anchorOffset, scene);
         if (!offsets.length) return null;
-
-        // 单实例标签替换：先删旧建新。核心对旧 region 补发 exit 完成清理，
-        // 新 region 的行为创建时对在场 token 补发 enter，状态对称收敛。
-        await this.dismiss(params.label, {scene});
-
-        const meta = this.#buildMeta(params, resolved);
         const regionData = {
             name: params.displayName || params.label,
             color: params.color || DEFAULT_COLOR,
-            // 区域本体对所有人可见。
             visibility: CONST.REGION_VISIBILITY.ALWAYS,
-            shapes: [{
-                type: "grid",
-                offsets,
-                // 显式写 origin（锚格格心）：核心兜底取 offsets[0] 格心
-                // （西北角附近），配置页改半径时的热更新会以它反推锚格，
-                // 缺失会导致范围整体偏移；跟随平移时核心同步更新
-                origin: resolved.anchorPoint
-            }],
-            // 不做高度限制：光环按 2D 地面格判定，bottom/top 给足量程
+            shapes: [{type: "grid", offsets, origin: resolved.anchorPoint}],
+            // 结算只判断平面覆盖；origin 必须是锚格格心，配置页热更新才不会偏移。
             elevation: {bottom: -10000, top: 10000, topInclusive: false},
             levels: this.#resolveLevels(resolved, params),
             attachment: resolved.follow && resolved.tokenDoc ? {token: resolved.tokenDoc.id} : null,
-            behaviors: [{
-                name: params.label,
-                type: "xjzlAura",
-                system: this.#behaviorSystem(params, quarterTurns)
-            }],
-            flags: {[FLAG_SCOPE]: {[FLAG_AURA]: meta}}
+            behaviors: [{name: params.label, type: "xjzlAura", system: this.#behaviorSystem(params, quarterTurns)}],
+            flags: {[FLAG_SCOPE]: {[FLAG_AURA]: this.#buildMeta(params, resolved, sourceInfo, uniqueness)}}
         };
-
-        const created = game.users.activeGM?.isSelf
-            ? await foundry.documents.RegionDocument.create(regionData, {parent: scene})
-            : await xjzlSocket.executeAsGM("createEmbedded", scene.uuid, "Region", [regionData]);
-        return Array.isArray(created) ? created[0] : created;
+        if (game.users.activeGM?.isSelf) return this.#enqueueCreate(scene, regionData, replacement);
+        const uuid = await this.#callGM("auraCreate", scene.uuid, regionData, replacement);
+        return uuid ? this.#awaitRegionSync(uuid) : null;
     }
 
     /**
-     * 消除光环：按 label 或 regionId 删除 region。
-     * 删除前预提交账目清理并 await 完成（每条账目按独立 owner 释放，
-     * 见 #preDeleteCleanup）；核心删除事件可能再次提交 exit，账目已清
-     * 与条目 eid 保证不重复摘除。
-     * @param {string} labelOrRegionId - 光环标签或 region 文档 id
-     * @param {object} [options] - {scene?: Scene}（默认 canvas.scene）
-     * @returns {Promise<number>} 删除的 region 数
+     * socketlib 只传 UUID；短暂等待本地同步，避免把普通 JSON 当作文档返回。
+     * @param {string} uuid - GM 创建的 Region UUID
+     * @returns {Promise<RegionDocument>} 同步未完成时抛出带已提交 UUID 的异常
+     */
+    static async #awaitRegionSync(uuid) {
+        let cause;
+        try {
+            for (let attempt = 0; attempt < 10; attempt++) {
+                const region = await fromUuid(uuid);
+                if (region) return region;
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+        } catch (error) {
+            cause = error;
+        }
+        // UUID 是 GM 的提交收据；本地解析失败不能退化为“未创建”。
+        throw Object.assign(new Error("XJZL | 光环已创建，但本地文档同步未完成：" + uuid, {cause}), {
+            code: "AURA_SYNC_PENDING", regionUuid: uuid
+        });
+    }
+
+    /**
+     * 明确路由到活动 GM；executeAsGM 在其他 GM 客户端会本地执行。
+     * @param {string} method - 已注册的光环 socket 方法
+     * @param {...*} args - 可序列化参数
+     * @returns {Promise<*>}
+     */
+    static #callGM(method, ...args) {
+        const gm = game.users.activeGM;
+        if (!gm) throw new Error("XJZL | 无活动 GM，无法处理光环。");
+        return xjzlSocket.executeAsUser(method, gm.id, ...args);
+    }
+
+    /**
+     * GM 创建入口，返回可跨 socket 传输的 UUID。
+     * @param {Scene} scene - 目标场景
+     * @param {object} regionData - 已构造的 Region 数据
+     * @param {object|null} [replacement] - 刷新目标及原来源
+     * @returns {Promise<string|null>}
+     */
+    static async createOnGM(scene, regionData, replacement = null) {
+        const region = await this.#enqueueCreate(scene, regionData, replacement);
+        return region?.uuid ?? null;
+    }
+
+    /**
+     * GM 创建：队列外清账，队列内重新检查目标与冲突后提交文档写入。
+     * 清账期间新增的冲突须重新清理，不能带着新账目删除 Region。
+     * @param {Scene} scene - 目标场景
+     * @param {object} regionData - 新 Region 数据
+     * @param {object|null} replacement - 选定的刷新实例；创建时为 null
+     * @returns {Promise<RegionDocument|null>}
+     */
+    static async #enqueueCreate(scene, regionData, replacement) {
+        if (!game.users.activeGM?.isSelf) throw new Error("XJZL | 光环创建只能由活动 GM 执行。");
+        const meta = regionData.flags?.[FLAG_SCOPE]?.[FLAG_AURA];
+        if (!scene || !meta?.label || !["source", "scene", "none"].includes(meta.uniqueness)
+            || (meta.uniqueness === "source" && !meta.sourceTokenUuid)) {
+            throw new Error("XJZL | 无效的光环创建请求。");
+        }
+        if (meta.follow && scene.tokens.get(regionData.attachment?.token)?.uuid !== meta.sourceTokenUuid) return null;
+        const selectTargets = () => {
+            const target = replacement ? scene.regions.get(replacement.id) : null;
+            if (replacement && (!target || target.getFlag(FLAG_SCOPE, FLAG_AURA)?.sourceTokenUuid !== replacement.sourceTokenUuid)) {
+                return null;
+            }
+            const conflicts = meta.uniqueness === "none" ? [] : this.query(meta.label, {
+                scene, ...(meta.uniqueness === "source" ? {source: meta.sourceTokenUuid} : {})
+            });
+            return [...new Set(target ? [target, ...conflicts] : conflicts)];
+        };
+        for (;;) {
+            const targets = selectTargets();
+            if (!targets) return null;
+            const cleaned = new Map(await Promise.all(targets.map(async region => [region, await this.#preDeleteCleanup(region)])));
+            const result = await this.#enqueueWrite(async () => {
+                const current = selectTargets();
+                if (!current) return null;
+                // 清账期间其他请求可写入；释放队列后补清新冲突，再重试提交。
+                if (current.some(region => !cleaned.has(region) || AuraLedger.allEntriesOfRegion(region)
+                    .some(({entry}) => !cleaned.get(region).has(entry.eid)))) return undefined;
+                if (meta.follow) {
+                    const token = scene.tokens.get(regionData.attachment?.token);
+                    if (!token || token.uuid !== meta.sourceTokenUuid) return null;
+                    const behavior = regionData.behaviors[0].system;
+                    const turns = meta.params.quarterTurns === "auto"
+                        ? snapDirectionToQuarterTurns(token._source.rotation ?? 0) : behavior.quarterTurns;
+                    const sizeX = scene.grid.sizeX ?? scene.grid.size;
+                    const sizeY = scene.grid.sizeY ?? scene.grid.size;
+                    const anchor = {i: Math.floor(token._source.y / sizeY), j: Math.floor(token._source.x / sizeX)};
+                    const origin = {x: anchor.j * sizeX + sizeX / 2, y: anchor.i * sizeY + sizeY / 2};
+                    const shape = regionData.shapes[0];
+                    // 排队期间源可能移动或转向；只在锚点变化时重算，固定区域保持选定落点。
+                    if (shape.origin.x !== origin.x || shape.origin.y !== origin.y || behavior.quarterTurns !== turns) {
+                        shape.offsets = this.#buildOffsets(behavior, turns, anchor, scene);
+                        shape.origin = origin;
+                        behavior.quarterTurns = turns;
+                    }
+                }
+                if (current.length) await scene.deleteEmbeddedDocuments("Region", current.map(region => region.id));
+                return foundry.documents.RegionDocument.create(regionData, {parent: scene});
+            });
+            if (result !== undefined) return result;
+        }
+    }
+
+    /**
+     * 仅串行提交文档写入，回调不得等待账本或调用光环公共 API。
+     * @param {Function} write - 已完成清账的写入回调
+     * @returns {Promise<*>} 本次结果或异常；失败不阻塞后续提交
+     */
+    static #enqueueWrite(write) {
+        const operation = this.#mutationChain.then(() => {
+            if (!game.users.activeGM?.isSelf) throw new Error("XJZL | 光环写入只能由活动 GM 执行。");
+            return write();
+        });
+        // 错误仍由本次调用接收；仅让内部队列恢复，后续请求不会被一并拒绝。
+        this.#mutationChain = operation.then(() => undefined, () => undefined);
+        return operation;
+    }
+
+    /**
+     * 按标签或 Region ID 删除；source 可限定来源，无法解析时返回 0。
+     * @param {string} labelOrRegionId - 业务标签或 Region ID（ID 优先）
+     * @param {object} [options] - {scene?, source?}
+     * @returns {Promise<number>} 实际删除数量
      */
     static async dismiss(labelOrRegionId, options = {}) {
         const scene = options.scene ?? canvas.scene;
         if (!scene || !labelOrRegionId) return 0;
-        const ids = [];
-        if (scene.regions.has(labelOrRegionId)) {
-            ids.push(labelOrRegionId);
-        } else {
-            for (const region of scene.regions) {
-                if (region.getFlag(FLAG_SCOPE, FLAG_AURA)?.label === labelOrRegionId) ids.push(region.id);
-            }
+        const sourceTokenUuid = this.#sourceFilter(options);
+        if (sourceTokenUuid === null) return 0;
+        if (!game.users.activeGM?.isSelf) {
+            return this.#callGM("auraDismiss", scene.uuid, labelOrRegionId, sourceTokenUuid ?? null);
         }
-        if (!ids.length) return 0;
-        const regions = ids.map(id => scene.regions.get(id)).filter(Boolean);
-        for (const region of regions) await this.#preDeleteCleanup(region);
-        if (game.users.activeGM?.isSelf) {
-            await scene.deleteEmbeddedDocuments("Region", ids);
-        } else {
-            await xjzlSocket.executeAsGM("deleteEmbedded", scene.uuid, "Region", ids);
-        }
-        return ids.length;
+        return this.dismissOnGM(scene, labelOrRegionId, sourceTokenUuid ?? null);
     }
 
     /**
-     * 按标签查询场上光环实例（脚本编排用：碧火检定消耗、暗刻引爆等）。
-     * @param {string} label - 光环标签
-     * @param {object} [options] - {scene?: Scene}
-     * @returns {RegionDocument[]} 同标签的全部 region（通常为单实例）
+     * GM 删除入口；队列外清账，实际删除串行提交，避免重复消费。
+     * 清理失败会中止删除。
+     * @param {Scene} scene - 目标场景
+     * @param {string} labelOrRegionId - 标签或 Region ID
+     * @param {string|null} [sourceTokenUuid] - null 表示不限制来源
+     * @returns {Promise<number>}
+     */
+    static async dismissOnGM(scene, labelOrRegionId, sourceTokenUuid = null) {
+        if (!game.users.activeGM?.isSelf) throw new Error("XJZL | 光环删除只能由活动 GM 执行。");
+        if (!scene) return 0;
+        const direct = scene.regions.get(labelOrRegionId);
+        const regions = direct ? [direct] : this.query(labelOrRegionId, {scene});
+        let count = 0;
+        for (const region of regions) {
+            if (sourceTokenUuid && region.getFlag(FLAG_SCOPE, FLAG_AURA)?.sourceTokenUuid !== sourceTokenUuid) continue;
+            if (await this.#deleteRegion(region)) count++;
+        }
+        return count;
+    }
+
+    /**
+     * 返回指定标签的实例；提供 source 时只匹配该源 Token。
+     * @param {string} label - 业务标签
+     * @param {object} [options] - {scene?, source?}
+     * @returns {RegionDocument[]}
      */
     static query(label, options = {}) {
         const scene = options.scene ?? canvas.scene;
         if (!scene || !label) return [];
-        return scene.regions.filter(r => r.getFlag(FLAG_SCOPE, FLAG_AURA)?.label === label);
+        const sourceTokenUuid = this.#sourceFilter(options);
+        if (sourceTokenUuid === null) return [];
+        return scene.regions.filter(region => {
+            const meta = region.getFlag(FLAG_SCOPE, FLAG_AURA);
+            return meta?.label === label
+                && (sourceTokenUuid === undefined || meta.sourceTokenUuid === sourceTokenUuid);
+        });
     }
 
     /**
-     * 列出场景上全部光环标签（去重）。
-     * @param {object} [options] - {scene?: Scene}
+     * 检查是否已有实例，供“已建则跳过”的补建脚本使用。
+     * @param {string} label - 业务标签
+     * @param {TokenDocument|Token|Actor|string|null} [source] - 省略或 null 时不限来源
+     * @param {object} [options] - {scene?}
+     * @returns {boolean}
+     */
+    static exists(label, source, options = {}) {
+        return this.query(label, source == null ? options : {...options, source}).length > 0;
+    }
+
+    /**
+     * 枚举标签并去重；多实例数量应通过 query 的结果计算。
+     * @param {object} [options] - {scene?, source?}
      * @returns {string[]}
      */
     static queryLabels(options = {}) {
         const scene = options.scene ?? canvas.scene;
         if (!scene) return [];
+        const sourceTokenUuid = this.#sourceFilter(options);
+        if (sourceTokenUuid === null) return [];
         const labels = new Set();
         for (const region of scene.regions) {
-            const label = region.getFlag(FLAG_SCOPE, FLAG_AURA)?.label;
-            if (label) labels.add(label);
+            const meta = region.getFlag(FLAG_SCOPE, FLAG_AURA);
+            if (meta?.label && (sourceTokenUuid === undefined || meta.sourceTokenUuid === sourceTokenUuid)) labels.add(meta.label);
         }
         return [...labels];
     }
 
     /**
-     * 按档位/半径变化重建光环：读旧实例持久化参数，删旧建新。
-     * @param {string} label - 光环标签
-     * @param {object} [overrides] - 覆盖参数（如升级后的 radius/payloadEffectName）
-     * @param {object} [options] - {scene?: Scene}
-     * @returns {Promise<RegionDocument|null>} 新 region
+     * 重建选定实例；跟随源失效时返回 null，固定区域沿用保存的来源和锚点。
+     * @param {string} labelOrRegionId - 标签或 Region ID；多实例建议用 ID
+     * @param {object} [overrides] - 创建参数的覆盖项
+     * @param {object} [options] - {scene?, source?}；标签只定位首个匹配实例
+     * @returns {Promise<RegionDocument|null>} 并发目标已失效时返回 null；
+     *   已提交但未同步的异常与 create 相同，携带新 Region UUID
      */
-    static async refreshAura(label, overrides = {}, options = {}) {
-        const regions = this.query(label, options);
-        if (!regions.length) return null;
-        const meta = regions[0].getFlag(FLAG_SCOPE, FLAG_AURA);
-        const scene = regions[0].parent;
-        if (!meta?.params) {
-            console.warn(`XJZL | 光环「${label}」缺少创建参数快照，无法刷新。`);
-            return null;
-        }
-        // 跟随型以源 Token 重建（源已删除时落空）；固定型保留锚点，
-        // 同时在参数中保留原源身份，供阵营和自身过滤使用。
-        const source = meta.follow && meta.sourceTokenUuid
+    static async refreshAura(labelOrRegionId, overrides = {}, options = {}) {
+        const scene = options.scene ?? canvas.scene;
+        if (!scene || !labelOrRegionId) return null;
+        const sourceTokenUuid = this.#sourceFilter(options);
+        if (sourceTokenUuid === null) return null;
+        const direct = scene.regions.get(labelOrRegionId);
+        const region = direct?.getFlag(FLAG_SCOPE, FLAG_AURA) ? direct : this.query(labelOrRegionId, options)[0];
+        const meta = region?.getFlag(FLAG_SCOPE, FLAG_AURA);
+        if (!meta?.params || (sourceTokenUuid !== undefined && meta.sourceTokenUuid !== sourceTokenUuid)) return null;
+        const source = meta.follow
             ? await fromUuid(meta.sourceTokenUuid)
-            : {scene, x: meta.params.anchorPoint?.x ?? 0, y: meta.params.anchorPoint?.y ?? 0};
-        if (!source) {
-            console.warn(`XJZL | 光环「${label}」的源已失效，无法刷新。`);
-            return null;
-        }
-        // 结算参数以行为 system 的当前值为准：配置页修改半径/
-        // 形状/payload/动作后快照不会自动同步，重建必须读最新值，否则
-        // 会退回创建时的旧配置——行为 system 与 create 的 params 平铺
-        // 字段一一对应，直接整体覆盖。
-        const behavior = regions[0].behaviors.find(b => b.type === "xjzlAura");
+            : {scene, x: meta.params.anchorPoint.x, y: meta.params.anchorPoint.y};
+        if (!source) return null;
+        const behavior = region.behaviors.find(b => b.type === "xjzlAura");
         const liveParams = behavior ? {...behavior.system} : {};
-        // "auto" 朝向在 schema 中已固化为数字，重建时恢复源语义以便
-        // 按源 Token 当前朝向重新吸附（overrides 显式给值时尊重调用方）
-        if (meta.params.quarterTurns === "auto" && overrides.quarterTurns === undefined) {
-            liveParams.quarterTurns = "auto";
-        }
-        await this.dismiss(label, {scene});
-        return this.create(source, {
-            ...meta.params, ...liveParams,
-            sourceTokenUuid: meta.sourceTokenUuid,
-            sourceActorUuid: meta.sourceActorUuid,
-            ...overrides
-        });
+        if (meta.params.quarterTurns === "auto" && overrides.quarterTurns === undefined) liveParams.quarterTurns = "auto";
+        return this.#createImpl(source, {
+            ...meta.params, ...liveParams, sourceActorUuid: meta.sourceActorUuid,
+            uniqueness: meta.uniqueness, ...overrides
+        }, {id: region.id, sourceTokenUuid: meta.sourceTokenUuid, sourceActorUuid: meta.sourceActorUuid});
     }
 
     /**
@@ -397,6 +506,9 @@ export class AuraManager {
             if (meta.lifecycle === "combat" && !meta.combatId) orphan = true;
             else if (meta.combatId && !game.combats.get(meta.combatId)) orphan = true;
             else if (meta.sourceItemUuid && !(await fromUuid(meta.sourceItemUuid))) orphan = true;
+            // 跟随型光环随源 Token 平移，Token 已删则失去锚定意义（放置型
+            // 如暗刻在场上独立存在，源 Token 删除不构成孤儿）。
+            else if (meta.follow && meta.sourceTokenUuid && !(await fromUuid(meta.sourceTokenUuid))) orphan = true;
             if (orphan) {
                 console.warn(`XJZL | 清理失效光环 region「${region.name}」(label: ${meta.label})。`);
                 await this.#deleteRegion(region);
@@ -423,9 +535,73 @@ export class AuraManager {
         }
     }
 
-    /* -------------------------------------------- */
-    /*  内部实现                                     */
-    /* -------------------------------------------- */
+    /**
+     * 将实体解析为 Token 文档；世界 Actor 与定位逻辑共用首个活动 Token。
+     * @param {TokenDocument|Token|Actor} source - 已解析的源实体
+     * @returns {TokenDocument|null}
+     */
+    static #tokenOfSource(source) {
+        if (source?.documentName === "Token") return source;
+        if (source instanceof foundry.canvas.placeables.Token) return source.document;
+        if (source?.documentName === "Actor" || source instanceof foundry.documents.Actor) {
+            return source.token ?? source.getActiveTokens?.(false)?.[0]?.document ?? null;
+        }
+        return null;
+    }
+
+    /**
+     * 解析一次查询来源；字符串是持久化 Token UUID，允许源已删除的固定区域。
+     * @param {object} options - source 省略时不限制，显式无效值不能退化为不限来源
+     * @returns {string|undefined|null} undefined 为不限来源，null 为无效来源
+     */
+    static #sourceFilter(options) {
+        if (!("source" in options)) return undefined;
+        const source = options.source;
+        const uuid = typeof source === "string" ? source : this.#tokenOfSource(source)?.uuid;
+        if (uuid) return uuid;
+        console.warn("XJZL | 光环源过滤参数无法解析为 Token：", source);
+        return null;
+    }
+
+    /**
+     * 创建时只接受实际来源；固定区域刷新可沿用保存的 Token UUID，不反推身份。
+     * @param {object} resolved - 位置解析结果
+     * @param {object} params - source 或 sourceActorUuid 声明坐标区域的来源
+     * @param {object|null} saved - 刷新时保存的来源
+     * @returns {Promise<object|null>} {sourceTokenUuid, sourceActorUuid}；显式无效来源返回 null
+     */
+    static async #resolveSourceInfo(resolved, params, saved) {
+        let token = null;
+        try {
+            if (params.source !== undefined) {
+                const entity = typeof params.source === "string" ? await fromUuid(params.source) : params.source;
+                token = typeof params.source === "string"
+                    ? (entity?.documentName === "Token" ? entity : null) : this.#tokenOfSource(entity);
+                if (!token) {
+                    console.warn("XJZL | 光环 source 无法解析为 Token：", params.label, params.source);
+                    return null;
+                }
+            } else if (!resolved.tokenDoc && !saved && params.sourceActorUuid) {
+                token = this.#tokenOfSource(await fromUuid(params.sourceActorUuid));
+                if (!token) {
+                    console.warn("XJZL | 光环 sourceActorUuid 没有活动 Token：", params.label, params.sourceActorUuid);
+                    return null;
+                }
+            }
+        } catch (error) {
+            console.warn("XJZL | 光环来源解析失败：", params.label, params.source ?? params.sourceActorUuid, error);
+            return null;
+        }
+        token = resolved.tokenDoc ?? token;
+        if (token && token.parent?.tokens?.get(token.id) !== token) {
+            console.warn("XJZL | 光环来源 Token 已不在场景中：", params.label, token.uuid);
+            return null;
+        }
+        return {
+            sourceTokenUuid: token?.uuid ?? saved?.sourceTokenUuid ?? null,
+            sourceActorUuid: params.sourceActorUuid ?? token?.actor?.uuid ?? saved?.sourceActorUuid ?? null
+        };
+    }
 
     /**
      * 解析光环源为 {scene, tokenDoc, anchorOffset, anchorPoint, follow}。
@@ -443,19 +619,13 @@ export class AuraManager {
         let point = null;
 
         if (!source) return {scene: null, tokenDoc: null, anchorOffset: {i: 0, j: 0}, anchorPoint: null, follow: false};
-        if (source.documentName === "Token") {
-            tokenDoc = source;
-        } else if (source instanceof foundry.canvas.placeables.Token) {
-            tokenDoc = source.document;
-        } else if (source.documentName === "Actor" || source instanceof foundry.documents.Actor) {
-            // Actor：取当前场景的活动 Token；无 Token 的 Actor 无法定环
-            const tokens = source.getActiveTokens?.(false) ?? [];
-            tokenDoc = tokens[0]?.document ?? null;
+        tokenDoc = this.#tokenOfSource(source);
+        if (source.documentName === "Actor" || source instanceof foundry.documents.Actor) {
             if (!tokenDoc) {
                 console.warn(`XJZL | 光环源 Actor「${source.name}」在当前场景没有 Token。`);
                 return {scene: null, tokenDoc: null, anchorOffset: {i: 0, j: 0}, anchorPoint: null, follow: false};
             }
-        } else if (source.scene && Number.isFinite(source.x) && Number.isFinite(source.y)) {
+        } else if (!tokenDoc && source.scene && Number.isFinite(source.x) && Number.isFinite(source.y)) {
             scene = source.scene;
             point = {x: source.x, y: source.y};
         }
@@ -538,9 +708,11 @@ export class AuraManager {
      * 组装 region flags 持久化元数据；params 全量快照供 refreshAura 重建。
      * @param {object} params - 光环参数
      * @param {object} resolved - 源解析结果
+     * @param {object} sourceInfo - 已解析的 {sourceTokenUuid, sourceActorUuid}
+     * @param {string} uniqueness - 唯一性模式（refreshAura 重建沿用）
      * @returns {object} meta
      */
-    static #buildMeta(params, resolved) {
+    static #buildMeta(params, resolved, sourceInfo, uniqueness) {
         const combat = game.combat;
         const lifecycle = params.lifecycle || "manual";
         // 时限以创建时轮次为基准，每轮开始由 updateCombat 统一递减；
@@ -550,20 +722,23 @@ export class AuraManager {
         const duration = (params.durationRounds > 0 && combat?.round)
             ? {rounds: params.durationRounds, startedRound: combat.round}
             : null;
+        // 来源文档不进入参数快照，避免把实体引用带入 flags 序列化。
+        const {source: _sourceEntity, ...snapshot} = params;
         const meta = {
             label: params.label,
             version: 1,
             lifecycle,
             follow: resolved.follow,
-            // 固定型刷新按坐标重建，沿用原源 Token UUID 才能保持阵营/自身过滤。
-            sourceTokenUuid: resolved.tokenDoc?.uuid ?? params.sourceTokenUuid ?? null,
-            sourceActorUuid: params.sourceActorUuid ?? resolved.tokenDoc?.actor?.uuid ?? null,
+            sourceTokenUuid: sourceInfo.sourceTokenUuid,
+            sourceActorUuid: sourceInfo.sourceActorUuid,
             sourceItemUuid: params.sourceItemUuid ?? null,
+            uniqueness,
             combatId: params.combatId ?? ((lifecycle === "combat" || duration || params.maintain) && combat ? combat.id : null),
             duration,
             maintain: params.maintain ? {...params.maintain} : null,
             params: {
-                ...foundry.utils.deepClone(params),
+                ...foundry.utils.deepClone(snapshot),
+                uniqueness,
                 // 放置型重建锚点：跟随型 params.anchorPoint 置空
                 anchorPoint: resolved.follow ? null : resolved.anchorPoint,
                 quarterTurns: params.quarterTurns
@@ -634,10 +809,12 @@ export class AuraManager {
      * 仍在、可重试；此时坚持删除会让清理账目随文档消失，AE 永久残留且
      * 失去重试凭据。
      * @param {RegionDocument} region - 待删除的光环 region
+     * @returns {Promise<Set<string>>} 已提交清理的账目 eid；Actor 已不存在时无法释放
      */
     static async #preDeleteCleanup(region) {
         const pending = [];
-        for (const {key, tokenId, entry} of AuraLedger.allEntriesOfRegion(region)) {
+        const entries = AuraLedger.allEntriesOfRegion(region);
+        for (const {key, tokenId, entry} of entries) {
             pending.push(AuraLedger.submitExit({
                 behaviorId: key,
                 regionUuid: region.uuid,
@@ -651,20 +828,29 @@ export class AuraManager {
             throw new AggregateError(rejected.map(r => r.reason),
                 `XJZL | 光环 region「${region.name}」预清理失败，已中止删除（region 保留可重试）`);
         }
+        return new Set(entries.map(({entry}) => entry.eid));
     }
 
     /**
-     * 删除单个光环 region（本类调用点均已在活动 GM 端）。
+     * 删除单个光环；非活动 GM 将整次清账与删除委托活动 GM。
      * @param {RegionDocument} region - 光环 region
+     * @returns {Promise<boolean>} 仅实际删除者返回 true
      */
     static async #deleteRegion(region) {
         const scene = region.parent;
-        if (!scene) return;
-        await this.#preDeleteCleanup(region);
-        if (game.users.activeGM?.isSelf) {
-            await scene.deleteEmbeddedDocuments("Region", [region.id]);
-        } else {
-            await xjzlSocket.executeAsGM("deleteEmbedded", scene.uuid, "Region", [region.id]);
+        if (!scene || scene.regions.get(region.id) !== region) return false;
+        if (!game.users.activeGM?.isSelf) {
+            return (await this.dismiss(region.id, {scene})) > 0;
+        }
+        for (;;) {
+            const cleaned = await this.#preDeleteCleanup(region);
+            const deleted = await this.#enqueueWrite(async () => {
+                if (scene.regions.get(region.id) !== region) return false;
+                if (AuraLedger.allEntriesOfRegion(region).some(({entry}) => !cleaned.has(entry.eid))) return undefined;
+                await scene.deleteEmbeddedDocuments("Region", [region.id]);
+                return true;
+            });
+            if (deleted !== undefined) return deleted;
         }
     }
 

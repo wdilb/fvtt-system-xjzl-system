@@ -27,6 +27,9 @@ export function setupSocket() {
     xjzlSocket.register("stopStance", _socketStopStance);
     // 非活动 GM 的 Region 事件经此委托活动 GM 结算。
     xjzlSocket.register("auraLedger", _socketAuraLedger);
+    // 光环写入统一由活动 GM 处理，保留唯一性与账目清理。
+    xjzlSocket.register("auraCreate", _socketAuraCreate);
+    xjzlSocket.register("auraDismiss", _socketAuraDismiss);
     // 注册战斗动作计数器
     xjzlSocket.register("recordCombatStat", _socketRecordCombatStat);
     xjzlSocket.register("broadcastCombatStats", _socketBroadcastCombatStats);
@@ -313,6 +316,33 @@ async function _socketDeleteEmbedded(parentUuid, type, ids, context) {
     const parent = await fromUuid(parentUuid);
     // 强制 context 为对象
     return await parent?.deleteEmbeddedDocuments(type, ids, context || {});
+}
+
+/**
+ * 光环创建委托；返回 UUID，调用端再获取本地 RegionDocument。
+ * 经 game.xjzl.aura 调用，避免 socket 与 manager 的循环导入。
+ * @param {string} sceneUuid - 目标场景 uuid
+ * @param {object} regionData - 完整 region 数据
+ * @param {object|null} [replacement] - 刷新目标及原来源
+ * @returns {Promise<string|null>} Region UUID；目标已失效时返回 null
+ */
+async function _socketAuraCreate(sceneUuid, regionData, replacement = null) {
+    if (isNotActiveGM()) return null;
+    const scene = await fromUuid(sceneUuid);
+    return game.xjzl.aura.createOnGM(scene, regionData, replacement);
+}
+
+/**
+ * 光环删除委托；GM 先释放清理账目，再删除匹配实例。
+ * @param {string} sceneUuid - 目标场景 UUID
+ * @param {string} labelOrRegionId - 标签或 Region ID
+ * @param {string|null} [sourceTokenUuid] - null 表示不限来源
+ * @returns {Promise<number>} 删除数量
+ */
+async function _socketAuraDismiss(sceneUuid, labelOrRegionId, sourceTokenUuid = null) {
+    if (isNotActiveGM()) return 0;
+    const scene = await fromUuid(sceneUuid);
+    return game.xjzl.aura.dismissOnGM(scene, labelOrRegionId, sourceTokenUuid);
 }
 
 /**
