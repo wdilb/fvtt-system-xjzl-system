@@ -1028,7 +1028,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // -----------------------------------------------------
         const rawArtBooks = actor.itemTypes.art_book || [];
         context.artBooks = rawArtBooks.map(book => {
-            const maxXP = book.system.chapters.reduce((sum, c) => sum + Math.floor((c.cost || 0) * (c.xpCostRatio ?? 1)), 0);
+            // maxXP 直接读 DataModel 算好的各章 progress.max (已折算消耗系数)，避免重复公式
+            const maxXP = (book.system.chapters || []).reduce((sum, c) => sum + (c.progress?.max ?? 0), 0);
+            // 研读进度用各篇钳制后的进度求和：空章节旧书残留在书级的余额是待返还存量而非研读进度，
+            // 计入会把未读的整书虚标为 100%；真实投入总额 (system.xpInvested) 仍用于统计与返还
+            const investedXP = (book.system.chapters || []).reduce((sum, c) => sum + (c.progress?.current ?? 0), 0);
             let completedCount = 0;
             if (book.system.chapters) {
                 for (const ch of book.system.chapters) if (ch.progress && ch.progress.isCompleted) completedCount++;
@@ -1046,8 +1050,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             tooltip += `<div style='margin-top:8px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:11px; color:${progressColor};'>进度: ${progressText}</div></div>`;
 
             book.derived = {
-                maxXP: maxXP, tooltip: tooltip,
-                percent: maxXP > 0 ? Math.min(100, (book.system.xpInvested / maxXP) * 100) : 0,
+                maxXP: maxXP, investedXP: investedXP, tooltip: tooltip,
+                percent: maxXP > 0 ? Math.min(100, (investedXP / maxXP) * 100) : 0,
                 isCompleted: isCompleted
             };
             return book;
@@ -2470,53 +2474,52 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-     * 技艺书修炼
+     * 技艺书修炼 (按篇章投入，篇章可任选)
      */
     async _onInvestArtXP(event, target) {
         const item = this.document.items.get(target.dataset.itemId);
-        if (!item) return;
+        const chapterId = target.dataset.chapterId;
+        if (!item || !chapterId) return;
+        const chapter = item.system.chapters.find(c => c.id === chapterId);
+        if (!chapter) return;
 
-        // 计算总消耗 (Max XP)
-        // 必须应用折扣系数，并向下取整，逻辑需与 DataModel 和 investArt 方法保持完全一致
-        const totalCost = item.system.chapters.reduce((sum, c) => {
-            const cost = c.cost || 0;
-            const ratio = c.xpCostRatio ?? 1; // 获取系数，默认1
-            return sum + Math.floor(cost * ratio);
-        }, 0);
-
+        // 篇章上限由 DataModel 折算消耗系数后算好 (chapter.progress.max)，此处无需重复公式
         const result = await this._promptInvest({
-            title: `研读: ${item.name}`,
+            title: `研读: ${chapter.name}`,
             mode: "invest",
-            currentInvested: item.system.xpInvested,
-            maxXP: totalCost,
+            currentInvested: chapter.xpInvested,
+            maxXP: chapter.progress.max,
             poolGeneral: this.document.system.cultivation.general,
             poolSpecific: this.document.system.cultivation.arts || 0 // 传入技艺专属池
         });
 
         if (result !== null) {
             // 调用 Item 中的标准方法
-            await item.investArt(result);
+            await item.investArt(chapter.id, result);
         }
     }
 
     /**
-     * 技艺书回退
+     * 技艺书回退 (按篇章返还)
      */
     async _onRefundArtXP(event, target) {
         const item = this.document.items.get(target.dataset.itemId);
-        if (!item) return;
+        const chapterId = target.dataset.chapterId;
+        if (!item || !chapterId) return;
+        const chapter = item.system.chapters.find(c => c.id === chapterId);
+        if (!chapter) return;
 
         const result = await this._promptInvest({
-            title: `放弃研读: ${item.name}`,
+            title: `返还: ${chapter.name}`,
             mode: "refund",
-            currentInvested: item.system.xpInvested,
-            // 传入 breakdown 供弹窗校验上限
-            breakdown: item.system.sourceBreakdown || { general: 0, specific: 0 }
+            currentInvested: chapter.xpInvested,
+            // 传入该篇章的 breakdown 供弹窗校验上限
+            breakdown: chapter.sourceBreakdown || { general: 0, specific: 0 }
         });
 
         if (result !== null) {
             // 调用 Item 中的标准方法
-            await item.refundArt(result);
+            await item.refundArt(chapter.id, result);
         }
     }
 

@@ -1000,29 +1000,43 @@ export class XJZLItem extends Item {
   }
 
   /**
-   * 技艺书修炼：投入修为
-   * 逻辑对齐: investMove
-   * @param {Number|Object} amountOrAllocation - 数量或分配对象
+   * 技艺书篇章全量写路径：写篇章数组的同时清零书级字段的存储副本。
+   * 必须使用 diff:false —— migrateData 已把内存 _source 的书级字段清零，
+   * 默认 diff 会把与内存同值的清零字段当作"未变化"过滤掉，
+   * 导致数据库残留旧总池，重载后被 migrateData 误判为未迁移旧数据
+   * （表现为已全额返还的修为在重载后复活）。
+   * @param {Array<object>} chapters 待写入的完整章节数组（source 形态）
+   * @returns {Promise} 更新结果
    */
-  async investArt(amountOrAllocation) {
+  async updateArtBookChapters(chapters) {
+    if (this.type !== "art_book") return;
+    return this.update({
+      "system.chapters": chapters,
+      "system.xpInvested": 0, // 书级字段为聚合展示值，存储副本恒清零
+      "system.sourceBreakdown": { general: 0, specific: 0 }
+    }, { diff: false });
+  }
+
+  /**
+   * 技艺书修炼：向指定篇章投入修为 (篇章可任选，互不依赖)
+   * 逻辑对齐: investMove
+   * @param {String} chapterId - 篇章 ID
+   * @param {Number|Object} amountOrAllocation - 数字(自动) 或 对象(手动 {general, specific})
+   */
+  async investArt(chapterId, amountOrAllocation) {
     if (this.type !== "art_book") return;
     if (!this.actor) return ui.notifications.warn("物品不在角色身上。");
 
     // === 1. 准备数据 ===
-    // 技艺书没有固定的 maxXP 属性，它是所有章节消耗的总和
-    // 这些数据都在 system 上，不需要像招式那样去数组里找
-    // 计算总消耗 (Max XP) 时，必须应用折扣系数
-    // 否则会导致溢出检查失效，允许玩家投入超过折后上限的修为
-    const totalCost = this.system.chapters.reduce((sum, c) => {
-      const rawCost = c.cost || 0;
-      const ratio = c.xpCostRatio ?? 1;
-      return sum + Math.floor(rawCost * ratio);
-    }, 0);
-    const currentInvested = this.system.xpInvested;
+    // 修为记录在各章内部，必须使用 toObject 获取纯数据副本修改数组
+    const itemData = this.system.toObject();
+    const chapterIndex = itemData.chapters.findIndex(c => c.id === chapterId);
+    if (chapterIndex === -1) return ui.notifications.error("未找到指定篇章。");
 
-    if (currentInvested >= totalCost) {
-      return ui.notifications.warn("该书籍已全部研读完毕。");
-    }
+    // chapterDerived: 用于读取计算后的数据 (如 progress.max 已折算消耗系数)
+    // targetChapter: 用于写入数据 (Source Data)
+    const chapterDerived = this.system.chapters[chapterIndex];
+    const targetChapter = itemData.chapters[chapterIndex];
 
     // === 2. 参数归一化 ===
     let general = 0;
@@ -1050,7 +1064,13 @@ export class XJZLItem extends Item {
     if (totalTarget <= 0) return ui.notifications.warn("请输入有效的投入数量。");
 
     // === 3. 上限检查与溢出钳制 (Clamping) ===
-    const needed = totalCost - currentInvested;
+    // 上限直接读 DataModel 折算好的篇章消耗，避免重复 cost*ratio 公式
+    const maxXP = chapterDerived.progress.max;
+    const currentInvested = targetChapter.xpInvested || 0;
+
+    if (currentInvested >= maxXP) return ui.notifications.warn("该篇章已研读完毕。");
+
+    const needed = maxXP - currentInvested;
 
     // 溢出策略：优先保留专属，削减通用
     if (totalTarget > needed) {
@@ -1078,14 +1098,13 @@ export class XJZLItem extends Item {
     if (actorSpecific < specific) return ui.notifications.warn(`技艺修为不足！需要 ${specific}`);
 
     // === 5. 执行更新 ===
-    // 读取当前 breakdown (防空)
-    const currentBreakdown = this.system.sourceBreakdown || { general: 0, specific: 0 };
+    // 更新目标篇章的数据
+    targetChapter.xpInvested = currentInvested + finalTotal;
 
-    // 计算新 breakdown
-    const newBreakdown = {
-      general: currentBreakdown.general + general,
-      specific: currentBreakdown.specific + specific
-    };
+    // 初始化/更新成分池
+    if (!targetChapter.sourceBreakdown) targetChapter.sourceBreakdown = { general: 0, specific: 0 };
+    targetChapter.sourceBreakdown.general += general;
+    targetChapter.sourceBreakdown.specific += specific;
 
     // 准备 Actor 更新数据
     const actorUpdates = {
@@ -1098,27 +1117,30 @@ export class XJZLItem extends Item {
     // 并发提交
     await Promise.all([
       this.actor.update(actorUpdates),
-      this.update({
-        "system.xpInvested": currentInvested + finalTotal,
-        "system.sourceBreakdown": newBreakdown
-      })
+      this.updateArtBookChapters(itemData.chapters)
     ]);
 
-    ui.notifications.info(`${this.name} 研读进度 +${finalTotal} (通用:${general}, 专属:${specific})。`);
+    ui.notifications.info(`${this.name} · ${chapterDerived.name} 研读进度 +${finalTotal} (通用:${general}, 专属:${specific})。`);
   }
 
   /**
-   * 技艺书散功：回收修为
+   * 技艺书散功：从指定篇章回收修为
    * 逻辑对齐: refundMove (优先退还通用)
-   * @param {Number|Object} amountOrAllocation 
+   * @param {String} chapterId - 篇章 ID
+   * @param {Number|Object} amountOrAllocation - 回收数量或分配对象
    */
-  async refundArt(amountOrAllocation) {
+  async refundArt(chapterId, amountOrAllocation) {
     if (this.type !== "art_book") return;
     if (!this.actor) return;
 
     // === 1. 获取数据 ===
+    const itemData = this.system.toObject();
+    const chapterIndex = itemData.chapters.findIndex(c => c.id === chapterId);
+    if (chapterIndex === -1) return ui.notifications.error("未找到指定篇章。");
+
+    const targetChapter = itemData.chapters[chapterIndex];
     // 读取当前存量 (Component Check)
-    const breakdown = this.system.sourceBreakdown || { general: 0, specific: 0 };
+    const breakdown = targetChapter.sourceBreakdown || { general: 0, specific: 0 };
 
     // === 2. 参数归一化 ===
     let refundGeneral = 0;
@@ -1153,9 +1175,9 @@ export class XJZLItem extends Item {
     if (totalRefund <= 0) return;
 
     // === 3. 执行更新 ===
-    // 扣除书籍内数据
-    const newXP = this.system.xpInvested - totalRefund;
-    const newBreakdown = {
+    // 扣除篇章内数据
+    targetChapter.xpInvested -= totalRefund;
+    targetChapter.sourceBreakdown = {
       general: breakdown.general - refundGeneral,
       specific: breakdown.specific - refundSpecific
     };
@@ -1172,13 +1194,10 @@ export class XJZLItem extends Item {
 
     await Promise.all([
       this.actor.update(actorUpdates),
-      this.update({
-        "system.xpInvested": newXP,
-        "system.sourceBreakdown": newBreakdown
-      })
+      this.updateArtBookChapters(itemData.chapters)
     ]);
 
-    ui.notifications.info(`${this.name} 散功成功，返还 ${totalRefund} (通:${refundGeneral}/专:${refundSpecific})。`);
+    ui.notifications.info(`${this.name} · ${targetChapter.name} 散功成功，返还 ${totalRefund} (通:${refundGeneral}/专:${refundSpecific})。`);
   }
 
   /* -------------------------------------------- */

@@ -1,6 +1,7 @@
 
 import { XJZL } from "../config.mjs";
 import { localizeConfig } from "../utils/utils.mjs";
+import { allocateBookXPToChapters } from "../utils/art-book-xp.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -97,26 +98,64 @@ export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             reward: { level: 1, check: 0 }
         };
 
-        await this.document.update({
-            "system.chapters": [...chapters, newChapter]
-        });
+        // 空章节旧书的书级遗留池：添加首章时按序折入新篇章（旧系统语义：书级池即研读进度），
+        // 否则下方写路径的书级清零会把这笔无法按篇拆分的余额直接抹掉
+        if (chapters.length === 0 && (source.xpInvested || 0) > 0) {
+            const { chapters: allocated } = allocateBookXPToChapters([newChapter], source.xpInvested, source.sourceBreakdown);
+            await this.document.updateArtBookChapters(allocated);
+            return;
+        }
+
+        // 走全状态写路径：同步落库书级清零，防止重载后被 migrateData 误判重复拆分
+        await this.document.updateArtBookChapters([...chapters, newChapter]);
     }
 
     async _onDeleteChapter(event, target) {
         const idx = Number(target.dataset.idx);
         const source = this.document.system.toObject();
         const chapters = source.chapters || [];
+        const chapter = chapters[idx];
+        if (!chapter) return;
+
+        // 篇章独立持有修为：删除前先按来源全额返还，避免投入随篇章一起消失。
+        // 世界物品没有归属 Actor 也没有修为业务，无需返还
+        const invested = chapter.xpInvested || 0;
+        const hasActor = Boolean(this.document.actor);
 
         // 确认删除
         const confirm = await foundry.applications.api.DialogV2.confirm({
             window: { title: "删除篇章" },
-            content: "<p>确定要删除这个篇章吗？</p>",
+            content: (invested > 0 && hasActor)
+                ? `<p>该篇章已投入 <b>${invested}</b> 点修为，删除后将返还至修为池。确定要删除吗？</p>`
+                : "<p>确定要删除这个篇章吗？</p>",
             rejectClose: false
         });
 
-        if (confirm) {
-            chapters.splice(idx, 1);
-            await this.document.update({ "system.chapters": chapters });
+        if (!confirm) return;
+
+        // 确认期间数据可能被其他客户端修改（弹窗前快照不可信），按确认后的最新存量返还
+        if (hasActor) {
+            const current = (this.document.system.toObject().chapters || []).find(c => c.id === chapter.id);
+            if (current && (current.xpInvested || 0) > 0) {
+                const breakdown = current.sourceBreakdown || { general: current.xpInvested, specific: 0 };
+                await this.document.refundArt(current.id, { general: breakdown.general || 0, specific: breakdown.specific || 0 });
+
+                // 复检：返还被并发修改打断（如另一端先返还导致存量不足）时篇章仍有余额，
+                // 中止删除，剩余修为交由用户走正常返还流程，避免随篇章一起丢失
+                const after = (this.document.system.toObject().chapters || []).find(c => c.id === chapter.id);
+                if (after && (after.xpInvested || 0) > 0) {
+                    ui.notifications.warn(`篇章「${after.name}」仍有 ${after.xpInvested} 点修为未能返还，已取消删除。`);
+                    return;
+                }
+            }
         }
+
+        // 返还会重写 chapters 数组，删除前重新读取，并按 id 定位防止索引漂移；
+        // 篇章已被其他客户端删除时无需操作
+        const refreshed = this.document.system.toObject().chapters || [];
+        const finalIdx = refreshed.findIndex(c => c.id === chapter.id);
+        if (finalIdx === -1) return;
+        refreshed.splice(finalIdx, 1);
+        await this.document.updateArtBookChapters(refreshed);
     }
 }

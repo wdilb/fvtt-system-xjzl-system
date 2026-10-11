@@ -1667,10 +1667,27 @@ Hooks.on("preCreateItem", (item, data, options, userId) => {
 
   // 5. 类型 C：技艺书 (Art Book) 清洗 (如果有的话)
   else if (item.type === "art_book") {
+    // 修为记录在各章内部，遍历清零（对齐武学 moves 的清洗方式）
+    const rawChapters = item.system.toObject().chapters || [];
+    let hasChapterChanges = false;
+    const cleanChapters = rawChapters.map(chapter => {
+      if ((chapter.xpInvested || 0) > 0) {
+        hasChapterChanges = true;
+        // 返回清洗后的新对象 (保留其他字段，仅重置修为)
+        return foundry.utils.mergeObject(chapter, {
+          xpInvested: 0,
+          sourceBreakdown: { general: 0, specific: 0 }
+        });
+      }
+      return chapter;
+    });
+    if (hasChapterChanges) {
+      updates["system.chapters"] = cleanChapters;
+    }
+    // 书级字段现为各章聚合的派生值，一并清零避免残留旧结构数据
     if (item.system.xpInvested > 0) {
       updates["system.xpInvested"] = 0;
       updates["system.sourceBreakdown"] = { general: 0, specific: 0 };
-      // 如果有章节进度，可能也需要重置，视具体结构而定
     }
   }
 
