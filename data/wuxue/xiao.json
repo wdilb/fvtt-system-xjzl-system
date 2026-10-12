@@ -1341,9 +1341,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "保存反震基准",
+                            "trigger": "preDefense",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n// 反震输入取本次伤害在防御结算前的基准：把可写输出对象按引用存入本次共享 config，\n// 后续 preDefense 脚本对 args.output.damage 的修正会继续反映到 damaged 读取的数值上。\nargs.config.qiankunReflectedOutput = args.output;",
+                            "active": true
+                        },
+                        {
                             "label": "格挡反伤对抗",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nconst dmg = args.finalDamage || 0;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.attacker,\n    type: \"wuxue\",\n    label: `乾坤颠倒 - 武学对抗 (建议己方加值: +${bonus})`,\n    outcome: {\n        win: {\n            text: `真气颠倒反震！对方受到相同伤害。`,\n            targetDamage: { value: dmg, type: args.type }\n        },\n        lose: {\n            text: \"对方武学造诣更高，真气未被颠倒。\"\n        }\n    }\n});",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\n\n// 读取 preDefense 存入本次 config 的输出引用，数值已包含后续 preDefense 脚本的修正。\n// preDefense 发生在暴击倍率之前：这里按最终暴击配置把倍率补上且只补一次，\n// 对抗后果的 targetDamage 不会再应用暴击，避免双重翻倍或漏算。\nconst ref = args.config?.qiankunReflectedOutput;\nlet dmg;\nif (ref && Number.isFinite(ref.damage)) {\n    dmg = (args.config.isCrit && args.config.applyCritDamage !== false) ? Math.floor(ref.damage * 2) : ref.damage;\n} else {\n    // 回退：本次调用的缓存缺失（如脚本被改动）时，沿用旧的最终伤害读数。\n    dmg = args.finalDamage || 0;\n}\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.attacker,\n    type: \"wuxue\",\n    label: `乾坤颠倒 - 武学对抗 (建议己方加值: +${bonus})`,\n    outcome: {\n        win: {\n            text: `真气颠倒反震！对方受到相同伤害。`,\n            targetDamage: { value: dmg, type: args.type }\n        },\n        lose: {\n            text: \"对方武学造诣更高，真气未被颠倒。\"\n        }\n    }\n});",
                             "active": true
                         }
                     ]
