@@ -156,7 +156,7 @@ passive / calc（持续被动与面板计算）
 | 扣费前可取消的选择或施展前提 | `preAttack` |
 | 不影响扣费的参数、落点选择或区域创建 | `attack` |
 | 针对单个目标修改命中或穿透 | `check` |
-| 攻击者在应用伤害前修改数值、类型或穿透 | `preDamage` |
+| 攻击者在应用伤害前修改数值、类型、穿透或取消默认提交 | `preDamage` |
 | 防御者响应未命中 | `avoided` |
 | 防御者在减伤前修改防御配置 | `preDefense` |
 | 防御者在减伤后修改最终伤害 | `preTake` |
@@ -232,6 +232,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `costConfig.mp` | `number` | **可写** | 本次内力消耗。 |
 | `costConfig.hp` | `number` | **可写** | 本次气血消耗。 |
 | `costConfig.rage` | `number` | **可写** | 本次怒气消耗。 |
+| `allowDamageModifiers` | `boolean` | **可写** | 攻击侧数值修正资格的唯一声明点：默认 `true`。确需固定后果、不接受后续外部数值修正的招式，在本招式自身 `preAttack` 脚本中写 `args.allowDamageModifiers = false`。声明资格、来源保护与副作用边界的完整规则见 `preDamage` 表格后的集中说明。 |
 | `scriptFlags` | `Object` | **可写** | 本次出招的自定义选择；系统会在进入 `attack` 时将其合并到 `args.flags`，并随攻击卡传给后续阶段。 |
 | `abort` | `boolean` | **可写** | 设为 `true` 会在扣除资源前中止出招。 |
 | `abortReason` | `string` | **可写** | 中止时向操作者显示的提示。 |
@@ -246,6 +247,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 |---|---|---|---|
 | `move` / `item` / `attacker` | `Object` / `Item` / `Actor` | 只读 | 当前招式、所属武学和出招者。 |
 | `actionType` | `string` | 只读 | 动作类型，例如 `attack`、`heal` 或 `buff`。 |
+| `allowDamageModifiers` | `boolean` | 只读 | 攻击侧数值修正资格：核心在 `preAttack` 结束后固定此布尔值并只读透传，脚本改写不能影响后续脚本或卡片保存值；为 `false` 时外部数值改写被逐段还原。完整规则见 `preDamage` 表格后的集中说明；通用增伤/减伤脚本不需要读取它。 |
 | `damageType` / `type` | `string` | 只读 | 原始伤害类型；两者同义。 |
 | `element` | `string` | 只读 | 招式属性。 |
 | `costConsumed` | `Object` | 只读 | 已实际消耗的 `mp`、`hp`、`rage`、`morale` 及 `desperateBonus`。 |
@@ -287,6 +289,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
+| `allowDamageModifiers` | `boolean` | 只读 | 攻击侧数值修正资格：由本招式 `preAttack` 声明并经核心固定，随攻击卡流转到本阶段，各目标一致；未声明时为 `true`。完整规则见下方集中说明。 |
 | `targetCount` | `number` | 只读 | 本次实际结算的目标数量；仅在真实逐目标结算阶段提供。 |
 | `targets` | `Actor[]` | 只读 | 本次实际结算的全部目标（自动与手动结算均提供）；需要跨目标统计（如按持有某状态的个数增伤）时使用。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
@@ -294,12 +297,16 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张攻击卡独立。 |
 | `element` | `string` | 只读 | 招式原始属性。 |
 | `outcome.isHit` / `.isCrit` / `.isBroken` | `boolean` | 只读 | 攻击方已确定的命中、暴击和破架结果。 |
+| `targetKanpo` | `number`，默认 `0` | 只读 | 破架统计使用的目标看破值（解除架招前保存）。创建延期原攻击请求卡时随 `targetKanpo` 参数传给宏，真实后果按原值计入统计。 |
 | `config.amount` | `number` | **可写** | 即将传入伤害 API 的原始数值。 |
+| `config.skipDamage` | `boolean` | **可写** | 设为 `true` 取消本目标本次默认伤害提交：本笔不调用目标 `applyDamage`，不扣气血/护体/内力/体力，不进入目标伤害链。后果交给后续豁免、对抗或本招式其他逻辑；命中结果与 `hit`/`hit_once` 后效保留，`hit` 可读取 `args.damageConfig` 获取被延期的攻击输入。该标志由聊天结算层在全部 `preDamage` 完成后消费，不会透传到 `applyDamage`。 |
 | `config.type` / `config.element` | `string` | **可写** | 对当前目标实际应用的伤害类型和属性。 |
 | `config.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 对当前目标的穿透配置。 |
 | `config.applyCritDamage` | `boolean` | **可写** | 是否应用暴击伤害倍率；不改变 `outcome.isCrit`。 |
 | `config.ignoreMinDamage` | `boolean` | **可写** | 是否忽略最低 1 点伤害保底。 |
 | `isManual` | `boolean` | 条件提供 | 手动伤害结算时为 `true`。 |
+
+`allowDamageModifiers` 为 `false` 时，核心会在每段外部脚本执行前保存受保护输入、执行后立即还原其不应采纳的改写（异常路径同样恢复）：preDamage 阶段保护 `config.amount` 与 `config.applyCritDamage`，attack 阶段保护 `args.flags.damageResult.damage`。"原始值"是该段外部脚本执行前的有效输入。按原始动作的招式来源区分自身与外部脚本：本招式自身的基础生成、数量计算、资源换算、条件倍率和目标条件公式照常保留。脚本改写该只读字段不能解除核心限制。`preAttack` 阶段对该声明字段执行同样的逐段来源保护：外部来源的改写在脚本结束后还原，阶段结束后核心固定的布尔值只反映自身脚本的选择。此开关只拒绝数值改写，不取消脚本执行，也不自动撤销消耗、弹窗、状态或消息；伤害类型、属性、穿透、`ignoreMinDamage` 与 `skipDamage` 按原规则读取；受击侧的防御、抗性、护体、增减伤与反伤不受它限制。
 
 ### `avoided`（异步，防御者侧）
 
@@ -452,6 +459,8 @@ await actor.applyHealing({
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `baseDamage` | `number` | 只读 | 招式或卡片面板伤害。 |
+| `damageConfig` | `Object` / `null` | 只读 | 本目标全部有效 `preDamage` 处理完成后的攻击输入快照：`amount`、`type`、`element`、`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`applyCritDamage`、`ignoreMinDamage`。`amount` 位于真实伤害的暴击倍率与防御计算之前，不是已扣资源的最终伤害。未命中或未运行 `preDamage` 时为 `null`；各目标、各次结算独立。需要本次完整计算结果的延期伤害（请求卡后果）必须在 `hit` 读取它确定伤害，不要在 `preDamage` 提前截取尚会被后续脚本修改的数值；后续修正是否有效按本招式的 `preAttack` 声明决定，不按有无系数推断。 |
+| `targetKanpo` | `number`，默认 `0` | 只读 | 破架统计使用的目标看破值（解除架招前保存）。创建延期原攻击请求卡时随 `targetKanpo` 参数传给宏，真实后果按原值计入统计。 |
 | `finalDamage` | `number` | 条件提供 | 进入目标资源分配前的最终伤害。 |
 | `isDying` / `isDead` | `boolean` | 条件提供 | 本次结算是否使目标进入濒死或死亡。 |
 | `damageResult` | `Object` | 只读 | `applyDamage()` 返回的原始结果对象。 |
@@ -941,7 +950,12 @@ await Macros.requestSave({
 | `attacker` / `label` | `Actor` / `string`，可选 | 来源 Actor 和卡片标题。 |
 | `level` / `bonus` | `number`，默认 `0` | 临时优劣势层级和数值修正。 |
 | `onSuccess` / `onFail` | 状态 ID、AE 数据或数组，可选 | 结果状态；不能传函数，函数会被忽略并警告。 |
-| `damageOnSuccess` / `damageOnFail` | `{ value, type }`，可选 | `value` 使用正数；伤害类型走标准 `applyDamage` 并保留防御/抗性，资源类型走负数 `applyHealing` 直接流失（以发起者为 healer）。 |
+| `damageOnSuccess` / `damageOnFail` | `{ value, type, ...单笔字段 }`，可选 | `value` 为非负有限数值（`number` 类型，含合法零输入，同样调用一次伤害 API）；缺失、非 `number` 类型或负数视为录入错误，拒绝本笔结算并报告（不做字符串、布尔等值的数值折算）。伤害类型走标准 `applyDamage` 并保留防御/抗性，资源类型走负数 `applyHealing` 直接流失（以发起者为 healer）。单笔字段：`isCrit`（默认 `false`）、`applyCritDamage`（默认 `true`）、`ignoreBlock`/`ignoreDefense`/`ignoreStance`（默认 `false`）、`element`（默认 `none`）、`ignoreMinDamage`（默认 `false`）；不同后果独立配置。 |
+| `item` | `Item` 或 UUID 字符串，可选 | 延期原攻击的来源 Item；卡片只保存 UUID，真实结算时按本地或 GM 路径还原，使[空]、北冥护体等受击脚本读到正确来源。 |
+| `move` | `Object`，可选 | 延期原攻击的招式；卡片只保存 `id`/`name`/`type`/`element`/`damageType`/`weaponType`/`currentCost` 普通字段，不保存描述或脚本数组。 |
+| `source` | `string`，可选 | 真实伤害后果的 `applyDamage` 来源（如 `move`/`basic`/`both`）；不传保持缺省 `extra`。 |
+| `isBroken` / `isSkill` | `boolean`，可选 | 真实伤害后果保留的破架状态（默认 `false`）与是否按招式伤害计入技能抗性（默认 `true`）。 |
+| `targetKanpo` | `number`，可选 | 破架统计所需的目标看破值（在 `hit`/`preDamage` 从 `args.targetKanpo` 读取）；延期原攻击应随来源一起传递，缺省按 `0` 计分。 |
 | `successText` / `failureText` | `string`，可选 | 结果说明。 |
 | `removeStanceOnSuccess` / `removeStanceOnFail` | `boolean`，默认 `false` | 对应结果出现时解除检定者架招。 |
 
@@ -965,12 +979,17 @@ await Macros.requestContest({
 
 `requestContest(options)` 中 `attacker`、`defender`、`type` 必填；`defType` 默认等于 `type`，`attBonus`/`defBonus` 默认 `0`。`outcome.win/lose` 从发起者视角定义，单独传入的 `winText`/`loseText` 会覆盖对应 `outcome` 文本。
 
+| 参数 | 类型/默认值 | 说明 |
+|---|---|---|
+| `item` / `move` | `Item`/UUID / `Object`，可选 | 延期原攻击的来源恢复，随卡保存方式与 `requestSave` 相同。 |
+| `source` / `isBroken` / `isSkill` / `targetKanpo` | `string` / `boolean` / `number`，可选 | 真实伤害后果的 `applyDamage` 来源、破架/技能抗性标记与破架统计看破值；不传保持缺省。 |
+
 | `outcome.win/lose` 字段 | 类型与作用 |
 |---|---|
 | `text` | 结果说明字符串。 |
 | `selfEffect` / `targetEffect` | 状态 ID、AE 数据对象或它们的数组；数组按顺序逐个应用。 |
 | `selfRecovery` | `{ value, type }`；给发起者恢复资源，`type` 应为 `applyHealing` 支持的资源类型。 |
-| `targetDamage` / `selfDamage` | `{ value, type }`；伤害类型走 `applyDamage`，无视格挡、架招和基础防御但保留抗性；资源类型走负数 `applyHealing` 直接流失。 |
+| `targetDamage` / `selfDamage` | `{ value, type, ...单笔字段 }`；伤害类型走 `applyDamage`（默认必中，`ignoreBlock`/`ignoreDefense`/`ignoreStance` 默认 `false`，单笔字段同 `requestSave`），资源类型走负数 `applyHealing` 直接流失。请求级来源恢复只作用于延期的原攻击后果 `targetDamage`：自动继承发起者、随卡 `item`/`move`、`source`/`isBroken`/`isSkill` 与 `targetKanpo`。`selfDamage`（反噬）不继承这些来源，按 `applyDamage`/`applyHealing` 缺省行为结算；单笔后果没有来源覆盖参数。 |
 
 自动化执行顺序为：发起者状态 → 对抗者状态 → 发起者恢复 → 对抗者伤害/流失 → 发起者反噬。返回创建聊天卡片的 `Promise<ChatMessage>`，平局判发起者获胜。
 
@@ -1027,29 +1046,112 @@ args.ruanweiProcessed = true;
 
 不要使用过于通用的 `args.processed`，避免与其他脚本冲突。
 
-### 多段伤害招式
+### 延期伤害（请求卡后果）
 
-一次出招造成多段相同伤害时，各跳应复用同一份攻击侧输入，防御与抗性由每跳独立正常结算：
+原伤害由豁免或对抗决定是否结算时，在 `preDamage` 设 `args.config.skipDamage = true` 取消默认提交，再由后果创建请求卡。延期原攻击的单笔字段（type、element、穿透、applyCritDamage、ignoreMinDamage、isCrit）应逐项映射，不得只保存 value/type 后让其他字段落回默认值；请求级可用 `item`、`move`、`source`、`isBroken`、`isSkill`、`targetKanpo` 保留原攻击来源与破架统计参数。
+
+确需固定后果的招式先在自身 `preAttack` 声明不接受外部修正：
 
 ```javascript
-// preDamage：固化本跳最终输入（含脚本修改），存入临时 flag
-await actor.setFlag("xjzl-system", "example_last_hit", {
-  amount: args.config.amount,
-  type: args.config.type,
-  applyCritDamage: args.config.applyCritDamage !== false
-});
+// 本招式自身的 preAttack；后续自身数量/资源公式仍照常执行。
+args.allowDamageModifiers = false;
+```
 
-// hit：按剩余段数逐跳补算
+固定后果不依赖后续修正，保留原创建时机，直接截取 `config.amount`（本招式声明 false 时该值不受外部修正影响）：
+
+```javascript
+// preDamage：保留固定值并取消默认提交，单笔字段逐项映射
+const dmg = args.config.amount;
+args.config.skipDamage = true;
+const cfg = args.config;
+await Macros.requestSave({
+  target: args.target,
+  attacker: actor,
+  type: "dingli",
+  dc: 13,
+  label: "定力豁免",
+  damageOnFail: {
+    value: dmg,
+    type: "mental",
+    element: cfg.element ?? "none",
+    ignoreBlock: cfg.ignoreBlock === true,
+    ignoreDefense: cfg.ignoreDefense === true,
+    ignoreStance: cfg.ignoreStance === true,
+    applyCritDamage: cfg.applyCritDamage !== false,
+    ignoreMinDamage: cfg.ignoreMinDamage === true,
+    isCrit: args.outcome.isCrit === true
+  },
+  item: thisItem,
+  move: args.move,
+  source: "move",
+  isBroken: args.outcome.isBroken === true,
+  targetKanpo: args.targetKanpo || 0
+});
+```
+
+依赖完整计算结果的后果，必须等 `hit` 读取 `args.damageConfig`（已含全部有效修正，是否采纳由本招式声明决定）再创建请求卡：
+
+```javascript
+// preDamage：只取消默认提交，保留数值
+args.config.skipDamage = true;
+
+// hit：读取最终攻击输入并创建对抗，单笔字段逐项映射
+if (!args.isHit) return;
+const cfg = args.damageConfig ?? {};
+await Macros.requestContest({
+  attacker: actor,
+  defender: args.target,
+  type: "wuxue",
+  label: "武学化解",
+  item: thisItem,
+  move: args.move,
+  source: "move",
+  isBroken: args.isBroken === true,
+  targetKanpo: args.targetKanpo || 0,
+  outcome: {
+    win: {
+      text: "压制成功！",
+      targetDamage: {
+        value: Math.max(0, Number(cfg.amount) || 0),
+        type: cfg.type ?? "neigong",
+        element: cfg.element ?? "none",
+        ignoreBlock: cfg.ignoreBlock === true,
+        ignoreDefense: cfg.ignoreDefense === true,
+        ignoreStance: cfg.ignoreStance === true,
+        applyCritDamage: cfg.applyCritDamage !== false,
+        ignoreMinDamage: cfg.ignoreMinDamage === true,
+        isCrit: args.isCrit === true
+      }
+    }
+  }
+});
+```
+
+通用加伤、减伤与倍率脚本（内功、装备、特性、AE）不需要读取 `allowDamageModifiers`，继续修改原有参数即可；数值是否采纳由系统执行器按本次动作的声明决定，副作用（消耗、弹窗、提示）按原流程发生，不因数值被拒而自动回滚。
+
+### 多段伤害招式
+
+一次出招造成多段相同伤害时，各跳应复用同一份攻击侧输入，防御与抗性由每跳独立正常结算。额外跳在 `hit` 读取 `args.damageConfig`（本目标全部有效 `preDamage` 后的输入，含后续有效修正），不要在 `preDamage` 提前缓存。只判断快照是否存在，不按 `amount > 0` 过滤：输入为零时各段照常提交，目标的受击脚本（如"受到伤害时额外受伤"类状态）仍可另行加伤；也不要改用上一跳的 `finalDamage`，否则会重复计算目标侧修正：
+
+```javascript
+// hit：按剩余段数逐跳补算，输入复用本目标的 damageConfig
 if (args.isHit) {
-  const cfg = actor.getFlag("xjzl-system", "example_last_hit");
-  if (cfg && cfg.amount > 0) {
+  const cfg = args.damageConfig;
+  if (cfg) {
     for (let i = 1; i < segmentCount; i++) {
       await args.target.applyDamage({
         amount: cfg.amount,
         type: cfg.type,
+        element: cfg.element,
         attacker: actor,
+        isHit: true,
         isCrit: args.isCrit,
+        isBroken: args.isBroken,
         applyCritDamage: cfg.applyCritDamage,
+        ignoreBlock: cfg.ignoreBlock,
+        ignoreDefense: cfg.ignoreDefense,
+        ignoreStance: cfg.ignoreStance,
+        ignoreMinDamage: cfg.ignoreMinDamage,
         item: args.item,
         move: args.move,
         source: "move"
@@ -1057,12 +1159,9 @@ if (args.isHit) {
     }
   }
 }
-
-// hit_once：清理 flag
-await actor.unsetFlag("xjzl-system", "example_last_hit");
 ```
 
-`args.finalDamage` 是防御计算后的值，把它再传入 `applyDamage` 会二次扣抗性并再次触发防御侧脚本；多段伤害应复用 `preDamage` 后的输入值。flag 必须在 `hit_once` 清理；多目标串行结算时 `preDamage` 逐目标覆盖、`hit` 读到的即当前目标配置。
+`args.finalDamage` 是防御计算后的值，把它再传入 `applyDamage` 会二次扣抗性并再次触发防御侧脚本；多段伤害应复用 `preDamage` 后的输入值（即 `args.damageConfig`），各跳独立结算防御，无需临时 flag。
 
 ### 玩家决策
 
