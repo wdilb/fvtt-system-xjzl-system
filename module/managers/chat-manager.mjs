@@ -1489,6 +1489,9 @@ export class ChatCardManager {
 
             // 2. 只有命中了才跑这个脚本 (未命中不需要改伤害类型)
             if (isHit) {
+                // 攻击侧数值修正资格：从卡片 flags 恢复 preAttack 声明后核心固定的布尔值；
+                // 旧卡片未携带该标志时保持 true。preDamage 中只读，脚本改写不能影响后续脚本。
+                const allowDamageModifiers = flags.allowDamageModifiers !== false;
                 const preDamageContext = {
                     attacker: attacker,
                     target: targetActor,
@@ -1509,13 +1512,38 @@ export class ChatCardManager {
                         isBroken: isBroken
                     },
 
+                    // 破架统计用看破值：解除架招前保存，随延期请求卡传给真实后果（只读）
+                    targetKanpo: targetKanpo,
+
                     // 配置 (可写)
                     config: damageConfig
                 };
+                Object.defineProperty(preDamageContext, "allowDamageModifiers", {
+                    get: () => allowDamageModifiers,
+                    enumerable: true
+                });
 
                 // 执行脚本
                 await attacker.runScripts(SCRIPT_TRIGGERS.PRE_DAMAGE, preDamageContext, move);
             }
+
+            // 本目标全部有效 preDamage 完成后的攻击输入快照：hit 脚本创建请求卡时读取。
+            // amount 位于真实伤害的暴击倍率与防御计算之前，不是已扣资源的最终伤害。
+            const hitDamageConfig = isHit ? {
+                amount: damageConfig.amount,
+                type: damageConfig.type,
+                element: damageConfig.element,
+                ignoreBlock: damageConfig.ignoreBlock,
+                ignoreDefense: damageConfig.ignoreDefense,
+                ignoreStance: damageConfig.ignoreStance,
+                applyCritDamage: damageConfig.applyCritDamage,
+                ignoreMinDamage: damageConfig.ignoreMinDamage
+            } : null;
+
+            // 延期伤害：preDamage 设 skipDamage 后由聊天结算层取消本笔默认提交，
+            // 后果交给后续豁免、对抗或招式其他逻辑；不透传到 applyDamage，也不复制给请求卡真实后果。
+            // 命中结果与 hit/hit_once 后效保留，只向攻击侧后续提供零损失结果。
+            const skipDefaultDamage = isHit && damageConfig.skipDamage === true;
             // 判断是否是招式
             const isSkillDamage = move.type !== "basic";
             // 判定伤害来源 (source)
@@ -1524,7 +1552,17 @@ export class ChatCardManager {
                 damageSource = flags.moveId === "opportunity" ? "both" : "basic";
             }
             // C. 调用 Actor 伤害处理
-            const damageResult = await targetActor.applyDamage({
+            const damageResult = skipDefaultDamage ? {
+                finalDamage: 0,
+                hpLost: 0,
+                hutiLost: 0,
+                mpLost: 0,
+                tiliLost: 0,
+                isDying: false,
+                isDead: false,
+                rageGained: false,
+                isHit: true
+            } : await targetActor.applyDamage({
                 amount: damageConfig.amount,     // 面板伤害
                 type: damageConfig.type,    // 伤害类型
                 targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
@@ -1545,9 +1583,12 @@ export class ChatCardManager {
                 source: damageSource       // 注入来源标识
             });
 
-            // 统计数据更新为该目标发送独立伤害卡片 (仅命中时)
-            if (isHit) {
-                hitCount++;
+            // 命中即计入命中数：skipDamage 只取消默认伤害提交，不取消命中结果本身
+            if (isHit) hitCount++;
+
+            // 结算卡片只反映实际提交的默认伤害；取消提交时本笔不发卡，
+            // 后续豁免/对抗请求卡由 hit 脚本创建，避免出现“0 伤害”误导卡。
+            if (isHit && !skipDefaultDamage) {
                 const templateData = {
                     name: displayName,
                     img: targetActor.img || target.texture?.src, // 优先取 actor 图
@@ -1604,6 +1645,8 @@ export class ChatCardManager {
                 isHit: isHit,
                 isCrit: isCrit,
                 isBroken: isBroken,
+                // 破架统计用看破值：hit 脚本创建延期请求卡时随来源保存
+                targetKanpo: targetKanpo,
                 baseDamage: flags.damage, // 面板伤害 (吸血逻辑可能需要这个)
 
                 // 展开 Actor 返回的结算数据
@@ -1634,6 +1677,9 @@ export class ChatCardManager {
                 element: moveElement,         //  招式的属性 (taiji, yin, yang 等)
                 // 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
                 scriptFlags: flags.scriptFlags || {},
+                // 本目标全部有效 preDamage 完成后的攻击输入快照（只读）；
+                // 需要本次完整计算结果的延期伤害在此读取并创建请求卡。未命中或未运行 preDamage 时为 null。
+                damageConfig: hitDamageConfig,
                 // 添加一些参数和_applyHeal保持一致
                 isAttack: true,       // 明确标记
                 isHeal: false,
@@ -2027,6 +2073,8 @@ export class ChatCardManager {
 
             // 执行 PRE_DAMAGE 脚本
             if (isHit) {
+                // 与自动结算一致：资格从卡片 flags 恢复，preDamage 中只读
+                const allowDamageModifiers = flags.allowDamageModifiers !== false;
                 const preDamageContext = {
                     attacker: attacker,
                     target: targetActor,
@@ -2044,11 +2092,32 @@ export class ChatCardManager {
                         isCrit: config.isCrit,
                         isBroken: config.isBroken
                     },
+                    // 与自动结算一致：破架统计用看破值（只读），供 preDamage 创建的延期请求卡读取
+                    targetKanpo: targetKanpo,
                     config: damageConfig,
                     isManual: true
                 };
+                Object.defineProperty(preDamageContext, "allowDamageModifiers", {
+                    get: () => allowDamageModifiers,
+                    enumerable: true
+                });
                 await attacker.runScripts(SCRIPT_TRIGGERS.PRE_DAMAGE, preDamageContext, move);
             }
+
+            // 本目标全部有效 preDamage 完成后的攻击输入快照（与自动结算同构），供 hit 脚本创建请求卡。
+            const hitDamageConfig = isHit ? {
+                amount: damageConfig.amount,
+                type: damageConfig.type,
+                element: damageConfig.element,
+                ignoreBlock: damageConfig.ignoreBlock,
+                ignoreDefense: damageConfig.ignoreDefense,
+                ignoreStance: damageConfig.ignoreStance,
+                applyCritDamage: damageConfig.applyCritDamage,
+                ignoreMinDamage: damageConfig.ignoreMinDamage
+            } : null;
+
+            // 与自动结算使用同一提交判断：preDamage 设 skipDamage 后取消本笔默认伤害提交
+            const skipDefaultDamage = isHit && damageConfig.skipDamage === true;
 
             // 判断是否为招式
             const isSkillDamage = move.type !== "basic";
@@ -2061,7 +2130,17 @@ export class ChatCardManager {
             }
 
             // 调用 Actor 伤害接口
-            const damageResult = await targetActor.applyDamage({
+            const damageResult = skipDefaultDamage ? {
+                finalDamage: 0,
+                hpLost: 0,
+                hutiLost: 0,
+                mpLost: 0,
+                tiliLost: 0,
+                isDying: false,
+                isDead: false,
+                rageGained: false,
+                isHit: true
+            } : await targetActor.applyDamage({
                 amount: damageConfig.amount,
                 type: damageConfig.type,    // 沿用招式类型
                 targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
@@ -2082,8 +2161,10 @@ export class ChatCardManager {
                 source: damageSource       // 注入来源标识
             });
 
-            if (isHit) {
-                hitCount++;
+            if (isHit) hitCount++;
+
+            // 与自动结算一致：取消提交时本笔不发结算卡片
+            if (isHit && !skipDefaultDamage) {
                 // 发送伤害卡片 (复用 damage-card.hbs)
                 const templateData = {
                     name: target.name,
@@ -2135,6 +2216,8 @@ export class ChatCardManager {
                 isHit: isHit,
                 isCrit: config.isCrit,
                 isBroken: config.isBroken,
+                // 与自动结算一致：破架统计用看破值，hit 脚本创建延期请求卡时随来源保存
+                targetKanpo: targetKanpo,
                 baseDamage: finalBaseDamage,
                 ...damageResult,
                 damageResult: damageResult
@@ -2154,6 +2237,8 @@ export class ChatCardManager {
                 element: moveElement,//  招式的属性 (taiji, yin, yang 等)
                 // 与自动结算的 hit 上下文保持同构，动作分类标记脚本才能统一判断
                 scriptFlags: flags.scriptFlags || {},
+                // 与自动结算一致：本目标全部有效 preDamage 后的攻击输入快照（只读）
+                damageConfig: hitDamageConfig,
                 isAttack: true,
                 isHeal: false,
                 isBuff: false,
@@ -2392,77 +2477,114 @@ export class ChatCardManager {
 
                     // --- B. 应用数值惩罚 (扣资源或造成伤害) ---
                     if (damageConfig) {
-                        // 1. 解析参数 (确保是固定数值)
-                        const rawVal = Number(damageConfig.value);
-                        const amount = isNaN(rawVal) ? 0 : rawVal; // 保底为0
+                        // 1. 解析参数：类型与空值检查必须先于数值转换——Number() 会把
+                        // null、""、false、[] 折算为 0、把 true 折算为 1，这些是录入错误
+                        // 而不是合法零。只有 number 类型的有限非负数值（含明确合法的零）
+                        // 才调用伤害/流失 API，不得触发受击后效，不能作为延期标记过滤。
+                        const amount = damageConfig.value;
+                        const valueInvalid = typeof amount !== "number"
+                          || !Number.isFinite(amount) || amount < 0;
                         const typeKey = damageConfig.type || "hp";    // 默认为气血
 
-                        if (amount > 0) {
-                            // 判断 typeKey 是否在系统定义的伤害类型中 (如 poison, fire, waigong)
-                            // 注意：CONFIG.XJZL.damageTypes 包含了 liushi, none 等
-                            const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
+                        // 判断 typeKey 是否在系统定义的伤害类型中 (如 poison, fire, waigong)
+                        // 注意：CONFIG.XJZL.damageTypes 包含了 liushi, none 等
+                        const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
 
-                            // 尝试解析发起者：检定卡结算已脱离攻击者脚本栈，来源必须显式恢复，
-                            // 否则伤害/资源变化会把目标自己当成来源，污染统计与 resourceChanged。
-                            let attacker = null;
-                            if (flags.attackerUuid) {
-                                const attDoc = await fromUuid(flags.attackerUuid);
-                                attacker = attDoc?.actor || attDoc;
-                            }
+                        // 尝试解析发起者：检定卡结算已脱离攻击者脚本栈，来源必须显式恢复，
+                        // 否则伤害/资源变化会把目标自己当成来源，污染统计与 resourceChanged。
+                        let attacker = null;
+                        if (flags.attackerUuid) {
+                            const attDoc = await fromUuid(flags.attackerUuid);
+                            attacker = attDoc?.actor || attDoc;
+                        }
 
-                            if (isDamageType) {
-                                // === 分支 1: 造成伤害 (走 applyDamage) ===
-                                // 这样可以计算抗性、护体抵扣、触发受击特效等
+                        // 原攻击来源恢复：Item 按 UUID 在本地或 GM 路径还原，招式为随卡普通字段。
+                        // 使[空]、北冥护体、洛神反噬等受击脚本在真实结算阶段读到正确来源；
+                        // 无来源请求这些值保持 null，沿用原缺省行为。
+                        let sourceItem = null;
+                        if (flags.sourceItemUuid) {
+                            sourceItem = await fromUuid(flags.sourceItemUuid);
+                        }
+                        const sourceMove = flags.sourceMove || null;
 
-                                // 调用伤害逻辑
-                                // 判定触发的伤害通常：必中(true),但会受到 抗性 (Resistances) 的减免
-                                const damageResult = await actor.applyDamage({
-                                    amount: amount,
-                                    type: typeKey,
-                                    targetTokenUuid: doc?.documentName === "Token" ? doc.uuid : null,
-                                    attacker: attacker,
-                                    isHit: true,
-                                    ignoreMinDamage: true //可以减免到0
-                                });
+                        if (valueInvalid) {
+                            // 录入错误：拒绝本笔结算并报告；状态等其他后果照常执行
+                            ChatCardManager._reportInvalidOutcomeValue(damageConfig);
+                            html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.15); color:#8b0000; border-radius:4px;">
+                                <i class="fas fa-triangle-exclamation"></i> 后果数值非法，已拒绝结算（请检查招式脚本录入）
+                            </div>`;
+                        } else if (isDamageType) {
+                            // === 分支 1: 造成伤害 (走 applyDamage) ===
+                            // 这样可以计算抗性、护体抵扣、触发受击特效等
 
-                                // 构造显示文本 (显示实际损失)
-                                const losses = [];
-                                if (damageResult.hutiLost > 0) losses.push(`${damageResult.hutiLost} 护体`);
-                                if (damageResult.hpLost > 0) losses.push(`${damageResult.hpLost} 气血`);
-                                if (damageResult.mpLost > 0) losses.push(`${damageResult.mpLost} 内力`);
+                            // 调用伤害逻辑
+                            // 判定触发的伤害为真实伤害：默认命中；单笔字段按契约默认值读取，
+                            // 不再保留请求层的默认穿透/保底豁免，需要时在后果内显式配置。
+                            const damageResult = await actor.applyDamage({
+                                amount: amount,
+                                type: typeKey,
+                                targetTokenUuid: doc?.documentName === "Token" ? doc.uuid : null,
+                                attacker: attacker,
+                                isHit: true,
+                                isCrit: damageConfig.isCrit === true,
+                                applyCritDamage: damageConfig.applyCritDamage !== false,
+                                ignoreBlock: damageConfig.ignoreBlock === true,
+                                ignoreDefense: damageConfig.ignoreDefense === true,
+                                ignoreStance: damageConfig.ignoreStance === true,
+                                element: damageConfig.element || "none",
+                                ignoreMinDamage: damageConfig.ignoreMinDamage === true,
+                                // 延期原攻击的显式映射；无来源请求不覆盖 applyDamage 缺省值
+                                ...(flags.source ? { source: flags.source } : {}),
+                                ...(flags.isBroken ? { isBroken: true } : {}),
+                                ...(flags.isSkill === false ? { isSkill: false } : {}),
+                                ...(Number.isFinite(flags.targetKanpo) ? { targetKanpo: flags.targetKanpo } : {}),
+                                ...(sourceItem ? { item: sourceItem } : {}),
+                                ...(sourceMove ? { move: sourceMove } : {})
+                            });
 
-                                const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[typeKey]);
-                                const lossText = losses.length > 0 ? losses.join(", ") : "被抗性抵消";
+                            // 构造显示文本 (显示实际损失)
+                            const losses = [];
+                            if (damageResult.hutiLost > 0) losses.push(`${damageResult.hutiLost} 护体`);
+                            if (damageResult.hpLost > 0) losses.push(`${damageResult.hpLost} 气血`);
+                            if (damageResult.mpLost > 0) losses.push(`${damageResult.mpLost} 内力`);
 
-                                html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
-                                    <i class="fas fa-bolt"></i> 受到 <b>${amount}</b> 点${typeLabel}伤害<br>
-                                    <span style="color:#555;">(实际结算: -${lossText})</span>
-                                </div>`;
+                            const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[typeKey]);
+                            // 实际损失优先展示：零输入仍可能因目标受击脚本（如肝肠断）产生实际扣减，
+                            // 不能被"零输入"提示遮盖；仅在确认无任何损失时才给出零输入/被抵消说明
+                            const lossText = losses.length > 0
+                                ? losses.join(", ")
+                                : (amount === 0 ? "零输入" : "被抗性抵消");
 
-                            }
-                            else {
-                                // === 分支 2: 直接资源流失 (走 applyHealing) ===
-                                // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)
+                            html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                                <i class="fas fa-bolt"></i> 受到 <b>${amount}</b> 点${typeLabel}伤害<br>
+                                <span style="color:#555;">(实际结算: -${lossText})</span>
+                            </div>`;
 
-                                // 流失来源是检定发起者；不传 healer 会被系统当成目标自己，resourceChanged/统计随之失真
-                                await actor.applyHealing({
-                                    amount: -amount,
-                                    type: typeKey,
-                                    showScrolling: true,
-                                    healer: attacker
-                                });
+                        }
+                        else if (amount > 0) {
+                            // === 分支 2: 直接资源流失 (走 applyHealing) ===
+                            // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)；零流失不产生实际变更
 
-                                // 简单的字典映射
-                                const typeLabels = {
-                                    hp: "气血", mp: "内力", neili: "内力",
-                                    rage: "怒气", huti: "护体", tili: "体力"
-                                };
-                                const label = typeLabels[typeKey] || typeKey;
+                            // 流失来源是检定发起者；不传 healer 会被系统当成目标自己，resourceChanged/统计随之失真
+                            await actor.applyHealing({
+                                amount: -amount,
+                                type: typeKey,
+                                showScrolling: true,
+                                healer: attacker,
+                                ...(sourceItem ? { item: sourceItem } : {}),
+                                ...(sourceMove ? { move: sourceMove } : {})
+                            });
 
-                                html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
-                                    <i class="fas fa-heart-broken"></i> <b>${amount}</b> 点${label}流失
-                                </div>`;
-                            }
+                            // 简单的字典映射
+                            const typeLabels = {
+                                hp: "气血", mp: "内力", neili: "内力",
+                                rage: "怒气", huti: "护体", tili: "体力"
+                            };
+                            const label = typeLabels[typeKey] || typeKey;
+
+                            html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                                <i class="fas fa-heart-broken"></i> <b>${amount}</b> 点${label}流失
+                            </div>`;
                         }
                     }
 
@@ -2745,6 +2867,24 @@ export class ChatCardManager {
 
         if (!attacker || !defender) return ["错误：无法找到参与者，自动化中止。"];
 
+        // 原攻击来源恢复：Item 按 UUID 在本地或 GM 路径还原，招式为随卡普通字段；
+        // 仅延期的原攻击后果 (targetDamage) 与发起者自身恢复继承该来源，
+        // 反噬 (selfDamage) 按自己的语义配置来源，不因保存了原攻击来源就无条件继承。
+        let sourceItem = null;
+        if (flags.sourceItemUuid) {
+            sourceItem = await fromUuid(flags.sourceItemUuid);
+        }
+        const moveSourceContext = {
+            attacker,
+            item: sourceItem,
+            move: flags.sourceMove || null,
+            source: flags.source,
+            isBroken: flags.isBroken,
+            isSkill: flags.isSkill,
+            // 破架统计所需的看破值：随延期请求卡保存，真实后果按原值计入统计
+            targetKanpo: flags.targetKanpo
+        };
+
         // === A. 处理 AE (Case 1 & 2) ===
 
         // 给发起者加状态 (Self Effect)
@@ -2763,13 +2903,13 @@ export class ChatCardManager {
 
         // 发起者获得资源 (Self Recovery)
         if (config.selfRecovery) {
-            const res = await ChatCardManager._applyResourceHelper(attacker, config.selfRecovery, 1); // 1 = 加
+            const res = await ChatCardManager._applyResourceHelper(attacker, config.selfRecovery, 1, moveSourceContext); // 1 = 加
             if (res) logs.push(`发起者恢复: ${res}`);
         }
 
         // 对抗者扣除资源 (Target Damage)
         if (config.targetDamage) {
-            const res = await ChatCardManager._applyResourceHelper(defender, config.targetDamage, -1); // -1 = 减
+            const res = await ChatCardManager._applyResourceHelper(defender, config.targetDamage, -1, moveSourceContext); // -1 = 减
             if (res) logs.push(`对抗者受到: ${res}`);
         }
 
@@ -2833,17 +2973,30 @@ export class ChatCardManager {
     }
 
     /**
+     * 请求后果数值非法时的统一报告：拒绝结算、控制台留痕并提示操作者。
+     * @param {Object} config 非法的后果配置（用于控制台定位录入位置）
+     * @returns {String} 写入卡片日志的短文本
+     */
+    static _reportInvalidOutcomeValue(config) {
+        console.warn("XJZL | 请求后果数值非法，已拒绝结算:", config);
+        ui.notifications.error(`请求后果数值非法（value: ${config?.value ?? "缺失"}），已拒绝结算。`);
+        return "数值非法，已拒绝结算";
+    }
+
+    /**
      * 辅助：安全应用资源变动 (支持 恢复、流失、伤害)
      * @param {Actor} actor 目标角色
-     * @param {Object} resourceConfig 配置 { value: 10, type: "hp"/"poison" }
+     * @param {Object} resourceConfig 配置 { value, type, isCrit, applyCritDamage, ignoreBlock/Defense/Stance, element, ignoreMinDamage }
      * @param {Number} multiplier 系数 (1=获得/恢复, -1=失去/伤害)
+     * @param {Object} [context] 请求级来源恢复：{ attacker, item, move, source, isBroken, isSkill, targetKanpo }；无来源请求省略
      * @returns {String} 简短的日志文本
      */
-    static async _applyResourceHelper(actor, resourceConfig, multiplier) {
-        // 1. 基础解析
-        const val = Number(resourceConfig.value);
-        if (!val || val === 0) return null;
-
+    static async _applyResourceHelper(actor, resourceConfig, multiplier, context = {}) {
+        // 1. 基础解析：类型与空值检查必须先于数值转换——Number() 会把 null、""、
+        // false、[] 折算为 0、把 true 折算为 1，这些是录入错误而不是合法零。
+        // 只有 number 类型的有限非负数值（含明确合法的零）才调用伤害/流失 API。
+        const val = resourceConfig.value;
+        const valueInvalid = typeof val !== "number" || !Number.isFinite(val) || val < 0;
         const typeKey = resourceConfig.type || "hp";
 
         // 获取本地化标签 (尝试从伤害类型或通用标签中找)
@@ -2856,15 +3009,32 @@ export class ChatCardManager {
             typeLabel = map[typeKey] || typeKey;
         }
 
+        // 来源恢复字段：无来源请求不传，保留 applyDamage/applyHealing 的缺省行为
+        const sourceParams = {
+            ...(context.attacker ? { attacker: context.attacker } : {}),
+            ...(context.item ? { item: context.item } : {}),
+            ...(context.move ? { move: context.move } : {}),
+            ...(context.source ? { source: context.source } : {}),
+            ...(context.isBroken ? { isBroken: true } : {}),
+            ...(context.isSkill === false ? { isSkill: false } : {}),
+            ...(Number.isFinite(context.targetKanpo) ? { targetKanpo: context.targetKanpo } : {})
+        };
+
         // =====================================================
-        // 情况 A: 恢复/获得 (Multiplier > 0)
+        // 情况 A: 恢复/获得 (Multiplier > 0)；零恢复不产生实际变更
         // =====================================================
         if (multiplier > 0) {
+            if (valueInvalid) return ChatCardManager._reportInvalidOutcomeValue(resourceConfig);
+            if (val === 0) return null;
             // 恢复永远走 applyHealing
             await actor.applyHealing({
                 amount: val, // 正数
                 type: typeKey,
-                showScrolling: true
+                showScrolling: true,
+                // 恢复自身时 healer 缺省即目标自己，不额外覆盖
+                ...(context.attacker && context.attacker !== actor ? { healer: context.attacker } : {}),
+                ...(context.item ? { item: context.item } : {}),
+                ...(context.move ? { move: context.move } : {})
             });
             return `恢复 ${val} ${typeLabel}`;
         }
@@ -2878,15 +3048,21 @@ export class ChatCardManager {
 
         if (isDamageType) {
             // --- 分支 B1: 造成伤害 (走 applyDamage, 计算抗性/护体) ---
+            if (valueInvalid) return ChatCardManager._reportInvalidOutcomeValue(resourceConfig);
 
-            // 对抗失败造成的伤害，通常视为无法规避的直击
+            // 真实伤害按标准流程结算：单笔字段按契约默认值读取
             const damageResult = await actor.applyDamage({
                 amount: val, // applyDamage 接收正数作为面板伤害
                 type: typeKey,
-                isHit: true,        // 必中
-                ignoreBlock: true,  // 无视格挡
-                ignoreStance: true, // 无视架招
-                ignoreDefense: true // 无视防御 (护甲)，但保留抗性计算
+                isHit: true, // 结果伤害默认命中
+                isCrit: resourceConfig.isCrit === true,
+                applyCritDamage: resourceConfig.applyCritDamage !== false,
+                ignoreBlock: resourceConfig.ignoreBlock === true,
+                ignoreDefense: resourceConfig.ignoreDefense === true,
+                ignoreStance: resourceConfig.ignoreStance === true,
+                element: resourceConfig.element || "none",
+                ignoreMinDamage: resourceConfig.ignoreMinDamage === true,
+                ...sourceParams
             });
 
             // 构建详细反馈 (显示实际损失)
@@ -2903,12 +3079,18 @@ export class ChatCardManager {
 
         } else {
             // --- 分支 B2: 直接流失 (走 applyHealing, 强制扣除) ---
-            // 适用于 hp, mp, rage 等非伤害类型
+            // 适用于 hp, mp, rage 等非伤害类型；零流失不产生实际变更
+            if (valueInvalid) return ChatCardManager._reportInvalidOutcomeValue(resourceConfig);
+            if (val === 0) return null;
 
             await actor.applyHealing({
                 amount: -val, // 传入负数
                 type: typeKey,
-                showScrolling: true
+                showScrolling: true,
+                // 流失来源是请求发起者；无来源请求不传 healer，保持缺省（目标自己）
+                ...(context.attacker ? { healer: context.attacker } : {}),
+                ...(context.item ? { item: context.item } : {}),
+                ...(context.move ? { move: context.move } : {})
             });
 
             return `流失 ${val} ${typeLabel}`;
@@ -3014,7 +3196,9 @@ export class ChatCardManager {
                 isBuffOnly: isBuffType || (baseAmount === 0),
 
                 // 6. 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
-                scriptFlags: flags.scriptFlags || {}
+                scriptFlags: flags.scriptFlags || {},
+                // 治疗/Buff 不运行 preDamage，无攻击输入快照
+                damageConfig: null
             };
 
             //  D.无论有没有数值，都执行 HIT 脚本

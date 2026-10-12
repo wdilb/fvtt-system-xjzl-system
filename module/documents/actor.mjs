@@ -102,6 +102,58 @@ function getDatabaseOperation(operation = {}) {
   return databaseOperation;
 }
 
+/**
+ * 攻击侧数值修正资格：仅 attack/preDamage 且本次动作明确传入 allowDamageModifiers === false 时锁定。
+ * 在阶段开始时求值一次并以布尔值固定，脚本改写只读标志不能解除核心限制；
+ * 缺少招式信息的旧调用不传该参数，保持原行为（允许修正），不默认禁止。
+ */
+function isExternalDamageInputLocked(trigger, args) {
+  return (trigger === SCRIPT_TRIGGERS.ATTACK || trigger === SCRIPT_TRIGGERS.PRE_DAMAGE)
+    && args?.allowDamageModifiers === false;
+}
+
+/**
+ * 外部脚本运行前快照受保护的攻击侧输入。
+ * preAttack 是声明点：只保护 allowDamageModifiers，外部来源（AE/背景注入）的改写——
+ * 包括把声明改回 true——在脚本结束后还原，核心最终只接纳本招式自身脚本的声明。
+ * attack/preDamage 锁定后保护面板值与数值/倍率开关：自身与外部脚本按“执行前保存的
+ * 原始动作招式引用”区分（entry.source 即原始动作招式的是本招式自身脚本）：本招式的
+ * 基础生成、数量计算、资源换算、条件倍率照常保留；外部来源对加伤、降伤与倍率开关的
+ * 修改才在脚本结束后还原。
+ * 不扫描脚本文本、不按显示名称或临时注入的 args.move 判断。
+ */
+function captureExternalDamageInput(sandbox, actionMove, entry) {
+  // 本招式自身脚本的改写照常保留：声明与基础公式都归属原始动作。
+  if (entry.source === actionMove) return null;
+  if (sandbox.trigger === SCRIPT_TRIGGERS.PRE_ATTACK) {
+    return { declaration: sandbox.args?.allowDamageModifiers };
+  }
+  if (!isExternalDamageInputLocked(sandbox.trigger, sandbox.args)) return null;
+  return {
+    panelDamage: sandbox.args?.flags?.damageResult?.damage,
+    configAmount: sandbox.args?.config?.amount,
+    configApplyCritDamage: sandbox.args?.config?.applyCritDamage
+  };
+}
+
+/** 脚本结束后立即还原无资格的修改，保证下一段脚本读取声明、伤害或创建请求前数值已复原。 */
+function restoreExternalDamageInput(sandbox, snapshot) {
+  if (!snapshot) return;
+  // hasOwnProperty 而非 !== undefined：声明字段即使缺省为 undefined 也要还原外部写入。
+  if (Object.prototype.hasOwnProperty.call(snapshot, "declaration") && sandbox.args) {
+    sandbox.args.allowDamageModifiers = snapshot.declaration;
+  }
+  if (snapshot.panelDamage !== undefined && sandbox.args?.flags?.damageResult) {
+    sandbox.args.flags.damageResult.damage = snapshot.panelDamage;
+  }
+  if (snapshot.configAmount !== undefined && sandbox.args?.config) {
+    sandbox.args.config.amount = snapshot.configAmount;
+  }
+  if (snapshot.configApplyCritDamage !== undefined && sandbox.args?.config) {
+    sandbox.args.config.applyCritDamage = snapshot.configApplyCritDamage;
+  }
+}
+
 // 将构造器缓存在模块作用域，避免每次 runScripts 重复创建
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 const SCRIPT_FUNCTION_CACHE_LIMIT = 256;
@@ -1349,6 +1401,11 @@ export class XJZLActor extends Actor {
    */
   async runScripts(trigger, context = {}, contextItem = null) {
     if (this.type === "container") return; //容器没有脚本
+    // preAttack 是声明点：契约默认布尔 true。旧入口直接调用本方法时也在此提供真实默认值，
+    // 调用方与后续脚本读取到的是布尔值而非 undefined。
+    if (trigger === SCRIPT_TRIGGERS.PRE_ATTACK && context.allowDamageModifiers === undefined) {
+      context.allowDamageModifiers = true;
+    }
     // 1. 收集脚本
     const scriptsToRun = this.collectScripts(trigger, contextItem);
     if (!scriptsToRun.length) return;
@@ -1431,8 +1488,17 @@ export class XJZLActor extends Actor {
   _runScriptsSync(scripts, sandbox, actionContext = null) {
     // 初始化执行上下文栈
     if (!this._scriptContextStack) this._scriptContextStack = [];
+    // preAttack 的声明保护与 attack/preDamage 的数值拦截共用逐段快照机制：
+    // 声明仅接纳本招式自身脚本；数值拦截的资格在阶段开始时锁定一次，脚本运行中
+    // 改写只读标志不能解除核心限制。
+    const externalDamageInputLocked = sandbox.trigger === SCRIPT_TRIGGERS.PRE_ATTACK
+      || isExternalDamageInputLocked(sandbox.trigger, sandbox.args);
+    // 原始动作招式引用：在临时注入（背景招式 contextData）前保存，用于区分自身与外部脚本来源。
+    const actionMove = sandbox.move;
     for (const entry of scripts) {
       let restoreMove = null;
+      // 无资格脚本运行前快照攻击输入，脚本结束后立即还原；finally 中也要可访问，须在 try 外声明。
+      let externalDamageInput = null;
       try {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
@@ -1472,6 +1538,7 @@ export class XJZLActor extends Actor {
           actionMove: actionContext?.move || null,
           actionSource: actionContext?.source || null
         });
+        if (externalDamageInputLocked) externalDamageInput = captureExternalDamageInput(sandbox, actionMove, entry);
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -1485,6 +1552,7 @@ export class XJZLActor extends Actor {
         // ui.notifications.error(`脚本错误: ${entry.label}`);
       }
       finally {
+        restoreExternalDamageInput(sandbox, externalDamageInput);
         restoreMove?.();
         // 出栈：无论成功失败，保证栈的清洁
         this._scriptContextStack.pop();
@@ -1501,9 +1569,18 @@ export class XJZLActor extends Actor {
   async _runScriptsAsync(scripts, sandbox, actionContext = null) {
     // 初始化执行上下文栈
     if (!this._scriptContextStack) this._scriptContextStack = [];
+    // preAttack 的声明保护与 attack/preDamage 的数值拦截共用逐段快照机制：
+    // 声明仅接纳本招式自身脚本；数值拦截的资格在阶段开始时锁定一次，脚本运行中
+    // 改写只读标志不能解除核心限制。
+    const externalDamageInputLocked = sandbox.trigger === SCRIPT_TRIGGERS.PRE_ATTACK
+      || isExternalDamageInputLocked(sandbox.trigger, sandbox.args);
+    // 原始动作招式引用：在临时注入（背景招式 contextData）前保存，用于区分自身与外部脚本来源。
+    const actionMove = sandbox.move;
 
     for (const entry of scripts) {
       let restoreMove = null;
+      // 无资格脚本运行前快照攻击输入，脚本结束后立即还原；finally 中也要可访问，须在 try 外声明。
+      let externalDamageInput = null;
       try {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
@@ -1543,6 +1620,7 @@ export class XJZLActor extends Actor {
           actionMove: actionContext?.move || null,
           actionSource: actionContext?.source || null
         });
+        if (externalDamageInputLocked) externalDamageInput = captureExternalDamageInput(sandbox, actionMove, entry);
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
         // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);
@@ -1552,6 +1630,7 @@ export class XJZLActor extends Actor {
         console.error(`[XJZL] 异步脚本错误 [${entry.label}]:`, err);
         ui.notifications.error(`特效脚本执行失败: ${entry.label}`);
       } finally {
+        restoreExternalDamageInput(sandbox, externalDamageInput);
         restoreMove?.();
         // 出栈：无论成功失败，保证栈的清洁
         this._scriptContextStack.pop();
@@ -3331,6 +3410,11 @@ export class XJZLActor extends Actor {
 
     // 运行脚本：虽然没有招式但内功、装备等可能对“普通攻击”有特殊加成
     // 脚本中可以通过判断 trigger === 'attack' && args.move.type === 'basic' 来专门针对普攻写逻辑
+    // 普攻不提供 preAttack 声明点：资格恒为 true 且只读，脚本改写不能影响后续阶段或卡片保存值
+    Object.defineProperty(attackContext, "allowDamageModifiers", {
+      get: () => true,
+      enumerable: true
+    });
     await this.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, virtualMove);
     // 获取全局必中状态
     const isGlobalForceHit = attackContext.flags.forceHit || false;
@@ -3597,6 +3681,7 @@ export class XJZLActor extends Actor {
           alwaysHit: attackContext.flags.alwaysHit || false,
 
           costConsumed: costConsumed, // 记录消耗
+          allowDamageModifiers: true, // 普攻恒为 true；聊天结算层的 preDamage 按它重建只读上下文
           scriptFlags: attackFlagsSnapshot, // 出招阶段自定义 flags 快照，供结算脚本只读
           damage: calcResult.damage,
           feint: 0,

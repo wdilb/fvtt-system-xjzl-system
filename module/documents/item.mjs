@@ -1908,6 +1908,9 @@ export class XJZLItem extends Item {
         item: this,
         attacker: actor,
         costConfig: finalCost, // 传入引用，脚本内修改 args.costConfig 即可生效
+        // 攻击侧数值修正资格声明点：默认 true；确需固定后果的招式在自身 preAttack 脚本中
+        // 写 args.allowDamageModifiers = false，核心在该阶段结束后固定此布尔值并只读透传。
+        allowDamageModifiers: true,
         // 允许出招前的用户选择随本次攻击卡传递到后续阶段。
         // 这是每次出招独立的临时容器，不写入 Actor，避免多张待结算卡片互相污染。
         scriptFlags: {},
@@ -1921,6 +1924,10 @@ export class XJZLItem extends Item {
         if (preAttackContext.abortReason) ui.notifications.warn(preAttackContext.abortReason);
         return;
       }
+      // preAttack 结束后核心固定本次动作的资格布尔值：不按系数/伤害自动判定，
+      // 之后 attack/卡片/preDamage 均以此为唯一来源，脚本改写不能解除限制或污染卡片。
+      // 声明仅接纳本招式自身脚本：外部来源（AE/背景注入）对该字段的改写已由执行器逐段还原。
+      const allowDamageModifiers = preAttackContext.allowDamageModifiers !== false;
       // PRE_ATTACK 允许脚本异步改变状态；攻击上下文的初始等级应读取脚本执行后的状态。
       const postPreAttackStatuses = actor.xjzlStatuses || {};
       // =====================================================
@@ -2092,6 +2099,12 @@ export class XJZLItem extends Item {
       // 增加劣势: flags.level -= 1
       // 强制普通: flags.level = 0
       // 执行异步脚本 (ATTACK)
+      // 资格字段只读化：attack 阶段脚本改写 args.allowDamageModifiers 不能影响
+      // 后续脚本读取或卡片保存值（非严格模式下对仅 getter 属性赋值是静默无操作）。
+      Object.defineProperty(attackContext, "allowDamageModifiers", {
+        get: () => allowDamageModifiers,
+        enumerable: true
+      });
       await actor.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, move);
 
       // 检查阻断
@@ -2537,6 +2550,8 @@ export class XJZLItem extends Item {
             moveType: move.type,       // 招式类型
             ...(detailAccess ? { detailAccess } : {}), // 锁定状态只在发卡时按来源阵营计算一次
             costConsumed: costConsumed,// 记录消耗
+            // 攻击侧数值修正资格：preAttack 声明后核心固定的布尔值，聊天结算层的 preDamage 按它重建只读上下文
+            allowDamageModifiers,
             // attack 阶段脚本对 args.flags 的写入快照（如爆发决策等自定义标记）。
             // 应用伤害时由 chat-manager 以 args.scriptFlags 只读暴露给 hit/hit_once 脚本；
             // 每张卡片持有独立快照，多张待结算卡片互不干扰，未结算也不会残留 Actor 状态。

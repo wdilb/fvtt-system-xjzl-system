@@ -1,6 +1,46 @@
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 /**
+ * 将招式压缩为随卡保存的普通字段：只保留受击消费者在真实结算阶段确需的信息，
+ * 不保存描述、脚本数组或完整招式；请求卡真实后果按自身语义决定来源，不强制继承。
+ */
+function toPlainMoveSnapshot(move) {
+    if (!move || typeof move !== "object") return null;
+    return {
+        id: move.id ?? null,
+        name: move.name ?? null,
+        type: move.type ?? null,
+        element: move.element ?? "none",
+        damageType: move.damageType ?? null,
+        weaponType: move.weaponType ?? null,
+        currentCost: move.currentCost
+            ? { mp: move.currentCost.mp || 0, rage: move.currentCost.rage || 0, hp: move.currentCost.hp || 0 }
+            : null
+    };
+}
+
+/** 来源 Item 支持 Item 文档或 UUID 字符串；卡片只保存 UUID，结算时按本地或 GM 路径还原。 */
+function toSourceItemUuid(item) {
+    if (!item) return null;
+    return typeof item === "string" ? item : (item.uuid ?? null);
+}
+
+/** 组装随卡保存的来源字段：延期的原攻击按需保留来源与破架统计参数；通用无来源请求不写入这些键。 */
+function buildSourceFlags({ item, move, source, isBroken, isSkill, targetKanpo }) {
+    const sourceItemUuid = toSourceItemUuid(item);
+    const sourceMove = toPlainMoveSnapshot(move);
+    const flags = {};
+    if (sourceItemUuid) flags.sourceItemUuid = sourceItemUuid;
+    if (sourceMove) flags.sourceMove = sourceMove;
+    if (source) flags.source = source;
+    if (isBroken === true) flags.isBroken = true;
+    if (isSkill === false) flags.isSkill = false;
+    // 破架统计所需的看破值：仅延期原攻击显式传入非零值时随卡保存；缺省行为保持 0
+    if (Number.isFinite(targetKanpo) && targetKanpo !== 0) flags.targetKanpo = targetKanpo;
+    return flags;
+}
+
+/**
  * 脚本宏助手 (Script Macros)
  * 提供给 Item 脚本使用的高级封装函数
  */
@@ -20,7 +60,7 @@ export class XJZLMacros {
      * 
      * @param {Object|Array} [options.onSuccess] 成功时应用的 Effect 数据 (格式同 onFail)
      * @param {Object} [options.damageOnSuccess] 成功时扣除资源/造成伤害 (格式同 damageOnFail，常用于豁免后伤害减半)
-     * 
+     *
      * @param {Actor} [options.attacker] 发起者 Actor (可选，用于显示名字，脚本里通常是 `actor` 或 `attacker`)
      * @param {Number} options.level     预设优劣势 (正数=优, 负数=劣)
      * @param {Number} options.bonus     预设加减值
@@ -28,8 +68,21 @@ export class XJZLMacros {
      * @param {String} [options.failureText] 失败时的提示文本
      * @param {Boolean} [options.removeStanceOnSuccess] 成功时解除检定者的架招
      * @param {Boolean} [options.removeStanceOnFail] 失败时解除检定者的架招
+     *
+     * 延期原攻击的来源恢复 (可选；通用无来源请求不传，保持缺省行为)：
+     * @param {Item|String} [options.item] 原攻击来源 Item 文档或 UUID；随卡保存 UUID，结算时还原
+     * @param {Object} [options.move] 原攻击招式；只随卡保存 id/name/type/element/damageType/weaponType/currentCost 普通字段
+     * @param {String} [options.source] 真实伤害后果的 applyDamage source (如 "move"/"basic"/"both")；默认 "extra"
+     * @param {Boolean} [options.isBroken] 真实伤害后果保留的破架状态；默认 false
+     * @param {Boolean} [options.isSkill] 真实伤害后果是否按招式伤害计入技能抗性；默认 true
+     * @param {Number} [options.targetKanpo] 破架统计所需的目标看破值（解除架招前保存）；默认 0
+     *
+     * damageOnSuccess/damageOnFail 单笔字段 (默认值)：isCrit=false、applyCritDamage=true、
+     * ignoreBlock/ignoreDefense/ignoreStance=false、element="none"、ignoreMinDamage=false；
+     * value 为非负有限数值（number 类型，含合法零输入），伤害类型走标准 applyDamage，资源类型走负数 applyHealing 直接流失；
+     * 缺失、非 number 类型或负数视为录入错误，拒绝本笔结算并报告（不做字符串、布尔等值的数值折算）。
      */
-    static async requestSave({ target, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText, removeStanceOnSuccess = false, removeStanceOnFail = false }) {
+    static async requestSave({ target, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText, removeStanceOnSuccess = false, removeStanceOnFail = false, item, move, source, isBroken, isSkill, targetKanpo }) {
         if (!target) return ui.notifications.error("requestSave: 缺少目标 (target)");
         if (!type) return ui.notifications.error("requestSave: 缺少属性类型 (type)");
 
@@ -86,7 +139,9 @@ export class XJZLMacros {
             successText: successText || null,
             failureText: failureText || null,
             removeStanceOnSuccess: Boolean(removeStanceOnSuccess),
-            removeStanceOnFail: Boolean(removeStanceOnFail)
+            removeStanceOnFail: Boolean(removeStanceOnFail),
+            // 延期原攻击的来源恢复；无来源请求不写入这些键，保持缺省行为
+            ...buildSourceFlags({ item, move, source, isBroken, isSkill, targetKanpo })
         };
 
         // 4. 发送消息
@@ -113,18 +168,31 @@ export class XJZLMacros {
       * @param {String} [options.winText] 发起者获胜时的描述文本 (会被 outcome.win.text 覆盖)
       * @param {String} [options.loseText] 发起者失败时的描述文本 (会被 outcome.lose.text 覆盖)
       * 
-      * @param {Object} [options.outcome] 自动化后果配置 (基于发起者视角)
-      * @param {Object} [options.outcome.win] 发起者获胜时执行的结果
-      * @param {String} [options.outcome.win.text] 获胜描述文本
-      * @param {Object} [options.outcome.win.selfRecovery] 发起者恢复资源 { value: 10, type: "hp/mp/rage" }
-      * @param {Object} [options.outcome.win.selfDamage] 发起者流失资源/受伤害 { value: 10, type: "hp/poison..." }
-      * @param {String|Object|Array} [options.outcome.win.selfEffect] 发起者获得状态 (如 "prone")
-      * @param {Object} [options.outcome.win.targetDamage] 对抗者流失资源/受伤害
-      * @param {String|Object|Array} [options.outcome.win.targetEffect] 对抗者获得状态
-      * 
-      * @param {Object} [options.outcome.lose] 发起者失败时执行的结果 (内部结构同 win)
-      */
-    static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome, attBonus = 0, defBonus = 0 }) {
+     * @param {Object} [options.outcome] 自动化后果配置 (基于发起者视角)
+     * @param {Object} [options.outcome.win] 发起者获胜时执行的结果
+     * @param {String} [options.outcome.win.text] 获胜描述文本
+     * @param {Object} [options.outcome.win.selfRecovery] 发起者恢复资源 { value: 10, type: "hp/mp/rage" }
+     * @param {Object} [options.outcome.win.selfDamage] 发起者流失资源/受伤害 { value: 10, type: "hp/poison..." }
+     * @param {String|Object|Array} [options.outcome.win.selfEffect] 发起者获得状态 (如 "prone")
+     * @param {Object} [options.outcome.win.targetDamage] 对抗者流失资源/受伤害
+     * @param {String|Object|Array} [options.outcome.win.targetEffect] 对抗者获得状态
+     *
+     * @param {Object} [options.outcome.lose] 发起者失败时执行的结果 (内部结构同 win)
+     *
+     * 延期原攻击的来源恢复 (可选；通用无来源请求不传，保持缺省行为)：
+     * @param {Item|String} [options.item] 原攻击来源 Item 文档或 UUID；随卡保存 UUID，结算时还原
+     * @param {Object} [options.move] 原攻击招式；只随卡保存普通字段 (同 requestSave)
+     * @param {String} [options.source] 真实伤害后果的 applyDamage source；默认 "extra"
+     * @param {Boolean} [options.isBroken] 真实伤害后果保留的破架状态；默认 false
+     * @param {Boolean} [options.isSkill] 真实伤害后果是否按招式伤害计入技能抗性；默认 true
+     * @param {Number} [options.targetKanpo] 破架统计所需的目标看破值（解除架招前保存）；默认 0
+     *
+     * targetDamage/selfDamage 单笔字段 (默认值) 同 requestSave 的 damageOnSuccess/damageOnFail；
+     * 请求级来源恢复只作用于延期的原攻击后果 (targetDamage)：自动恢复发起者、随卡 item/move、
+     * source/isBroken/isSkill 与 targetKanpo；反噬 (selfDamage) 不继承这些来源，按 applyDamage/
+     * applyHealing 缺省行为结算，也没有单笔来源覆盖参数。
+     */
+    static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome, attBonus = 0, defBonus = 0, item, move, source, isBroken, isSkill, targetKanpo }) {
         if (!attacker || !defender) return ui.notifications.error("对抗请求缺少参与双方。");
         if (!type) return ui.notifications.error("对抗请求缺少属性类型。");
 
@@ -165,6 +233,8 @@ export class XJZLMacros {
             type: "contest-request",
             attackerUuid: attacker.uuid,
             defenderUuid: defender.uuid,
+            // 延期原攻击的来源恢复；无来源请求不写入这些键，保持缺省行为
+            ...buildSourceFlags({ item, move, source, isBroken, isSkill, targetKanpo }),
             config: {
                 attAttr: type,
                 defAttr: defenderType,
