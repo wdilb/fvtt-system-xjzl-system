@@ -326,6 +326,17 @@ export class ChatCardManager {
     }
 
     /* -------------------------------------------- */
+    /*  本地防重复点击 (Local Duplicate Guard)      */
+    /* -------------------------------------------- */
+
+    /**
+     * 本地防重复点击的进行中标记：豁免卡存消息 ID（覆盖检定到后果结算全程），
+     * 对抗卡另存 `${messageId}:${role}` 键拦截同一方连点，双方各自投掷互不影响。
+     * 只做本地重复点击保护，不承诺跨客户端唯一执行：不同客户端同时点击仍可能重复结算。
+     */
+    static _settlingOutcomeMessages = new Set();
+
+    /* -------------------------------------------- */
     /*  核心结算逻辑 (Resolution Logic)             */
     /* -------------------------------------------- */
 
@@ -695,8 +706,8 @@ export class ChatCardManager {
                 if (state === 1 && d2 !== null) finalDie = Math.max(d1, d2);
                 else if (state === -1 && d2 !== null) finalDie = Math.min(d1, d2);
 
-                // C. 计算数值
-                total = finalDie + hitMod + manualBonus;
+                // C. 计算数值（与出招缓存及预览卡片一致：基础 + 手动 + 全局脚本 + 该目标脚本加值）
+                total = finalDie + globalHitMod + (states.grantHit || 0);
                 const dodge = targetActor.system.combat.dodgeTotal ?? 10;
 
                 // D. 判定命中
@@ -1978,6 +1989,8 @@ export class ChatCardManager {
                 ignoreDefense: config.ignoreDefense,
                 ignoreStance: config.ignoreStance,
                 applyCritDamage: config.applyCritDamage,
+                // 与自动结算一致：初始化招式属性，preDamage 改写前伤害结算按招式属性取抗性
+                element: moveElement,
                 ignoreMinDamage: false  // 默认为 false (保底1点伤害)
             };
 
@@ -2020,6 +2033,8 @@ export class ChatCardManager {
                     item: item,
                     move: move,
                     element: moveElement,
+                    // 与自动结算一致：补传出招时 attack 阶段保存的自定义 flags 快照，出招选择在手动结算中继续生效
+                    scriptFlags: flags.scriptFlags || {},
                     // 手动结算同样在逐目标阶段执行 preDamage
                     targetCount: targets.length,
                     // 与自动结算保持一致：提供本次全部目标（Actor）
@@ -2274,248 +2289,259 @@ export class ChatCardManager {
      * @param {Boolean} manualInput 按住 Ctrl 时为 true，弹窗手动录入结果 (GM 线下实体骰等场景)
      */
     static async _rollSave(flags, message, autoFail = false, manualInput = false) {
-        // 1. 获取防御者 (Flags 里存的是 targetUuid)
-        const targetUuid = flags.targetUuid;
-        const doc = await fromUuid(targetUuid);
-        const actor = doc?.actor || doc;
-
-        if (!actor) return ui.notifications.warn("目标已不存在。");
-
-        // 权限检查：只有拥有者或GM可以点
-        if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
-
-        const dc = flags.dc || 10;
-        let total;
-        // 手动录入没有真实骰子与属性加值拆分，置空后结果块改用"手动输入"格式显示
-        let attrVal = null;
-        let diceResult = null;
-
-        if (manualInput) {
-            // Ctrl+点击：直接录入一个结果数值；null=取消，NaN=输入无效
-            // (DialogV2 ok 回调返回 nullish 时 promise 会 resolve 成按钮 action 字符串，无效输入必须用 NaN 哨兵)
-            const labelKey = CONFIG.XJZL.attributes[flags.attribute] ||
-                CONFIG.XJZL.skills[flags.attribute] ||
-                CONFIG.XJZL.arts[flags.attribute] ||
-                CONFIG.XJZL.weaponTypes[flags.attribute] ||
-                flags.attribute;
-            const attrLabel = game.i18n.localize(labelKey);
-            total = await ChatCardManager._promptManualCheckResult(actor, `${attrLabel} · DC ${dc}`);
-            if (total === null || !Number.isFinite(total)) return;
-        } else {
-            // 2. 调用 Actor 的检定方法
-            // 这会弹出一个新的聊天卡片显示骰子结果
-            // 读取 flags.level (发起请求时设定的优劣势)
-            const requestBonus = flags.bonus || 0;
-            const roll = await actor.rollAttributeTest(flags.attribute, {
-                level: flags.level || 0,
-                skipDialog: autoFail,      // 如果按了Shift，直接跳过弹窗
-                bonus: autoFail ? -999 : requestBonus
-            });
-
-            if (!roll) return; // 防呆，万一取消了
-
-            // 3. 比对结果
-            total = roll.total;
-
-            // 这是我们在 Actor.rollAttributeTest 里传入的
-            attrVal = roll.data.val || 0;
-            diceResult = roll.terms[0].total; // 骰子本身的结果
+        // 本地重复点击保护：检定与后果结算全程互斥，连点在投掷前即被拦截。
+        // 不承诺跨客户端唯一执行：不同客户端同时点击同一张卡片仍可能重复结算。
+        if (ChatCardManager._settlingOutcomeMessages.has(message.id)) {
+            return ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.OutcomeGuard.SaveSettling"));
         }
+        ChatCardManager._settlingOutcomeMessages.add(message.id);
+        try {
+            // 1. 获取防御者 (Flags 里存的是 targetUuid)
+            const targetUuid = flags.targetUuid;
+            const doc = await fromUuid(targetUuid);
+            const actor = doc?.actor || doc;
 
-        const isSuccess = total >= dc;
+            if (!actor) return ui.notifications.warn("目标已不存在。");
 
-        // ==========================================================
-        // 内部辅助函数：统一处理 AE 的施加与 伤害/资源的扣除
-        // ==========================================================
-        const processEffectsAndDamage = async (effectsConfig, damageConfig, removeStance = false) => {
-            let html = "";
+            // 权限检查：只有拥有者或GM可以点
+            if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
 
-            // --- A. 应用状态 (Effects) ---
-            if (effectsConfig) {
-                // 标准化为数组
-                const effectsData = Array.isArray(effectsConfig) ? effectsConfig : [effectsConfig];
-                // 用于收集成功应用的名字，显示在卡片上
-                const appliedNames = [];
+            const dc = flags.dc || 10;
+            let total;
+            // 手动录入没有真实骰子与属性加值拆分，置空后结果块改用"手动输入"格式显示
+            let attrVal = null;
+            let diceResult = null;
 
-                // 使用管理器逐个添加，自动处理本地化、叠层和刷新
-                for (const e of effectsData) {
-                    let effectData;
-                    // 支持直接传入字符串 ID (如 "dianxue")
-                    if (typeof e === "string") {
-                        effectData = { id: e, origin: message.uuid, disabled: false };
-                    } else {
-                        // 是对象，直接展开
-                        effectData = { ...e, origin: message.uuid, disabled: false };
-                    }
+            if (manualInput) {
+                // Ctrl+点击：直接录入一个结果数值；null=取消，NaN=输入无效
+                // (DialogV2 ok 回调返回 nullish 时 promise 会 resolve 成按钮 action 字符串，无效输入必须用 NaN 哨兵)
+                const labelKey = CONFIG.XJZL.attributes[flags.attribute] ||
+                    CONFIG.XJZL.skills[flags.attribute] ||
+                    CONFIG.XJZL.arts[flags.attribute] ||
+                    CONFIG.XJZL.weaponTypes[flags.attribute] ||
+                    flags.attribute;
+                const attrLabel = game.i18n.localize(labelKey);
+                total = await ChatCardManager._promptManualCheckResult(actor, `${attrLabel} · DC ${dc}`);
+                if (total === null || !Number.isFinite(total)) return;
+            } else {
+                // 2. 调用 Actor 的检定方法
+                // 这会弹出一个新的聊天卡片显示骰子结果
+                // 读取 flags.level (发起请求时设定的优劣势)
+                const requestBonus = flags.bonus || 0;
+                const roll = await actor.rollAttributeTest(flags.attribute, {
+                    level: flags.level || 0,
+                    skipDialog: autoFail,      // 如果按了Shift，直接跳过弹窗
+                    bonus: autoFail ? -999 : requestBonus
+                });
 
-                    // 调用核心管理器
-                    const createdEffect = await ActiveEffectManager.addEffect(actor, effectData);
-                    if (createdEffect) {
-                        appliedNames.push(createdEffect.name);
-                    }
-                }
+                if (!roll) return; // 防呆，万一取消了
 
-                // 在卡片上追加一行小字
-                if (appliedNames.length > 0) {
-                    const appliedLabel = game.i18n.localize("XJZL.UI.Chat.RequestSave.EffectApplied");
-                    html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(0,0,0,0.05); border-radius:4px;">
-                        ${appliedLabel}: <b>${appliedNames.join(", ")}</b>
-                    </div>`;
-                }
+                // 3. 比对结果
+                total = roll.total;
+
+                // 这是我们在 Actor.rollAttributeTest 里传入的
+                attrVal = roll.data.val || 0;
+                diceResult = roll.terms[0].total; // 骰子本身的结果
             }
 
-            // --- B. 应用数值惩罚 (扣资源或造成伤害) ---
-            if (damageConfig) {
-                // 1. 解析参数 (确保是固定数值)
-                const rawVal = Number(damageConfig.value);
-                const amount = isNaN(rawVal) ? 0 : rawVal; // 保底为0
-                const typeKey = damageConfig.type || "hp";    // 默认为气血
+            const isSuccess = total >= dc;
 
-                if (amount > 0) {
-                    // 判断 typeKey 是否在系统定义的伤害类型中 (如 poison, fire, waigong)
-                    // 注意：CONFIG.XJZL.damageTypes 包含了 liushi, none 等
-                    const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
+                // 4. 处理结果 (组装 HTML)
+                let resultHtml = "";
+                let color = "";
 
-                    // 尝试解析发起者：检定卡结算已脱离攻击者脚本栈，来源必须显式恢复，
-                    // 否则伤害/资源变化会把目标自己当成来源，污染统计与 resourceChanged。
-                    let attacker = null;
-                    if (flags.attackerUuid) {
-                        const attDoc = await fromUuid(flags.attackerUuid);
-                        attacker = attDoc?.actor || attDoc;
+                // ==========================================================
+                // 内部辅助函数：统一处理 AE 的施加与 伤害/资源的扣除
+                // ==========================================================
+                const processEffectsAndDamage = async (effectsConfig, damageConfig, removeStance = false) => {
+                    let html = "";
+
+                    // --- A. 应用状态 (Effects) ---
+                    if (effectsConfig) {
+                        // 标准化为数组
+                        const effectsData = Array.isArray(effectsConfig) ? effectsConfig : [effectsConfig];
+                        // 用于收集成功应用的名字，显示在卡片上
+                        const appliedNames = [];
+
+                        // 使用管理器逐个添加，自动处理本地化、叠层和刷新
+                        for (const e of effectsData) {
+                            let effectData;
+                            // 支持直接传入字符串 ID (如 "dianxue")
+                            if (typeof e === "string") {
+                                effectData = { id: e, origin: message.uuid, disabled: false };
+                            } else {
+                                // 是对象，直接展开
+                                effectData = { ...e, origin: message.uuid, disabled: false };
+                            }
+
+                            // 调用核心管理器
+                            const createdEffect = await ActiveEffectManager.addEffect(actor, effectData);
+                            if (createdEffect) {
+                                appliedNames.push(createdEffect.name);
+                            }
+                        }
+
+                        // 在卡片上追加一行小字
+                        if (appliedNames.length > 0) {
+                            const appliedLabel = game.i18n.localize("XJZL.UI.Chat.RequestSave.EffectApplied");
+                            html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(0,0,0,0.05); border-radius:4px;">
+                                ${appliedLabel}: <b>${appliedNames.join(", ")}</b>
+                            </div>`;
+                        }
                     }
 
-                    if (isDamageType) {
-                        // === 分支 1: 造成伤害 (走 applyDamage) ===
-                        // 这样可以计算抗性、护体抵扣、触发受击特效等
+                    // --- B. 应用数值惩罚 (扣资源或造成伤害) ---
+                    if (damageConfig) {
+                        // 1. 解析参数 (确保是固定数值)
+                        const rawVal = Number(damageConfig.value);
+                        const amount = isNaN(rawVal) ? 0 : rawVal; // 保底为0
+                        const typeKey = damageConfig.type || "hp";    // 默认为气血
 
-                        // 调用伤害逻辑
-                        // 判定触发的伤害通常：必中(true),但会受到 抗性 (Resistances) 的减免
-                        const damageResult = await actor.applyDamage({
-                            amount: amount,
-                            type: typeKey,
-                            targetTokenUuid: doc?.documentName === "Token" ? doc.uuid : null,
-                            attacker: attacker,
-                            isHit: true,
-                            ignoreMinDamage: true //可以减免到0
-                        });
+                        if (amount > 0) {
+                            // 判断 typeKey 是否在系统定义的伤害类型中 (如 poison, fire, waigong)
+                            // 注意：CONFIG.XJZL.damageTypes 包含了 liushi, none 等
+                            const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
 
-                        // 构造显示文本 (显示实际损失)
-                        const losses = [];
-                        if (damageResult.hutiLost > 0) losses.push(`${damageResult.hutiLost} 护体`);
-                        if (damageResult.hpLost > 0) losses.push(`${damageResult.hpLost} 气血`);
-                        if (damageResult.mpLost > 0) losses.push(`${damageResult.mpLost} 内力`);
+                            // 尝试解析发起者：检定卡结算已脱离攻击者脚本栈，来源必须显式恢复，
+                            // 否则伤害/资源变化会把目标自己当成来源，污染统计与 resourceChanged。
+                            let attacker = null;
+                            if (flags.attackerUuid) {
+                                const attDoc = await fromUuid(flags.attackerUuid);
+                                attacker = attDoc?.actor || attDoc;
+                            }
 
-                        const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[typeKey]);
-                        const lossText = losses.length > 0 ? losses.join(", ") : "被抗性抵消";
+                            if (isDamageType) {
+                                // === 分支 1: 造成伤害 (走 applyDamage) ===
+                                // 这样可以计算抗性、护体抵扣、触发受击特效等
 
-                        html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
-                            <i class="fas fa-bolt"></i> 受到 <b>${amount}</b> 点${typeLabel}伤害<br>
-                            <span style="color:#555;">(实际结算: -${lossText})</span>
+                                // 调用伤害逻辑
+                                // 判定触发的伤害通常：必中(true),但会受到 抗性 (Resistances) 的减免
+                                const damageResult = await actor.applyDamage({
+                                    amount: amount,
+                                    type: typeKey,
+                                    targetTokenUuid: doc?.documentName === "Token" ? doc.uuid : null,
+                                    attacker: attacker,
+                                    isHit: true,
+                                    ignoreMinDamage: true //可以减免到0
+                                });
+
+                                // 构造显示文本 (显示实际损失)
+                                const losses = [];
+                                if (damageResult.hutiLost > 0) losses.push(`${damageResult.hutiLost} 护体`);
+                                if (damageResult.hpLost > 0) losses.push(`${damageResult.hpLost} 气血`);
+                                if (damageResult.mpLost > 0) losses.push(`${damageResult.mpLost} 内力`);
+
+                                const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[typeKey]);
+                                const lossText = losses.length > 0 ? losses.join(", ") : "被抗性抵消";
+
+                                html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                                    <i class="fas fa-bolt"></i> 受到 <b>${amount}</b> 点${typeLabel}伤害<br>
+                                    <span style="color:#555;">(实际结算: -${lossText})</span>
+                                </div>`;
+
+                            }
+                            else {
+                                // === 分支 2: 直接资源流失 (走 applyHealing) ===
+                                // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)
+
+                                // 流失来源是检定发起者；不传 healer 会被系统当成目标自己，resourceChanged/统计随之失真
+                                await actor.applyHealing({
+                                    amount: -amount,
+                                    type: typeKey,
+                                    showScrolling: true,
+                                    healer: attacker
+                                });
+
+                                // 简单的字典映射
+                                const typeLabels = {
+                                    hp: "气血", mp: "内力", neili: "内力",
+                                    rage: "怒气", huti: "护体", tili: "体力"
+                                };
+                                const label = typeLabels[typeKey] || typeKey;
+
+                                html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                                    <i class="fas fa-heart-broken"></i> <b>${amount}</b> 点${label}流失
+                                </div>`;
+                            }
+                        }
+                    }
+
+                    if (removeStance && actor.system.martial?.stanceActive) {
+                        await actor.stopStance();
+                        html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(192,57,43,0.1); color:#8b0000; border-radius:4px;">
+                            <i class="fas fa-shield-halved"></i> 架招已解除
                         </div>`;
-
                     }
-                    else {
-                        // === 分支 2: 直接资源流失 (走 applyHealing) ===
-                        // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)
+                    return html;
+                };
 
-                        // 流失来源是检定发起者；不传 healer 会被系统当成目标自己，resourceChanged/统计随之失真
-                        await actor.applyHealing({
-                            amount: -amount,
-                            type: typeKey,
-                            showScrolling: true,
-                            healer: attacker
-                        });
-
-                        // 简单的字典映射
-                        const typeLabels = {
-                            hp: "气血", mp: "内力", neili: "内力",
-                            rage: "怒气", huti: "护体", tili: "体力"
-                        };
-                        const label = typeLabels[typeKey] || typeKey;
-
-                        html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
-                            <i class="fas fa-heart-broken"></i> <b>${amount}</b> 点${label}流失
+                if (isSuccess) {
+                    color = "#27ae60"; // Green
+                    resultHtml = `
+                        <div style="color:${color}; font-weight:bold; font-size:1.2em;">
+                            <i class="fas fa-check-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Success")}
+                        </div>
+                        <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.SuccessHint")}</div>
+                    `;
+                    // === 成功文本 ===
+                    if (flags.successText) {
+                        resultHtml += `
+                        <div style="margin-top:5px; padding:5px; background:rgba(39, 174, 96, 0.1); border-radius:4px; font-size:0.9em; color:#1e8449;">
+                            <i class="fas fa-info-circle"></i> ${flags.successText}
                         </div>`;
                     }
+                    // 执行成功的 Effect 与 伤害
+                    resultHtml += await processEffectsAndDamage(flags.onSuccess, flags.damageOnSuccess, flags.removeStanceOnSuccess);
+
+                } else {
+                    color = "#c0392b"; // Red
+                    resultHtml = `
+                        <div style="color:${color}; font-weight:bold; font-size:1.2em;">
+                            <i class="fas fa-times-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Failure")}
+                        </div>
+                        <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.FailureHint")}</div>
+                    `;
+                    // === 失败文本 ===
+                    if (flags.failureText) {
+                        resultHtml += `
+                        <div style="margin-top:5px; padding:5px; background:rgba(192, 57, 43, 0.1); border-radius:4px; font-size:0.9em; color:#922b21;">
+                            <i class="fas fa-exclamation-circle"></i> ${flags.failureText}
+                        </div>`;
+                    }
+                    // 执行失败的 Effect 与 伤害
+                    resultHtml += await processEffectsAndDamage(flags.onFail, flags.damageOnFail, flags.removeStanceOnFail);
                 }
-            }
 
-            if (removeStance && actor.system.martial?.stanceActive) {
-                await actor.stopStance();
-                html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(192,57,43,0.1); color:#8b0000; border-radius:4px;">
-                    <i class="fas fa-shield-halved"></i> 架招已解除
-                </div>`;
-            }
-            return html;
-        };
+                // 5. 更新卡片 (禁用按钮，显示结果)
+                // 构造替换 HTML
+                // 手动录入没有骰式拆分，摘要行显示"手动输入 = 总值"
+                const rollSummary = diceResult === null
+                    ? `${game.i18n.localize("XJZL.UI.ManualInput")} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}`
+                    : `1d20(${diceResult}) + ${attrVal} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}`;
+                const resultBlock = `
+                    <div style="text-align:center; padding:8px; background:#fff; border:1px solid ${color}; border-radius:4px; margin-top:5px;">
+                        <div style="font-size:0.9em; color:#555; margin-bottom:4px;">
+                            ${rollSummary}
+                        </div>
+                        ${resultHtml}
+                    </div>
+                `;
 
-        // 4. 处理结果 (组装 HTML)
-        let resultHtml = "";
-        let color = "";
+                // 替换原来放置按钮的 .card-buttons 区域
+                const div = document.createElement("div");
+                div.innerHTML = message.content;
 
-        if (isSuccess) {
-            color = "#27ae60"; // Green
-            resultHtml = `
-                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
-                    <i class="fas fa-check-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Success")}
-                </div>
-                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.SuccessHint")}</div>
-            `;
-            // === 成功文本 ===
-            if (flags.successText) {
-                resultHtml += `
-                <div style="margin-top:5px; padding:5px; background:rgba(39, 174, 96, 0.1); border-radius:4px; font-size:0.9em; color:#1e8449;">
-                    <i class="fas fa-info-circle"></i> ${flags.successText}
-                </div>`;
-            }
-            // 执行成功的 Effect 与 伤害
-            resultHtml += await processEffectsAndDamage(flags.onSuccess, flags.damageOnSuccess, flags.removeStanceOnSuccess);
+                const btnContainer = div.querySelector(".card-buttons");
 
-        } else {
-            color = "#c0392b"; // Red
-            resultHtml = `
-                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
-                    <i class="fas fa-times-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Failure")}
-                </div>
-                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.FailureHint")}</div>
-            `;
-            // === 失败文本 ===
-            if (flags.failureText) {
-                resultHtml += `
-                <div style="margin-top:5px; padding:5px; background:rgba(192, 57, 43, 0.1); border-radius:4px; font-size:0.9em; color:#922b21;">
-                    <i class="fas fa-exclamation-circle"></i> ${flags.failureText}
-                </div>`;
-            }
-            // 执行失败的 Effect 与 伤害
-            resultHtml += await processEffectsAndDamage(flags.onFail, flags.damageOnFail, flags.removeStanceOnFail);
-        }
+                if (btnContainer) {
+                    btnContainer.outerHTML = resultBlock;
+                    await ChatCardManager._safeUpdateMessage(message, { content: div.innerHTML });
+                } else {
+                    console.error("XJZL | 无法在卡片中找到 .card-buttons 容器");
+                }
 
-        // 5. 更新卡片 (禁用按钮，显示结果)
-        // 构造替换 HTML
-        // 手动录入没有骰式拆分，摘要行显示"手动输入 = 总值"
-        const rollSummary = diceResult === null
-            ? `${game.i18n.localize("XJZL.UI.ManualInput")} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}`
-            : `1d20(${diceResult}) + ${attrVal} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}`;
-        const resultBlock = `
-            <div style="text-align:center; padding:8px; background:#fff; border:1px solid ${color}; border-radius:4px; margin-top:5px;">
-                <div style="font-size:0.9em; color:#555; margin-bottom:4px;">
-                    ${rollSummary}
-                </div>
-                ${resultHtml}
-            </div>
-        `;
-
-        // 替换原来放置按钮的 .card-buttons 区域
-        const div = document.createElement("div");
-        div.innerHTML = message.content;
-
-        const btnContainer = div.querySelector(".card-buttons");
-
-        if (btnContainer) {
-            btnContainer.outerHTML = resultBlock;
-            await ChatCardManager._safeUpdateMessage(message, { content: div.innerHTML });
-        } else {
-            console.error("XJZL | 无法在卡片中找到 .card-buttons 容器");
+        } finally {
+            ChatCardManager._settlingOutcomeMessages.delete(message.id);
         }
     }
 
@@ -2534,112 +2560,134 @@ export class ChatCardManager {
         // 如果本地状态显示已经投过了，阻止点击
         if (currentState[updateKey]) return;
 
-        // 2. 获取 Actor
-        const uuid = role === "attacker" ? flags.attackerUuid : flags.defenderUuid;
-        const doc = await fromUuid(uuid);
-        const actor = doc?.actor || doc;
-
-        if (!actor) return ui.notifications.warn("角色已不存在。");
-        if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
-
-        // 3. 执行属性检定 (或手动录入结果)
-        const config = flags.config || {};
-        const attrKey = role === "attacker" ? config.attAttr : config.defAttr;
-
-        let rollData;
-        if (manualInput) {
-            // 手动模式只负责产出一个 total；后续写卡、完成检查与自动化结算和正常投掷共用同一条路径，
-            // 所以无论哪一方后补的结果，都会正常触发对抗结算
-            const manualTotal = await ChatCardManager._promptManualCheckResult(
-                actor,
-                (role === "attacker" ? config.attLabel : config.defLabel) || attrKey
-            );
-            // null = 用户取消；NaN = 输入为空或非法 (DialogV2 回调返回 nullish 时会 resolve 成按钮 action 字符串，
-            // 所以无效输入必须用 NaN 哨兵传递，不能返回 null)
-            if (manualTotal === null || !Number.isFinite(manualTotal)) return;
-            rollData = {
-                total: manualTotal,
-                formula: game.i18n.localize("XJZL.UI.ManualInput")
-            };
-        } else {
-            // === 提取对应的临时修正值 ===
-            const specificBonus = role === "attacker" ? (config.attBonus || 0) : (config.defBonus || 0);
-            const roll = await actor.rollAttributeTest(attrKey, {
-                chatMessage: false,
-                skipDialog: autoFail, // 按住 Shift 直接跳过弹窗
-                // 如果没按 Shift，传入特定的 bonus；如果按了，强制 -999
-                bonus: autoFail ? -999 : specificBonus
-            });
-
-            if (!roll) return;
-
-            rollData = {
-                total: roll.total,
-                formula: roll.formula
-            };
+        // 本地重复点击保护（按方）：同一方连点在投掷前即被拦截，避免二次检定覆盖骰值。
+        // 双方各自投掷互不影响；后果结算段另有整卡互斥。不承诺跨客户端唯一执行。
+        const rollGuardKey = `${message.id}:${role}`;
+        if (ChatCardManager._settlingOutcomeMessages.has(rollGuardKey)) {
+            return ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.OutcomeGuard.SideRolling"));
         }
+        ChatCardManager._settlingOutcomeMessages.add(rollGuardKey);
+        try {
 
-        // =====================================================
-        // 4. 原子化更新 (Atomic Update) - 修复并发的关键
-        // =====================================================
-        // 我们只更新 "flags.xjzl-system.state.attRoll" 这一条路径
-        // 这样即使对方同时在更新 "defRoll"，Foundry 也能合并这两个操作，而不是互相覆盖
-        const updatePath = `flags.xjzl-system.state.${updateKey}`;
+            // 2. 获取 Actor
+            const uuid = role === "attacker" ? flags.attackerUuid : flags.defenderUuid;
+            const doc = await fromUuid(uuid);
+            const actor = doc?.actor || doc;
 
-        await ChatCardManager._safeUpdateMessage(message, {
-            [updatePath]: rollData
-        });
+            if (!actor) return ui.notifications.warn("角色已不存在。");
+            if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
 
-        // =====================================================
-        // 5. 重新获取最新状态 (Re-fetch State)
-        // =====================================================
-        // 等待数据库更新完毕后，重新从 game.messages 获取该消息的最新实例
-        // 这样能确保我们看到的是 双方都更新后（如果有的话）的状态
-        const freshMessage = game.messages.get(message.id);
-        const freshFlags = freshMessage.flags["xjzl-system"];
-        const freshState = freshFlags.state;
+            // 3. 执行属性检定 (或手动录入结果)
+            const config = flags.config || {};
+            const attrKey = role === "attacker" ? config.attAttr : config.defAttr;
 
-        // 6. 检查是否对抗完成 (双端检查)
-        // 只有当两个都存在，且之前标记未完成时，才执行结算
-        // 使用一个锁 (isCompleted) 防止某一方网速慢重复触发
-        if (freshState.attRoll && freshState.defRoll && !freshState.isCompleted) {
-
-            // 确定赢家
-            let winner = null;
-            if (freshState.attRoll.total >= freshState.defRoll.total) {
-                winner = "attacker";
+            let rollData;
+            if (manualInput) {
+                // 手动模式只负责产出一个 total；后续写卡、完成检查与自动化结算和正常投掷共用同一条路径，
+                // 所以无论哪一方后补的结果，都会正常触发对抗结算
+                const manualTotal = await ChatCardManager._promptManualCheckResult(
+                    actor,
+                    (role === "attacker" ? config.attLabel : config.defLabel) || attrKey
+                );
+                // null = 用户取消；NaN = 输入为空或非法 (DialogV2 回调返回 nullish 时会 resolve 成按钮 action 字符串，
+                // 所以无效输入必须用 NaN 哨兵传递，不能返回 null)
+                if (manualTotal === null || !Number.isFinite(manualTotal)) return;
+                rollData = {
+                    total: manualTotal,
+                    formula: game.i18n.localize("XJZL.UI.ManualInput")
+                };
             } else {
-                winner = "defender";
+                // === 提取对应的临时修正值 ===
+                const specificBonus = role === "attacker" ? (config.attBonus || 0) : (config.defBonus || 0);
+                const roll = await actor.rollAttributeTest(attrKey, {
+                    chatMessage: false,
+                    skipDialog: autoFail, // 按住 Shift 直接跳过弹窗
+                    // 如果没按 Shift，传入特定的 bonus；如果按了，强制 -999
+                    bonus: autoFail ? -999 : specificBonus
+                });
+
+                if (!roll) return;
+
+                rollData = {
+                    total: roll.total,
+                    formula: roll.formula
+                };
             }
 
-            // 触发自动化结算
-            // 这里传入的是 freshMessage，确保自动化里用的也是最新数据
-            const autoLogs = await ChatCardManager._executeContestAutomation(winner, freshFlags, freshMessage);
+            // =====================================================
+            // 4. 原子化更新 (Atomic Update) - 修复并发的关键
+            // =====================================================
+            // 我们只更新 "flags.xjzl-system.state.attRoll" 这一条路径
+            // 这样即使对方同时在更新 "defRoll"，Foundry 也能合并这两个操作，而不是互相覆盖
+            const updatePath = `flags.xjzl-system.state.${updateKey}`;
 
-            // 更新完成状态和日志
-            // 同样使用路径更新，防止覆盖 rollData
-            await ChatCardManager._safeUpdateMessage(freshMessage, {
-                "flags.xjzl-system.state.isCompleted": true,
-                "flags.xjzl-system.state.winner": winner,
-                "flags.xjzl-system.state.executedLog": autoLogs
+            await ChatCardManager._safeUpdateMessage(message, {
+                [updatePath]: rollData
             });
+
+            // =====================================================
+            // 5. 重新获取最新状态 (Re-fetch State)
+            // =====================================================
+            // 等待数据库更新完毕后，重新从 game.messages 获取该消息的最新实例
+            // 这样能确保我们看到的是 双方都更新后（如果有的话）的状态
+            const freshMessage = game.messages.get(message.id);
+            const freshFlags = freshMessage.flags["xjzl-system"];
+            const freshState = freshFlags.state;
+
+            // 6. 检查是否对抗完成 (双端检查)
+            // 只有当两个都存在，且之前标记未完成时，才执行结算
+            // 使用一个锁 (isCompleted) 防止某一方网速慢重复触发
+            if (freshState.attRoll && freshState.defRoll && !freshState.isCompleted) {
+
+                // 本地重复点击保护：后果结算段对同一客户端互斥，拦截快速双击。
+                // 不承诺跨客户端唯一执行：不同客户端同时完成对抗仍可能重复结算，属于已接受的限制。
+                if (ChatCardManager._settlingOutcomeMessages.has(message.id)) {
+                    return ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.OutcomeGuard.ContestSettling"));
+                }
+                ChatCardManager._settlingOutcomeMessages.add(message.id);
+                try {
+                    // 确定赢家
+                    let winner = null;
+                    if (freshState.attRoll.total >= freshState.defRoll.total) {
+                        winner = "attacker";
+                    } else {
+                        winner = "defender";
+                    }
+
+                    // 触发自动化结算
+                    // 这里传入的是 freshMessage，确保自动化里用的也是最新数据
+                    const autoLogs = await ChatCardManager._executeContestAutomation(winner, freshFlags, freshMessage);
+
+                    // 更新完成状态和日志
+                    // 同样使用路径更新，防止覆盖 rollData
+                    await ChatCardManager._safeUpdateMessage(freshMessage, {
+                        "flags.xjzl-system.state.isCompleted": true,
+                        "flags.xjzl-system.state.winner": winner,
+                        "flags.xjzl-system.state.executedLog": autoLogs
+                    });
+                } finally {
+                    ChatCardManager._settlingOutcomeMessages.delete(message.id);
+                }
+            }
+
+            // 7. 原地重绘卡片内容
+            // 再次获取最新的（包含结算结果的）message进行渲染
+            const finalMessage = game.messages.get(message.id);
+            const finalFlags = finalMessage.flags["xjzl-system"];
+
+            const content = await renderTemplate("systems/xjzl-system/templates/chat/request-contest.hbs", {
+                ...config,
+                attackerName: (await fromUuid(flags.attackerUuid))?.name || "发起者",
+                defenderName: (await fromUuid(flags.defenderUuid))?.name || "对抗者",
+                attackerImg: (await fromUuid(flags.attackerUuid))?.img,
+                defenderImg: (await fromUuid(flags.defenderUuid))?.img,
+                flags: finalFlags // 使用最终状态
+            });
+
+            await ChatCardManager._safeUpdateMessage(finalMessage, { content: content });
+        } finally {
+            ChatCardManager._settlingOutcomeMessages.delete(rollGuardKey);
         }
-
-        // 7. 原地重绘卡片内容
-        // 再次获取最新的（包含结算结果的）message进行渲染
-        const finalMessage = game.messages.get(message.id);
-        const finalFlags = finalMessage.flags["xjzl-system"];
-
-        const content = await renderTemplate("systems/xjzl-system/templates/chat/request-contest.hbs", {
-            ...config,
-            attackerName: (await fromUuid(flags.attackerUuid))?.name || "发起者",
-            defenderName: (await fromUuid(flags.defenderUuid))?.name || "对抗者",
-            attackerImg: (await fromUuid(flags.attackerUuid))?.img,
-            defenderImg: (await fromUuid(flags.defenderUuid))?.img,
-            flags: finalFlags // 使用最终状态
-        });
-
-        await ChatCardManager._safeUpdateMessage(finalMessage, { content: content });
     }
 
     /**
