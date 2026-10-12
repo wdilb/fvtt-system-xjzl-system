@@ -1451,6 +1451,12 @@
                             "trigger": "hit",
                             "script": "if (args.isHit) {\n    await actor.changeResources({\n        \"system.resources.hp.value\": 1,\n        \"system.resources.mp.value\": 1\n    }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    \n    // 昏迷 (unconscious) 持续一个时辰 (7200秒)\n    // 我们获取模板后修改duration\n    const eff = game.xjzl.api.effects.getStatus('unconscious');\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { value: 7200, units: \"seconds\", expiry: null};\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n    ui.notifications.warn(`${actor.name} 施展天地同归，气若游丝！`);\n}",
                             "active": true
+                        },
+{
+                            "label": "天地同归-固定换算",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "// 伤害按自身气血上限换算的固定公式生成：不接受外部攻击侧数值修正（自身 attack 公式照常执行）。\nargs.allowDamageModifiers = false;"
                         }
                     ]
                 }
@@ -2138,6 +2144,12 @@
                             "trigger": "attack",
                             "script": "const currentRage = actor.system.resources.rage.value;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgPerRage = 10 + (lvl - 1) * 10;\nconst distPerRage = 1 + (lvl - 1) * 1;\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"神威\" },\n    content: `<p>当前怒气: ${currentRage}</p><p>消耗全部怒气，造成每点 <b>${dmgPerRage}</b> 流失伤害，击飞 <b>${distPerRage}</b> 米/点。</p>`,\n    yes: { label: \"释放\", icon: \"fas fa-bomb\" }\n});\n\nif (confirm) {\n    await actor.changeResources({\"system.resources.rage.value\": 0}, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    \n    const totalDmg = currentRage * dmgPerRage;\n    args.flags.damageResult.damage = totalDmg;\n    args.flags.damageResult.breakdown += `\\n神威 (${currentRage}怒): ${totalDmg}`;\n    \n    ui.notifications.info(`神威：击飞 ${currentRage * distPerRage} 米！`);\n} else {\n    args.flags.abort = true;\n}",
                             "active": true
+                        },
+{
+                            "label": "神威-固定换算",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "// 伤害按消耗怒气换算的固定公式生成：不接受外部攻击侧数值修正（自身 attack 公式照常执行）。\nargs.allowDamageModifiers = false;"
                         }
                     ]
                 }

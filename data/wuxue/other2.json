@@ -2082,7 +2082,13 @@
                         {
                             "label": "延迟伤害与韧性检定",
                             "trigger": "preDamage",
-                            "script": "// 现行惯例（同 清平曲·醉里吴音/地龙翻身）：仅韧性检定失败才受伤。\n// 截获已含全部增伤的最终面板值后归零，伤害改由检定失败结算，以免重复扣血。\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 17 + (lvl - 1) * 2;\nconst dmg = Math.max(0, Number(args.config.amount) || 0);\nargs.config.amount = 0;\nargs.config.ignoreMinDamage = true;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"renxing\",\n    dc: dc,\n    label: \"离魂调 - 韧性抵抗\",\n    // 内功伤害：走标准 applyDamage，保留防御与抗性\n    damageOnFail: { value: dmg, type: \"neigong\" },\n    // 气虚至多三层：以系统状态为底板补上叠层上限\n    onFail: { id: \"qixu\", flags: { \"xjzl-system\": { maxStacks: 3 } } },\n    failureText: \"心神失守，真气溃散！\"\n});",
+                            "script": "// 延期伤害：伤害改由韧性检定失败后结算，取消默认提交并保留完整计算的攻击输入，\n// 请求卡在 hit 读取 args.damageConfig 后创建。\nargs.config.skipDamage = true;",
+                            "active": true
+                        },
+                        {
+                            "label": "离魂调-韧性检定",
+                            "trigger": "hit",
+                            "script": "// 韧性检定失败才受伤：在 hit 读取本目标全部有效 preDamage 后的攻击输入（含有效修正）。\nif (!args.isHit) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 17 + (lvl - 1) * 2;\nconst cfg = args.damageConfig ?? {};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"renxing\",\n    dc: dc,\n    label: \"离魂调 - 韧性抵抗\",\n    // 延期原攻击：单笔输入逐项映射；内功伤害走标准 applyDamage，保留防御与抗性\n    damageOnFail: {\n        value: Math.max(0, Number(cfg.amount) || 0),\n        type: cfg.type ?? \"neigong\",\n        element: cfg.element ?? \"none\",\n        ignoreBlock: cfg.ignoreBlock === true,\n        ignoreDefense: cfg.ignoreDefense === true,\n        ignoreStance: cfg.ignoreStance === true,\n        applyCritDamage: cfg.applyCritDamage !== false,\n        ignoreMinDamage: cfg.ignoreMinDamage === true,\n        isCrit: args.isCrit === true\n    },\n    // 延期的原攻击随卡保存来源，受击脚本在真实结算时才能读到正确来源\n    item: thisItem,\n    move: args.move,\n    source: \"move\",\n    isBroken: args.isBroken === true,\n    targetKanpo: args.targetKanpo || 0,\n    // 气虚至多三层：以系统状态为底板补上叠层上限\n    onFail: { id: \"qixu\", flags: { \"xjzl-system\": { maxStacks: 3 } } },\n    failureText: \"心神失守，真气溃散！\"\n});",
                             "active": true
                         }
                     ]

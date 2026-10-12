@@ -489,7 +489,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>运劲于指，力通而发。击中目标造成伤害。命中无架招目标时，你可以放弃这次造成的伤害，转为将目标点穴（解穴难度 @{15 + @up * 2|15}），持续一回合。</p><p><strong>消耗：</strong>小石子*1</p><p><strong>升级：</strong>招式伤害+10，解穴难度+2，内力消耗+4。</p>",
-                    "automationNote": "命中无架招自动询问是否转为点穴，选择是则伤害归零并施加点穴。小石子消耗手动。",
+                    "automationNote": "命中无架招自动询问是否转为点穴，选择是则取消默认伤害提交并施加点穴。小石子消耗手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -512,7 +512,7 @@
                         {
                             "label": "点穴抉择",
                             "trigger": "preDamage",
-                            "script": "if (args.outcome.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"点指神通\" },\n        content: `<p>命中无架招目标！</p><p>是否<b>放弃伤害</b>转为<b>点穴</b>？</p><p>(DC: ${dc})</p>`,\n        yes: { label: \"点穴 (放弃伤害)\", icon: \"fas fa-bullseye\" },\n        no: { label: \"仅造成伤害\", icon: \"fas fa-fist-raised\" }\n    });\n\n    if (confirm) {\n        // 伤害归零\n        args.config.amount = 0;\n\n        // 施加点穴状态\n        const eff = game.xjzl.api.effects.getStatus('dianxue');\n        if (eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            // 记录解穴DC到AE上 (虽然系统目前没用到，但留作参考)\n            data.flags[\"xjzl-system\"] = { ...data.flags[\"xjzl-system\"], dc: dc };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 被点穴 (DC ${dc})，伤害已豁免。`);\n        }\n    }\n}",
+                            "script": "if (args.outcome.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"点指神通\" },\n        content: `<p>命中无架招目标！</p><p>是否<b>放弃伤害</b>转为<b>点穴</b>？</p><p>(DC: ${dc})</p>`,\n        yes: { label: \"点穴 (放弃伤害)\", icon: \"fas fa-bullseye\" },\n        no: { label: \"仅造成伤害\", icon: \"fas fa-fist-raised\" }\n    });\n\n    if (confirm) {\n        // 取消默认伤害提交：本笔不调用目标 applyDamage，不进入受击链\n        args.config.skipDamage = true;\n\n        // 施加点穴状态\n        const eff = game.xjzl.api.effects.getStatus('dianxue');\n        if (eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n            // 记录解穴DC到AE上 (虽然系统目前没用到，但留作参考)\n            data.flags[\"xjzl-system\"] = { ...data.flags[\"xjzl-system\"], dc: dc };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 被点穴 (DC ${dc})，伤害已豁免。`);\n        }\n    }\n}",
                             "active": true
                         }
                     ]

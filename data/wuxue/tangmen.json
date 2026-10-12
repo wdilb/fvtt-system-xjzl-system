@@ -198,7 +198,7 @@
                         {
                             "label": "第二段伤害",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 读取面板伤害作为 amount\n    const segResult = await args.target.applyDamage({\n        amount: args.baseDamage,\n        type: args.damageType,\n        attacker: args.attacker,\n        isHit: true,\n        isCrit: args.isCrit,\n        isBroken: args.isBroken,\n        element: args.element,\n        item: args.item,\n        move: args.move,\n        source: \"move\"\n    });\n    \n    // 构建战报文本\n    const segHp = segResult.hpLost || 0;\n    const segHuti = segResult.hutiLost || 0;\n    const segMp = segResult.mpLost || 0;\n    \n    const info = [];\n    if(segHp > 0) info.push(`HP -${segHp}`);\n    if(segHuti > 0) info.push(`护体 -${segHuti}`);\n    if(segMp > 0) info.push(`内力 -${segMp}`);\n    const resultStr = info.length > 0 ? info.join(\", \") : \"被防御或抗性抵消\";\n\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding: 10px;\">\n        <div style=\"border-left: 4px solid #2e7d32; padding-left: 8px; margin-bottom: 5px;\">\n            <h4 style=\"margin:0; color:#2e7d32;\">第二道绿芒</h4>\n        </div>\n        <div style=\"font-size: 0.9em;\">\n            <p>再次命中 <b>${args.target.name}</b>！</p>\n            <div style=\"background:rgba(0,0,0,0.05); padding:5px; border-radius:4px; font-weight:bold; color:#8b0000;\">\n                ${resultStr}\n            </div>\n        </div>\n    </div>`;\n\n    ChatMessage.create({ author: game.user.id, speaker: ChatMessage.getSpeaker({ actor: args.attacker }), content: content });\n}",
+                            "script": "if (args.isHit) {\n    // 复用本目标全部有效 preDamage 后的输入补算第二段（含后续有效修正），与第一段同一份攻击侧输入；\n    // 只判断快照存在，不按零过滤：输入为零时照常提交，目标受击脚本（如肝肠断）仍可另行加伤\n    const cfg = args.damageConfig;\n    if (!cfg) return;\n    const segResult = await args.target.applyDamage({\n        amount: cfg.amount,\n        type: cfg.type,\n        attacker: args.attacker,\n        isHit: true,\n        isCrit: args.isCrit,\n        isBroken: args.isBroken,\n        targetKanpo: args.targetKanpo || 0,\n        applyCritDamage: cfg.applyCritDamage,\n        ignoreBlock: cfg.ignoreBlock,\n        ignoreDefense: cfg.ignoreDefense,\n        ignoreStance: cfg.ignoreStance,\n        ignoreMinDamage: cfg.ignoreMinDamage,\n        element: cfg.element,\n        item: args.item,\n        move: args.move,\n        source: \"move\"\n    });\n    \n    // 构建战报文本\n    const segHp = segResult.hpLost || 0;\n    const segHuti = segResult.hutiLost || 0;\n    const segMp = segResult.mpLost || 0;\n    \n    const info = [];\n    if(segHp > 0) info.push(`HP -${segHp}`);\n    if(segHuti > 0) info.push(`护体 -${segHuti}`);\n    if(segMp > 0) info.push(`内力 -${segMp}`);\n    const resultStr = info.length > 0 ? info.join(\", \") : \"被防御或抗性抵消\";\n\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding: 10px;\">\n        <div style=\"border-left: 4px solid #2e7d32; padding-left: 8px; margin-bottom: 5px;\">\n            <h4 style=\"margin:0; color:#2e7d32;\">第二道绿芒</h4>\n        </div>\n        <div style=\"font-size: 0.9em;\">\n            <p>再次命中 <b>${args.target.name}</b>！</p>\n            <div style=\"background:rgba(0,0,0,0.05); padding:5px; border-radius:4px; font-weight:bold; color:#8b0000;\">\n                ${resultStr}\n            </div>\n        </div>\n    </div>`;\n\n    ChatMessage.create({ author: game.user.id, speaker: ChatMessage.getSpeaker({ actor: args.attacker }), content: content });\n}",
                             "active": true
                         }
                     ],
@@ -1475,13 +1475,13 @@
                         {
                             "label": "阻断默认伤害",
                             "trigger": "preDamage",
-                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
+                            "script": "// 延期伤害：取消默认伤害提交，后果由本招式后续检定/区域/转化逻辑结算。\nargs.config.skipDamage = true;",
                             "active": true
                         },
                         {
                             "label": "轻功检定",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 15;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避唐花',\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 15;\n// 延期原攻击：数值保留固定公式，其余输入从 hit.damageConfig 逐项映射\nconst cfg = args.damageConfig ?? {};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避唐花',\n    damageOnFail: {\n        value: dmg,\n        type: cfg.type ?? \"poison\",\n        element: cfg.element ?? \"none\",\n        ignoreBlock: cfg.ignoreBlock === true,\n        ignoreDefense: cfg.ignoreDefense === true,\n        ignoreStance: cfg.ignoreStance === true,\n        applyCritDamage: cfg.applyCritDamage !== false,\n        ignoreMinDamage: cfg.ignoreMinDamage === true,\n        isCrit: args.isCrit === true\n    },\n    // 延期的原攻击随卡保存来源，受击脚本在真实结算时才能读到正确来源\n    item: thisItem,\n    move: args.move,\n    source: \"move\",\n    isBroken: args.isBroken === true,\n    targetKanpo: args.targetKanpo || 0,\n    isSkill: true\n});",
                             "active": true
                         }
                     ]
@@ -1579,13 +1579,13 @@
                         {
                             "label": "阻断默认伤害",
                             "trigger": "preDamage",
-                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
+                            "script": "// 延期伤害：取消默认伤害提交，后果由本招式后续检定/区域/转化逻辑结算。\nargs.config.skipDamage = true;",
                             "active": true
                         },
                         {
                             "label": "阎王索命",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\n// 获取特效模板\nconst sourceEffect = thisItem.effects.getName('冤魂').toObject();\ndelete sourceEffect._id;\nsourceEffect.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\nsourceEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: sourceEffect,\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\n// 获取特效模板\nconst sourceEffect = thisItem.effects.getName('冤魂').toObject();\ndelete sourceEffect._id;\nsourceEffect.duration = { value: rounds, units: \"rounds\", expiry: \"turnStart\" };\nsourceEffect.origin = thisItem.uuid;\n\n// 延期原攻击：数值保留固定公式，其余输入从 hit.damageConfig 逐项映射\nconst cfg = args.damageConfig ?? {};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: sourceEffect,\n    damageOnFail: {\n        value: dmg,\n        type: cfg.type ?? \"poison\",\n        element: cfg.element ?? \"none\",\n        ignoreBlock: cfg.ignoreBlock === true,\n        ignoreDefense: cfg.ignoreDefense === true,\n        ignoreStance: cfg.ignoreStance === true,\n        applyCritDamage: cfg.applyCritDamage !== false,\n        ignoreMinDamage: cfg.ignoreMinDamage === true,\n        isCrit: args.isCrit === true\n    },\n    // 延期的原攻击随卡保存来源，受击脚本在真实结算时才能读到正确来源\n    item: thisItem,\n    move: args.move,\n    source: \"move\",\n    isBroken: args.isBroken === true,\n    targetKanpo: args.targetKanpo || 0,\n    isSkill: true\n});",
                             "active": true
                         }
                     ]
@@ -1733,13 +1733,13 @@
                         {
                             "label": "阻断默认伤害",
                             "trigger": "preDamage",
-                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
+                            "script": "// 延期伤害：取消默认伤害提交，后果由本招式后续检定/区域/转化逻辑结算。\nargs.config.skipDamage = true;",
                             "active": true
                         },
                         {
                             "label": "花雨毒爆",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 150 + (lvl - 1) * 50;\nconst dc = 20 + (lvl - 1) * 3;\n\n// 获取五毒AE模板\nconst wuduEffect = thisItem.effects.getName('五毒').toObject();\ndelete wuduEffect._id;\nwuduEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避满天花雨',\n    onFail: wuduEffect,\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 150 + (lvl - 1) * 50;\nconst dc = 20 + (lvl - 1) * 3;\n\n// 获取五毒AE模板\nconst wuduEffect = thisItem.effects.getName('五毒').toObject();\ndelete wuduEffect._id;\nwuduEffect.origin = thisItem.uuid;\n\n// 延期原攻击：数值保留固定公式，其余输入从 hit.damageConfig 逐项映射\nconst cfg = args.damageConfig ?? {};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避满天花雨',\n    onFail: wuduEffect,\n    damageOnFail: {\n        value: dmg,\n        type: cfg.type ?? \"poison\",\n        element: cfg.element ?? \"none\",\n        ignoreBlock: cfg.ignoreBlock === true,\n        ignoreDefense: cfg.ignoreDefense === true,\n        ignoreStance: cfg.ignoreStance === true,\n        applyCritDamage: cfg.applyCritDamage !== false,\n        ignoreMinDamage: cfg.ignoreMinDamage === true,\n        isCrit: args.isCrit === true\n    },\n    // 延期的原攻击随卡保存来源，受击脚本在真实结算时才能读到正确来源\n    item: thisItem,\n    move: args.move,\n    source: \"move\",\n    isBroken: args.isBroken === true,\n    targetKanpo: args.targetKanpo || 0,\n    isSkill: true\n});",
                             "active": true
                         }
                     ]
@@ -1813,13 +1813,13 @@
                         {
                             "label": "阻断默认伤害",
                             "trigger": "preDamage",
-                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
+                            "script": "// 延期伤害：取消默认伤害提交，后果由本招式后续检定/区域/转化逻辑结算。\nargs.config.skipDamage = true;",
                             "active": true
                         },
                         {
                             "label": "应用伤害与AE",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst baseDmg = 50 + (lvl - 1) * 50;\nconst dotDmg = 5 + (lvl - 1) * 5;\n\n// 1. 应用伤害 (使用脚本触发，支持抗性)\nawait args.target.applyDamage({\n    amount: baseDmg,\n    type: 'poison',\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true // 毒素无视防御\n});\n\n// 2. 应用AE\nconst sourceEffect = thisItem.effects.getName('观音泪');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.description = `每消耗1点内力，受到${dotDmg}点毒素伤害。`;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 泪如雨下！`);\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst baseDmg = 50 + (lvl - 1) * 50;\nconst dotDmg = 5 + (lvl - 1) * 5;\n// 延期原攻击：类型按规则转换为毒素并无视防御，其余输入从 hit.damageConfig 逐项映射\nconst cfg = args.damageConfig ?? {};\n\n// 1. 应用伤害 (使用脚本触发，支持抗性)\nawait args.target.applyDamage({\n    amount: baseDmg,\n    type: 'poison',\n    attacker: actor,\n    isHit: true,\n    isCrit: args.isCrit === true,\n    applyCritDamage: cfg.applyCritDamage !== false,\n    ignoreDefense: true, // 毒素无视防御（规则）\n    ignoreBlock: cfg.ignoreBlock === true,\n    ignoreStance: cfg.ignoreStance === true,\n    element: cfg.element ?? 'none',\n    ignoreMinDamage: cfg.ignoreMinDamage === true,\n    // 本招伤害改在 hit 阶段结算，显式保留原攻击来源\n    item: thisItem,\n    move: args.move,\n    source: \"move\"\n});\n\n// 2. 应用AE\nconst sourceEffect = thisItem.effects.getName('观音泪');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.description = `每消耗1点内力，受到${dotDmg}点毒素伤害。`;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 泪如雨下！`);\n}",
                             "active": true
                         }
                     ]

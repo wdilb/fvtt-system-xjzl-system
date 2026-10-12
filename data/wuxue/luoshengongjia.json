@@ -1095,13 +1095,13 @@
                             "label": "阻断默认伤害",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;"
+                            "script": "// 延期伤害：取消默认伤害提交，后果由本招式后续检定/区域/转化逻辑结算。\nargs.config.skipDamage = true;"
                         },
                         {
                             "label": "伤害转治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\n// 1. 抓取被截断前的原始面板伤害\nconst rawDamage = args.baseDamage;\n\n// 2. 抓取技能\nconst liaoshang = actor.system.skills.liaoshang.total;\nconst totalHeal = rawDamage + liaoshang;\n\n// 3. 执行回血\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: \"hp\", showScrolling: true});\n\n// 4. 发送反馈卡片\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-heart\"></i> 一色常青</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">气血流转，招式伤害融合疗伤技艺，回复了 <b>${totalHeal}</b> 点气血！</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
+                            "script": "if (!args.isHit) return;\n// 1. 抓取被截断前的原始面板伤害\n// 读取本目标全部有效 preDamage 后的攻击输入（含有效修正），无快照时回退面板值。\nconst rawDamage = Number(args.damageConfig?.amount ?? args.baseDamage) || 0;\n\n// 2. 抓取技能\nconst liaoshang = actor.system.skills.liaoshang.total;\nconst totalHeal = rawDamage + liaoshang;\n\n// 3. 执行回血\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: \"hp\", showScrolling: true});\n\n// 4. 发送反馈卡片\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-heart\"></i> 一色常青</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">气血流转，招式伤害融合疗伤技艺，回复了 <b>${totalHeal}</b> 点气血！</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
                         }
                     ]
                 },

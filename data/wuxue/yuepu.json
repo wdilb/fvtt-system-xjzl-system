@@ -618,6 +618,12 @@
                             "trigger": "hit",
                             "active": true,
                             "script": "if (args.isHit) {\n    // 错骨持续一回合：需带duration的完整状态数据\n    const cuoguTpl = game.xjzl.api.effects.getStatus('cuogu');\n    const cuoguData = cuoguTpl ? foundry.utils.deepClone(cuoguTpl) : null;\n    if (cuoguData) cuoguData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 13,\n        label: \"抵抗梅花落\",\n        onFail: cuoguData,\n        // hp为资源类型，requestSave 会走负数applyHealing直接流失，无需手动扣除\n        damageOnFail: { value: 30, type: \"hp\" },\n        failureText: \"真气逆行，错骨失血！流失 30 点气血。\",\n        successText: \"心神坚定，未受影响。\"\n    });\n}"
+                        },
+{
+                            "label": "梅花落-取消默认提交",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 规则只有定力检定后果（气血流失与错骨）：取消默认内功伤害提交，命中与 hit 后效保留。\nargs.config.skipDamage = true;"
                         }
                     ]
                 }
@@ -1488,6 +1494,12 @@
                             "trigger": "hit",
                             "active": true,
                             "script": "if (args.target) {\n    const currentHuti = args.target.system.resources.huti || 0;\n    let addAmount = 0;\n    if (currentHuti > 0) {\n        addAmount = 10;\n    } else {\n        addAmount = 40;\n    }\n    await args.target.applyHealing({ healer: actor,  amount: addAmount, type: 'huti', showScrolling: true });\n}"
+                        },
+{
+                            "label": "渔舟唱晚-取消默认提交",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 规则只有护体真气增益：取消默认伤害提交，不触发受击链；命中与 hit 后效保留。\nargs.config.skipDamage = true;"
                         }
                     ]
                 }
@@ -2416,7 +2428,13 @@
                             "label": "定力豁免伤害",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "// 截获面板伤害并清零主流程伤害，由检定结果决定是否承受\nconst dmg = args.config.amount;\nargs.config.amount = 0;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 13,\n    label: \"抵抗雨霖铃\",\n    // 内功伤害保留防御与抗性，由 requestSave 标准结算\n    damageOnFail: { value: dmg, type: \"neigong\" },\n    failureText: \"定力不足，琴音直入心神！\",\n    successText: \"心神坚定，不受琴音所扰。\"\n});"
+                            "script": "// 延期伤害：由定力检定决定是否承受，取消默认提交并保留本目标有效攻击输入；\n// 请求卡在 hit 读取 args.damageConfig 后创建。\nargs.config.skipDamage = true;"
+                        },
+{
+                            "label": "雨霖铃-定力检定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 定力检定失败才承受原伤害：在 hit 读取本目标全部有效 preDamage 后的攻击输入（含有效修正）。\nif (!args.isHit) return;\nconst cfg = args.damageConfig ?? {};\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 13,\n    label: \"抵抗雨霖铃\",\n    // 延期原攻击：单笔输入逐项映射，失败正常提交一次，成功不调用伤害 API\n    damageOnFail: {\n        value: Math.max(0, Number(cfg.amount) || 0),\n        type: cfg.type ?? \"neigong\",\n        element: cfg.element ?? \"none\",\n        ignoreBlock: cfg.ignoreBlock === true,\n        ignoreDefense: cfg.ignoreDefense === true,\n        ignoreStance: cfg.ignoreStance === true,\n        applyCritDamage: cfg.applyCritDamage !== false,\n        ignoreMinDamage: cfg.ignoreMinDamage === true,\n        isCrit: args.isCrit === true\n    },\n    // 延期的原攻击随卡保存来源，受击脚本在真实结算时才能读到正确来源\n    item: thisItem,\n    move: args.move,\n    source: \"move\",\n    isBroken: args.isBroken === true,\n    targetKanpo: args.targetKanpo || 0,\n    failureText: \"定力不足，琴音直入心神！\",\n    successText: \"心神坚定，不受琴音所扰。\"\n});"
                         }
                     ]
                 }
@@ -2474,6 +2492,12 @@
                             "trigger": "hit",
                             "active": true,
                             "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"忆江南\" },\n    content: \"<p>选择添加的效果：</p>\",\n    yes: { label: \"养血 (回血)\", icon: \"fas fa-heart\" },\n    no: { label: \"聚气 (回内)\", icon: \"fas fa-bolt\" }\n});\n\nlet slug = confirm ? \"yangxue\" : \"juqi\";\nconst effData = game.xjzl.api.effects.getStatus(slug);\nif (effData) {\n    const data = foundry.utils.deepClone(effData);\n    data.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                        },
+{
+                            "label": "忆江南-取消默认提交",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 规则只有状态施加：取消默认伤害提交，不触发受击链；命中与 hit 后效保留。\nargs.config.skipDamage = true;"
                         }
                     ]
                 }
@@ -3022,6 +3046,12 @@
                             "trigger": "hit",
                             "script": "const eff = thisItem.effects.getName(\"逢时\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
+                        },
+{
+                            "label": "碣石调幽兰-取消默认提交",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 规则只有“逢时”状态施加：取消默认伤害提交，不触发受击链；命中与 hit 后效保留。\nargs.config.skipDamage = true;"
                         }
                     ]
                 }
@@ -3279,8 +3309,14 @@
                         {
                             "label": "渡气对抗",
                             "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"duqi\",\n    label: \"送归咒 - 渡气\",\n    outcome: {\n        win: {\n            text: \"音律透体！此次伤害转为 [精神伤害] (请手动调整)。\"\n        },\n        lose: {\n            text: \"遭受反噬！\",\n            selfDamage: { \"value\": 30, \"type\": \"mp\" }\n        }\n    }\n});",
+                            "script": "// 渡气对抗决定原伤害去向：在 hit 读取本目标全部有效 preDamage 后的攻击输入（含有效修正），\n// 胜出转精神伤害，失利保留最终配置类型；两分支各正常提交一次，反噬独立配置不继承来源。\nif (!args.isHit) return;\nconst cfg = args.damageConfig ?? {};\nconst deferred = (typeOverride) => ({\n        value: Math.max(0, Number(cfg.amount) || 0),\n        type: typeOverride ?? (cfg.type ?? \"neigong\"),\n        element: cfg.element ?? \"none\",\n        ignoreBlock: cfg.ignoreBlock === true,\n        ignoreDefense: cfg.ignoreDefense === true,\n        ignoreStance: cfg.ignoreStance === true,\n        applyCritDamage: cfg.applyCritDamage !== false,\n        ignoreMinDamage: cfg.ignoreMinDamage === true,\n        isCrit: args.isCrit === true\n});\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"duqi\",\n    label: \"送归咒 - 渡气\",\n    // 延期的原攻击随卡保存来源，受击脚本在真实结算时才能读到正确来源\n    item: thisItem,\n    move: args.move,\n    source: \"move\",\n    isBroken: args.isBroken === true,\n    targetKanpo: args.targetKanpo || 0,\n    outcome: {\n        win: {\n            text: \"音律透体！此次伤害转为精神伤害。\",\n            targetDamage: deferred(\"mental\")\n        },\n        lose: {\n            text: \"渡气失利，原伤害照常侵体，自身流失 30 点内力。\",\n            targetDamage: deferred(),\n            selfDamage: { value: 30, type: \"mp\" }\n        }\n    }\n});",
                             "active": true
+                        },
+{
+                            "label": "送归咒-取消默认提交",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 延期伤害：由渡气对抗决定原伤害去向，取消默认提交并保留本目标有效攻击输入；\n// 对抗卡在 hit 读取 args.damageConfig 后创建。\nargs.config.skipDamage = true;"
                         }
                     ]
                 }
