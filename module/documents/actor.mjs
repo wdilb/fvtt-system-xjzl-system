@@ -3641,6 +3641,39 @@ export class XJZLActor extends Actor {
     // 9. 发送聊天消息
     // =====================================================
     const isAutoApplied = attackContext.flags.autoApplied || false;
+    // 仅为模板整理已有结算上下文；浅拷贝避免改变 targetsResults 或消息快照。
+    const cardModifiers = [];
+    const addSignedModifier = (list, label, value) => {
+      if (!value) return;
+      list.push({ label, value: `${value > 0 ? "+" : ""}${value}` });
+    };
+    const addThresholdModifier = (list, label, value) => {
+      if (!value) return;
+      list.push({ label, value: `${value > 0 ? "-" : "+"}${Math.abs(value)}` });
+    };
+    const showHitModifiers = !isGlobalForceHit;
+    const showCritModifiers = showHitModifiers && config.canCrit && ["waigong", "neigong"].includes(config.damageType);
+    if (showHitModifiers) {
+      addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ManualHit", config.bonusAttack);
+      addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ScriptHit", scriptBonusHit);
+    }
+    addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ManualDamage", config.bonusDamage);
+    if (showCritModifiers) {
+      addThresholdModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ScriptCritThreshold", attackContext.flags.critThresholdMod || 0);
+      addThresholdModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ManualCritThreshold", config.manualCritMod || 0);
+    }
+
+    const displayTargetsResults = Object.fromEntries(Object.entries(targetsResults).map(([uuid, result]) => {
+      const context = targetContexts.get(uuid);
+      const targetModifiers = [];
+      if (context && showHitModifiers) {
+        addSignedModifier(targetModifiers, "XJZL.UI.Chat.MoveCard.Modifier.TargetHit", context.grantHit);
+      }
+      if (context && showCritModifiers) {
+        addThresholdModifier(targetModifiers, "XJZL.UI.Chat.MoveCard.Modifier.TargetCritThreshold", context.critThresholdMod);
+      }
+      return [uuid, targetModifiers.length ? { ...result, modifiers: targetModifiers } : result];
+    }));
     const templateData = {
       actor: this,
       item: null, // 普攻没有 Item
@@ -3653,7 +3686,8 @@ export class XJZLActor extends Actor {
       rollTooltip: rollTooltip,
       damageTypeLabel: game.i18n.localize(CONFIG.XJZL.damageTypes[config.damageType]),
       displayTotal: displayTotal,
-      targetsResults: targetsResults,
+      targetsResults: displayTargetsResults,
+      cardModifiers: cardModifiers,
       hasTargets: Object.keys(targetsResults).length > 0,
       showFeintBtn: false, // 普攻不显示虚招
       autoApplied: isAutoApplied

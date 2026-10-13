@@ -2472,6 +2472,53 @@ export class XJZLItem extends Item {
         else flavorText = "施展招式 (无需检定)";
       }
 
+      // 仅为模板整理已有结算上下文；浅拷贝避免改变 targetsResults 或消息快照。
+      const cardModifiers = [];
+      const addSignedModifier = (list, label, value) => {
+        if (!value) return;
+        list.push({ label, value: `${value > 0 ? "+" : ""}${value}` });
+      };
+      const addThresholdModifier = (list, label, value) => {
+        if (!value) return;
+        list.push({
+          label,
+          value: `${value > 0 ? "-" : "+"}${Math.abs(value)}`
+        });
+      };
+      const showHitModifiers = needsHitCheck;
+      const showFeintModifiers = move.type !== "basic";
+      const showCritModifiers = showHitModifiers && config.canCrit && ["waigong", "neigong"].includes(damageType);
+      if (showHitModifiers) {
+        addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ManualHit", config.bonusAttack);
+        addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ScriptHit", scriptBonusHit);
+      }
+      if (showFeintModifiers) {
+        addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ManualFeint", config.bonusFeint);
+        addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ScriptFeint", scriptBonusFeint);
+      }
+      if (effectiveMode === "attack" || effectiveMode === "heal") {
+        addSignedModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ManualDamage", config.bonusDamage);
+      }
+      if (showCritModifiers) {
+        addThresholdModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ScriptCritThreshold", attackContext.flags.critThresholdMod || 0);
+        addThresholdModifier(cardModifiers, "XJZL.UI.Chat.MoveCard.Modifier.ManualCritThreshold", config.manualCritMod || 0);
+      }
+
+      const displayTargetsResults = Object.fromEntries(Object.entries(targetsResults).map(([uuid, result]) => {
+        const context = targetContexts.get(uuid);
+        const targetModifiers = [];
+        if (context && showHitModifiers) {
+          addSignedModifier(targetModifiers, "XJZL.UI.Chat.MoveCard.Modifier.TargetHit", context.grantHit);
+        }
+        if (context && showFeintModifiers) {
+          addSignedModifier(targetModifiers, "XJZL.UI.Chat.MoveCard.Modifier.TargetFeint", context.grantFeint);
+        }
+        if (context && showCritModifiers) {
+          addThresholdModifier(targetModifiers, "XJZL.UI.Chat.MoveCard.Modifier.TargetCritThreshold", context.critThresholdMod);
+        }
+        return [uuid, targetModifiers.length ? { ...result, modifiers: targetModifiers } : result];
+      }));
+
       // =====================================================
       // 8. 发送消息
       // =====================================================
@@ -2512,7 +2559,8 @@ export class XJZLItem extends Item {
         rollTooltip: rollTooltip, // 骰子详情 HTML
         damageTypeLabel: game.i18n.localize(XJZL.damageTypes[damageType]),
         displayTotal: displayTotal,
-        targetsResults: targetsResults,
+        targetsResults: displayTargetsResults,
+        cardModifiers: cardModifiers,
         hasTargets: Object.keys(targetsResults).length > 0,
         showFeintBtn: showFeintBtn,
         autoApplied: isAutoApplied,
