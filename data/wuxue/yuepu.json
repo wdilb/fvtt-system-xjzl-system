@@ -5904,7 +5904,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，琴音绵绵，减少一个友方角色 1 点怒气值，并为其移除一个地级及以下的状态，然后给他添加“流水静心”，持续一回合。<br>流水静心：你的命中、虚招对抗、属性检定、伤残检定、死亡检定结果+1。<br>音阶排序：角、羽、商<br>天籁之音：检定结果+2，持续回合数+2。</p>",
-                    "automationNote": "应用获得BUFF。减少怒气手动。移除状态手动。",
+                    "automationNote": "自动施加流水静心：命中与虚招对抗自动+1；属性检定、伤残检定、死亡检定+1手动调整。减少怒气手动。移除状态手动。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -5941,7 +5941,7 @@
                     "isUltimate": false,
                     "tier": null,
                     "description": "<p>蓄力动作，琴音绵绵，减少一个友方角色 1 点怒气值，并为其移除一个地级及以下的状态，然后给他添加“流水静心”，持续一回合。<br>流水静心：你的命中、虚招对抗、属性检定、伤残检定、死亡检定结果+1。<br>音阶排序：角、羽、商<br>天籁之音：检定结果+2，持续回合数+2。</p>",
-                    "automationNote": "演奏检定与音阶由玩家自行判定。自动施加流水静心（天籁，3回合）；检定结果+2由玩家手动调整；减怒与移除地级状态手动。",
+                    "automationNote": "演奏检定与音阶由玩家自行判定。自动施加流水静心（天籁，3回合）：命中与虚招对抗自动+2；属性检定、伤残检定、死亡检定+2手动调整；减怒与移除地级状态手动。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -5959,7 +5959,7 @@
                             "label": "添加流水静心",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"流水静心（天籁）\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                            "script": "// 同 slug 刷新对同单位时长是累加语义，会叠上普通版剩余时长；先移除旧状态再施加完整天籁版\nawait game.xjzl.api.effects.removeEffect(args.target, \"liushuijingxin\");\nconst eff = thisItem.effects.getName(\"流水静心（天籁）\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 }
@@ -5968,7 +5968,7 @@
         "effects": [
             {
                 "name": "流水静心",
-                "description": "你的命中、虚招对抗、属性检定、伤残检定、死亡检定结果+1（请手动调整）。",
+                "description": "你的命中、虚招对抗（虚招和看破）结果+1（自动）；属性检定、伤残检定、死亡检定结果+1（请手动调整）。",
                 "transfer": false,
                 "duration": {
                     "value": 1,
@@ -5983,13 +5983,34 @@
                 },
                 "img": "icons/magic/water/water-hand.webp",
                 "system": {
-                    "changes": []
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "type": "add",
+                            "value": "1"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "type": "add",
+                            "value": "1"
+                        },
+                        {
+                            "key": "system.combat.xuzhao",
+                            "type": "add",
+                            "value": "1"
+                        },
+                        {
+                            "key": "system.combat.kanpo",
+                            "type": "add",
+                            "value": "1"
+                        }
+                    ]
                 },
                 "showIcon": 2
             },
             {
                 "name": "流水静心（天籁）",
-                "description": "你的命中、虚招对抗、属性检定、伤残检定、死亡检定结果+2（天籁之音，请手动调整）。",
+                "description": "你的命中、虚招对抗（虚招和看破）结果+2（自动）；属性检定、伤残检定、死亡检定结果+2（天籁之音，请手动调整）。",
                 "transfer": false,
                 "duration": {
                     "value": 3,
@@ -5998,13 +6019,34 @@
                 },
                 "flags": {
                     "xjzl-system": {
-                        "slug": "liushuijingxin_tianlai",
+                        "slug": "liushuijingxin",
                         "stackable": false
                     }
                 },
                 "img": "icons/magic/water/water-hand.webp",
                 "system": {
-                    "changes": []
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "type": "add",
+                            "value": "2"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "type": "add",
+                            "value": "2"
+                        },
+                        {
+                            "key": "system.combat.xuzhao",
+                            "type": "add",
+                            "value": "2"
+                        },
+                        {
+                            "key": "system.combat.kanpo",
+                            "type": "add",
+                            "value": "2"
+                        }
+                    ]
                 },
                 "showIcon": 2
             }
