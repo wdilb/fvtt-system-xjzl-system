@@ -478,7 +478,8 @@ XJZL.subSects = {
   "tianchipai": "XJZL.SubSect.TianChiPai",       // 天池派
   "badaotang": "XJZL.SubSect.BaDaoTang",         // 霸刀堂
   "modaomen": "XJZL.SubSect.MoDaoMen",           // 魔刀门
-  "hehuanpai": "XJZL.SubSect.HeHuanPai"          // 合欢派
+  "hehuanpai": "XJZL.SubSect.HeHuanPai",         // 合欢派
+  "zhenhunsi": "XJZL.SubSect.ZhenHunSi"          // 镇魂司
 };
 
 // 21. 态度

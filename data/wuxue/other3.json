@@ -1,0 +1,447 @@
+[
+    {
+        "name": "天枢法尺",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "subSect": "zhenhunsi",
+            "tier": 2,
+            "description": "<p>镇魂司天察科所传，观天索地，丈量方圆，可显露邪祟、鬼魂痕迹，也可销声匿迹，十分神妙。</p><p><strong>需求：</strong>匕首-尺</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "匕首-尺",
+            "moves": [
+                {
+                    "name": "寰斗指魂",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，持尺平举，开启架招。格挡成功后，邪秽显迹，为目标添加“狩魂”一回合。</p><p><strong>狩魂：</strong>距你 10 米范围内的其他目标总能选中你。即使你被障碍物遮挡或处于“不可选中”，其他目标依旧能选中你。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡成功后自动为攻击者打下“狩魂”标记（1 回合，图标常显）。狩魂的“总能选中”效果系统无法强制，请按描述手动把握。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [2, 4, 6]
+                    },
+                    "scripts": [
+                        {
+                            "label": "狩魂标记",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "// 寰斗指魂：格挡成功后为攻击者打下“狩魂”标记（1 回合，时长见 AE 模板）。\n// 狩魂的“总能选中”超出系统目标机制，由玩家/GM 按描述手动把握。\nif (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst hdEff = thisItem.effects.getName('狩魂');\nif (!hdEff) return;\nconst hdData = hdEff.toObject();\nhdData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, hdData);\nui.notifications.info('邪秽显迹：' + args.attacker.name + ' 被打下“狩魂”标记（1 回合）。');"
+                        }
+                    ]
+                },
+                {
+                    "name": "游心慑灵",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "3米",
+                    "targetInfo": "周围所有敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，尺尖蘸朱砂，挥向周围所有敌人，对他们造成 0.4 神采点内功伤害。若命中[恶]、[邪]的角色，为其添加“狩魂”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害正常结算；命中[恶][邪]角色时自动打下“狩魂”标记（1 回合）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            { "prop": "shencai", "ratio": 0.4 }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [4, 8, 12]
+                    },
+                    "scripts": [
+                        {
+                            "label": "恶邪打狩魂",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 游心慑灵：命中 [恶][邪] 角色时为其打下“狩魂”标记（1 回合，时长见 AE 模板）。\nif (!args.isHit || !args.target) return;\nconst yxS = args.target.system?.social;\nif (!yxS) return;\nif (!(yxS.exing >= 100 && yxS.xiayi <= 50)) return;\nconst yxEff = thisItem.effects.getName('狩魂');\nif (!yxEff) return;\nconst yxData = yxEff.toObject();\nyxData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, yxData);\nui.notifications.info('邪秽显迹：' + args.target.name + ' 被打下“狩魂”标记（1 回合）。');"
+                        }
+                    ]
+                },
+                {
+                    "name": "凝宿护法",
+                    "type": "qi",
+                    "isUltimate": true,
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "range": "3米",
+                    "targetInfo": "自身",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>-天枢凝灵，护我同袍-</p><p>蓄力动作，单膝跪地，以尺插地，在自身周围三米范围形成透明的‘护灵障’，持续三回合。</p><p><strong>护灵障：</strong>区域外的角色无法选中区域内的角色。区域内的敌人在他回合初受到 @{40 + 20 * @up|40} 点精神伤害。护灵障形成在原地，不会跟随你移动，你只能拥有一个护灵障，如果你形成新的，之前的消失。</p><p><strong>升级：</strong>精神伤害+20，怒气-1，内力消耗+8。</p>",
+                    "automationNote": "自动在原地（不跟随）生成 3 米护灵障，持续 3 回合后自动消散；再次施展自动替换自己的旧护灵障。区域内敌人各自回合初自动受到 40 点精神伤害（每级+20）。“区域外无法选中区域内角色”的目标限制请玩家与 GM 按描述手动把握。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [8, 16, 24],
+                        "rage": [7, 6, 5]
+                    },
+                    "scripts": [
+                        {
+                            "label": "护灵障光环",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 护灵障：施展后在原地（不跟随）生成 3 米护灵障，持续 3 回合（单实例，再次施展自动替换）；\n// 区域内敌人各自回合初受 40+20×(升级-1) 点精神伤害（必中不暴击）。\n// “区域外角色无法选中区域内角色”超出系统目标机制，由玩家/GM 按描述手动把握。\nconst hlLvl = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: 'wuxue-hulingzhang-' + actor.id,\n    displayName: '护灵障',\n    follow: false,\n    radius: 3,\n    faction: 'enemy',\n    includeSelf: false,\n    enterEnabled: false,\n    roundEnabled: true,\n    roundTiming: 'tokenTurnStart',\n    roundAction: { kind: 'damage', amount: String(40 + 20 * (hlLvl - 1)), type: 'mental' },\n    durationRounds: 3,\n    lifecycle: 'combat',\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "狩魂",
+                "description": "距你 10 米范围内的其他目标总能选中你。即使你被障碍物遮挡或处于“不可选中”，其他目标依旧能选中你。",
+                "transfer": false,
+                "duration": {
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shouhun",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/ae/眼力.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
+    },
+    {
+        "name": "镇魂剑谱",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "subSect": "zhenhunsi",
+            "tier": 2,
+            "description": "<p>镇魂司阴阳科所传，专破邪法，绞杀阴邪秽物。</p><p><strong>需求：</strong>剑</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "拘魂点脉",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，剑身遇邪而赤，轻刺敌人眉心，对目标造成 0.5 神采点内功伤害。若敌人无架招且气感低于你，为其添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中无架招且气感低于你的敌人时自动禁足（1 回合）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            { "prop": "shencai", "ratio": 0.5 }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [2, 4, 6]
+                    },
+                    "scripts": [
+                        {
+                            "label": "气感低于则禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 拘魂点脉：命中无架招且气感低于你的敌人时，施加“禁足”（1 回合）。\nif (!args.isHit || !args.target) return;\nif (args.target.system?.martial?.stanceActive) return;\nconst jgMy = actor.system?.stats?.qigan?.total || 0;\nconst jgTgt = args.target.system?.stats?.qigan?.total || 0;\nif (jgTgt >= jgMy) return;\nconst jgEff = game.xjzl.api.effects.getStatus('root');\nif (!jgEff) return;\nconst jgData = foundry.utils.deepClone(jgEff);\njgData.duration = { value: 1, units: 'rounds', expiry: 'turnStart' };\nawait game.xjzl.api.effects.addEffect(args.target, jgData);\nui.notifications.info('拘魂点脉：' + args.target.name + ' 气感不及你，被禁足（1 回合）。');"
+                        }
+                    ]
+                },
+                {
+                    "name": "净魂扫邪",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，持剑画符，符成自燃，对目标造成 0.4 神采点内功伤害。击破架招时，移除目标身上任意一个状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破架招时自动发送聊天卡片提醒，请手动移除目标身上任意一个状态。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            { "prop": "shencai", "ratio": 0.4 }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [2, 4, 6]
+                    },
+                    "scripts": [
+                        {
+                            "label": "破架移除状态提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 净魂扫邪：击破架招时移除目标身上任意一个状态——移除哪个状态需玩家选择，保持手动；\n// 破架为全桌可见事件，用聊天卡片提醒而非本地通知。\nif (!args.isBroken || !args.target) return;\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: '<div class=\"xjzl-chat-card\" style=\"padding: 5px 8px;\"><b>净魂扫邪</b>：击破了 ' + args.target.name + ' 的架招！请手动移除其身上任意一个状态。</div>'\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "寻魂索影",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，剑穗无风自动，开启架招。架招开启期间，每当你被敌人添加状态时，可以消耗反应动作，对该敌人添加“禁足”，持续一回合。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "架招格挡值升级自动；被添加状态时的反应动作禁足为手动操作，请自行对来源敌人施加禁足。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [2, 4, 6]
+                    }
+                },
+                {
+                    "name": "唤魂归阴",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "15米",
+                    "targetInfo": "单体/多个",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，口念法诀，踏阴阳步，周围所有敌人需进行一次[定力]检定（难度 @{15 + @up|15}），失败则朝你的方向移动 @{1 + @up|1} 米，并俯身趴地，陷入倒地。</p><p><strong>升级：</strong>定力难度+1，移动距离+1，内力消耗+4。</p>",
+                    "automationNote": "选中目标后施展，逐个目标自动请求[定力]检定（难度 15+升级-1），失败自动陷入倒地并在检定卡提示朝施术者方向移动 1+升级-1 米（位移请手动结算）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [4, 8, 12]
+                    },
+                    "scripts": [
+                        {
+                            "label": "定力检定与倒地",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 唤魂归阴：对每个选中目标请求 [定力] 检定（难度 15+升级-1），失败自动陷入倒地；\n// 失败者朝施术者方向移动 1+升级-1 米，位移超出自动化框架，请手动结算。\nif (!args.target) return;\nconst hyLvl = Math.max(1, move.computedLevel || 1);\nconst hyDc = 15 + (hyLvl - 1);\nconst hyDist = 1 + (hyLvl - 1);\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'dingli',\n    dc: hyDc,\n    label: '唤魂归阴',\n    item: thisItem,\n    move: args.move,\n    onFail: 'prone',\n    failureText: '魂魄受牵，你俯身趴地陷入倒地，并被牵引朝施术者方向移动 ' + hyDist + ' 米（请手动移动）。'\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "破魂斩浊",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-阴阳归位，魂归地府-</p><p>主要动作，心意通神，旋剑斩出，对目标造成 0.8 神采点内功伤害。</p><p>·若命中[恶]、[邪]的角色，使其陷入“碎魂”，持续到战斗脱离。</p><p><strong>碎魂：</strong>你每回合初流失等同于自身神采数值的气血和内力。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "伤害正常结算；命中[恶][邪]角色时自动施加“碎魂”（持续到战斗脱离），碎魂的每回合流失已自动化（流失量=目标自身神采）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            { "prop": "shencai", "ratio": 0.8 }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [4, 8, 12],
+                        "rage": [7, 6, 5]
+                    },
+                    "scripts": [
+                        {
+                            "label": "恶邪施加碎魂",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 破魂斩浊：命中 [恶][邪] 角色时使其陷入“碎魂”（持续到战斗脱离，战斗结束后手动移除）。\nif (!args.isHit || !args.target) return;\nconst phS = args.target.system?.social;\nif (!phS) return;\nif (!(phS.exing >= 100 && phS.xiayi <= 50)) return;\nconst phEff = thisItem.effects.getName('碎魂');\nif (!phEff) return;\nconst phData = phEff.toObject();\nphData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, phData);\nui.notifications.info('阴阳归位：' + args.target.name + ' 陷入“碎魂”，持续到战斗脱离。');"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "碎魂",
+                "description": "你每回合初流失等同于自身神采数值的气血和内力。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "suihun",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "回合初魂魄流失",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "// 碎魂：每回合初流失等同于自身神采数值的气血（liushi 真实伤害）和内力（资源直接流失）。\nconst shSc = Math.max(0, S.stats?.shencai?.total || 0);\nif (shSc <= 0) return;\nawait actor.applyDamage({ amount: shSc, type: 'liushi', source: 'dot' });\nawait actor.applyHealing({ amount: -shSc, type: 'mp', source: 'dot', showScrolling: true });"
+                            }
+                        ]
+                    }
+                },
+                "img": "icons/svg/skull.svg",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
+    },
+    {
+        "name": "觉灵视",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "subSect": "zhenhunsi",
+            "tier": 2,
+            "description": "<p>邪祟非眼力可见，镇魂司弟子以灵觉代替目力，可觉察到平日里不为人知的细节。</p><p><strong>需求：</strong>《通灵篇》圆满</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "《通灵篇》圆满",
+            "moves": [
+                {
+                    "name": "觉灵视",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "@{max(3, 5 - @up)|全回合动作}",
+                    "description": "<p>@{action(max(3, 5 - @up))|全回合动作}，手掐剑指，闭目静神，而后睁眼，进入“灵视”状态，持续三回合。</p><p><strong>灵视：</strong>你可以选中“不可选中”的目标，且你对该类目标的命中+@{5 * @level|5}。</p><p><strong>升级：</strong>施展动作下降一级（全回合-蓄力-主要），对该类目标命中再+5，内力消耗+2。</p>",
+                    "automationNote": "自动进入“灵视”状态（3 回合，图标常显）；选中“不可选中”目标与对其命中加值请按描述手动把握。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [2, 4, 6]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启灵视",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 觉灵视：进入“灵视”状态（3 回合，时长见 AE 模板）。\n// 选中“不可选中”目标与对其命中+5 超出系统目标机制，由玩家/GM 按描述手动把握。\nconst jsEff = thisItem.effects.getName('灵视');\nif (!jsEff) return;\nconst jsData = jsEff.toObject();\njsData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, jsData);\nui.notifications.info('灵视已开启（3 回合）。');"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "灵视",
+                "description": "你可以选中“不可选中”的目标，且你对该类目标的命中+5（每级再+5）。",
+                "transfer": false,
+                "duration": {
+                    "value": 3,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lingshi",
+                        "stackable": false
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/ae/眼力.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
+    },
+    {
+        "name": "铸灵兵",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "subSect": "zhenhunsi",
+            "tier": 3,
+            "description": "<p>镇魂司绝技，驱灵念，引内劲，导五炁之法，锻造灵兵。其形态变换于虚实之间，诡异莫测而灵性自如，挥舞时宛若至亲密友并肩作战。</p><p>铸灵兵共分三层，需循序渐进修炼。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "铸灵兵",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，为自身附上“灵兵”状态（重复施展即刷新）。</p><p><strong>灵兵：</strong>武器伤害+5；第二层追加武器格挡+5；第三层改为武器伤害+10、武器格挡+10。第三层起，使用灵兵出招造成暴击时，额外获得 1 点怒气。</p><p><strong>第一层：附魂</strong><br>需求：悟性 10，神采达到 100<br>修为：1000</p><p>【融魂于器】你以内力和魂力结合，融铸灵兵。花费一天并失去 20 点神采，为一把武器附魂，使其获得铁匠词缀“灵兵”，可和原武器词缀叠加。</p><p>·只有为灵兵附魂之人方可装备它。一人只能拥有一把灵兵，且他能随时感应到该灵兵的大致方向。</p><p>·灵兵：武器伤害+5。</p><p><strong>第二层：塑魂</strong><br>需求：悟性 20，神采达到 200<br>修为：3000</p><p>【器意相通】你可以花费简要动作让 20 米内的自己的灵兵飞入自身手中并装备。</p><p>·进战时，为灵兵也投一次没有任何加值的先攻检定，你可以选择该结果作为你的先攻检定结果。</p><p>【进阶】“灵兵”词缀升级替换为下面的效果。</p><p>·灵兵：武器伤害+5，武器格挡+5。</p><p><strong>第三层：御魂</strong><br>需求：悟性 30，神采达到 300<br>修为：6000</p><p>【通神共鸣】每当你使用灵兵出招造成暴击时，额外获得 1 点怒气。</p><p>【进阶】“灵兵”词缀升级替换为下面的效果。</p><p>·灵兵：武器伤害+10，武器格挡+10。</p>",
+                    "automationNote": "施展本招即为自身挂上/刷新“灵兵”状态：武器伤害与武器格挡按修炼层数自动生效（见状态说明），升层后重新施展一次即可更新。【融魂于器】附魂仪式（一天、失去 20 神采、专属武器绑定）、【器意相通】飞回手中与先攻替换均为手动。【通神共鸣】已自动化：第三层起出招暴击自动+1 怒气并发卡片告知全桌。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [1000, 3000, 6000],
+                        "mappedStage": 0
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [0, 0, 0]
+                    },
+                    "scripts": [
+                        {
+                            "label": "挂灵兵状态",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 铸灵兵：为自身挂上“灵兵”状态（同 slug 重复施展即刷新加成与时长）。\n// 加成随修炼层数变化：一层武器伤害+5；二层追加武器格挡+5；三层武器伤害+10、武器格挡+10。\n// 附魂仪式、飞回手中与先攻替换为手动流程；通神共鸣的暴击怒气由“灵兵”状态脚本结算。\nconst lbLvl = Math.max(1, move.computedLevel || 1);\nconst lbDmg = lbLvl >= 3 ? 10 : 5;\nconst lbBlock = lbLvl >= 3 ? 10 : (lbLvl >= 2 ? 5 : 0);\nconst lbEff = thisItem.effects.getName('灵兵');\nif (!lbEff) return;\nconst lbData = lbEff.toObject();\nlbData.origin = thisItem.uuid;\nlbData.system.changes = [{ key: 'system.combat.damages.weapon.mod', type: 'add', value: String(lbDmg) }];\nif (lbBlock > 0) lbData.system.changes.push({ key: 'system.combat.block', type: 'add', value: String(lbBlock) });\nawait game.xjzl.api.effects.addEffect(actor, lbData);\nui.notifications.info('灵兵加成已生效（第' + lbLvl + '层）：武器伤害+' + lbDmg + (lbBlock > 0 ? '，武器格挡+' + lbBlock : '') + '。');"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "灵兵",
+                "description": "灵兵加成：武器伤害+5；第二层追加武器格挡+5；第三层改为武器伤害+10、武器格挡+10。御魂（第三层）：每当你使用灵兵出招造成暴击时，额外获得 1 点怒气。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lingbing",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "通神共鸣",
+                                "trigger": "hit",
+                                "active": true,
+                                "script": "// 通神共鸣（御魂层）：使用灵兵出招命中且暴击时，额外获得 1 点怒气，并发卡片告知全桌。\n// 需《铸灵兵》修炼至第三层；排除治疗/Buff 与普攻（趁虚而入仍算出招）；\n// 持有本状态即代表正在使用灵兵，不再检测具体武器；手动结算未命中不回怒。\nif (!args.isHit || !args.isCrit) return;\nif (['heal', 'buff'].includes(args.actionType)) return;\nif (args.move?.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nconst gyBook = (thisEffect?.parent?.type === 'wuxue') ? thisEffect.parent : actor.items.find(i => i.name === '铸灵兵');\nif ((gyBook?.system?.moves?.[0]?.computedLevel || 0) < 3) return;\nawait actor.changeResources({\n    'system.resources.rage.value': { delta: 1 }\n}, { cause: 'script', sourceActor: actor, item: args.item, move: args.move, source: 'lingshi_gongming' });\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: '<div class=\"xjzl-chat-card\" style=\"padding: 5px 8px;\"><b>通神共鸣</b>：' + actor.name + ' 的灵兵出招暴击，人兵合一，额外获得 1 点怒气。</div>'\n});"
+                            }
+                        ]
+                    }
+                },
+                "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "system": {
+                    "changes": []
+                },
+                "showIcon": 2
+            }
+        ]
+    }
+]

@@ -59,6 +59,7 @@ const MULTI_FILE_CONFIG = {
         "putong",         // 普通传承
         "other",          // 其他，一些魔门武学、模组里的武学等等
         "other2",         // 其他，一些魔门武学、模组里的武学(主要是长白的、乌蒙的)
+        "other3",         // 其他，镇魂司武学
         "xiao",           //关山、征越等模组资源
         "jianchen",       //栏杆拍遍模组资源
         "gongchuagn2026", //2026共创
