@@ -1920,13 +1920,13 @@
                             {
                                 "label": "惊人增伤(计算)",
                                 "trigger": "calc",
-                                "script": "// 1. 同步查找内功物品 (不使用 await)\nconst neigong = actor.items.find(i => i.name.includes(\"天凤心诀\") && i.type === \"neigong\");\nlet bonus = 20;\n\n// 2. 根据内功等级判断加成\nif (neigong && neigong.system.stage) {\n    if (neigong.system.stage >= 2) bonus = 30;\n    if (neigong.system.stage >= 3) bonus = 40;\n}\n\n// 3. 应用数值到输出对象\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`惊人 +${bonus}`);",
+                                "script": "// 普攻不触发（趁虚而入不算普攻）\nif (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\n\n// 1. 同步查找内功物品 (不使用 await)\nconst neigong = actor.items.find(i => i.name.includes(\"天凤心诀\") && i.type === \"neigong\");\nlet bonus = 20;\n\n// 2. 根据内功等级判断加成\nif (neigong && neigong.system.stage) {\n    if (neigong.system.stage >= 2) bonus = 30;\n    if (neigong.system.stage >= 3) bonus = 40;\n}\n\n// 3. 应用数值到输出对象\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`惊人 +${bonus}`);",
                                 "active": true
                             },
                             {
                                 "label": "惊人消耗(结算)",
                                 "trigger": "hit",
-                                "script": "// 只有在攻击动作结算后才移除\nif (['attack', 'basic-attack'].includes(args.actionType) || args.isAttack) {\n    await game.xjzl.api.effects.removeEffect(actor, thisEffect.slug);\n}",
+                                "script": "// 出招类效果：治疗/增益与普攻不触发（趁虚而入不算普攻）\nif (['heal', 'buff'].includes(args.actionType)) return;\nif (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\n\nawait game.xjzl.api.effects.removeEffect(actor, thisEffect.slug);",
                                 "active": true
                             }
                         ]
