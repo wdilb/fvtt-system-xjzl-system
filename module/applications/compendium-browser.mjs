@@ -12,6 +12,21 @@ const INITIAL_PAGE = 60;
 const PAGE_STEP = 60;
 const MAX_RENDER = 500;
 
+/** 单次随机抽取的数量上限：宏参数与弹窗输入共用，防止 Infinity/笔误大数让抽取循环卡死页面。 */
+const MAX_DRAW_AMOUNT = 100;
+
+/**
+ * 归一化抽取数量：收敛到 [1, MAX_DRAW_AMOUNT] 的整数。
+ * Infinity 必须在此拦下——它能穿透 Math.max/Math.floor 原样进入抽取循环造成死循环。
+ * @param {number} value 原始数量（宏/弹窗/调用方传入，可能为 NaN、Infinity 或超大数）
+ * @returns {number} 合法整数数量
+ */
+function normalizeDrawAmount(value) {
+    const parsed = Math.floor(Number(value));
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.min(MAX_DRAW_AMOUNT, Math.max(1, parsed));
+}
+
 export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(ApplicationV2) {
 
     constructor(options) {
@@ -101,6 +116,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             openSheet: XJZLCompendiumBrowser.prototype._onOpenSheet,
             resetFilters: XJZLCompendiumBrowser.prototype._onResetFilters,
             randomize: XJZLCompendiumBrowser.prototype._onRandomizeClick,
+            // 导出宏与抽取共用入口和配置弹窗，具体动作在弹窗内选择
+            exportMacro: XJZLCompendiumBrowser.prototype._onRandomizeClick,
             toggleView: XJZLCompendiumBrowser.prototype._onToggleView,
             loadMore: XJZLCompendiumBrowser.prototype._loadMore
         }
@@ -212,7 +229,23 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /*  数据加载                                     */
     /* -------------------------------------------- */
 
+    /**
+     * 加载合集索引（并发去重）。
+     * ready 钩子的自动索引与宏、建卡向导等外部入口可能同时触发；复用进行中的加载，
+     * 避免同一合集包被重复 getIndex。结束（无论成败）后清除记录，刷新与后续调用可重新加载。
+     */
     async loadData() {
+        this._loadPromise ??= this._loadIndex();
+        const promise = this._loadPromise;
+        try {
+            return await promise;
+        } finally {
+            if (this._loadPromise === promise) this._loadPromise = null;
+        }
+    }
+
+    /** 实际重建内存索引；必须经由 loadData() 调用以获得并发去重。 */
+    async _loadIndex() {
         ui.notifications.info(game.i18n.localize("XJZL.CompendiumBrowser.State.Loading"));
 
         // 重置缓存
@@ -859,7 +892,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const tab = options.tab || this.browserState.activeTab;
         const filters = options.filters || this.browserState.tabs[tab]?.filters || {};
         const query = options.query ?? this.browserState.tabs[tab]?.searchQuery ?? "";
-        const amount = options.amount || 1;
+        const amount = normalizeDrawAmount(options.amount);
         const useWeight = options.weighted ?? true;
         const rawItems = this.cachedData[tab] || [];
 
@@ -876,15 +909,15 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         /**
          * 辅助函数：获取单个物品权重
-         * @param {Object} item 
+         * @param {Object} item
          */
         const getWeight = (item) => {
             if (!useWeight) return 1;
             const sys = item.system;
-            if (item.type === "wuxue" || item.type === "neigong") {
-                return tierWeights[sys.tier ?? 1] || 10;
-            }
-            return qualityWeights[sys.quality ?? 0] || 10;
+            const isTier = item.type === "wuxue" || item.type === "neigong";
+            const weight = isTier ? tierWeights[sys.tier ?? 1] : qualityWeights[sys.quality ?? 0];
+            // 仅对"权重表未覆盖该品级"兜底为 10；不能用 || 10，否则显式配置的 0（排除该品级）会被改写成 10
+            return Number.isFinite(weight) ? weight : 10;
         };
 
         const results = [];
@@ -900,21 +933,28 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 totalWeight += getWeight(item);
             }
 
+            // 全部品级权重为 0 时没有可抽对象；否则游标法里 random<=0 恒成立，会固定抽到第一个
+            if (totalWeight <= 0) {
+                ui.notifications.warn(game.i18n.localize("XJZL.CompendiumBrowser.State.ZeroWeight"));
+                return [];
+            }
+
             // 3.2 循环抽取
             for (let i = 0; i < amount; i++) {
                 let random = Math.random() * totalWeight;
                 let selected = null;
 
-                // 游标法选择
+                // 游标法选择：命中必须用严格小于——Math.random() 可能恰为 0，
+                // 用 <= 0 时累计权重仍为 0 的零权重项会被误选
                 for (const item of pool) {
                     random -= getWeight(item);
-                    if (random <= 0) {
+                    if (random < 0) {
                         selected = item;
                         break;
                     }
                 }
-                // 浮点数兜底
-                if (!selected) selected = pool[pool.length - 1];
+                // 浮点数兜底同样只取正权重项；前置的 totalWeight 守卫保证正权重项必然存在
+                if (!selected) selected = pool.findLast(item => getWeight(item) > 0);
                 results.push(foundry.utils.deepClone(selected));
             }
         } else {
@@ -929,21 +969,98 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         return results;
     }
 
+    /**
+     * 把 { key: string[]|Set } 形式的筛选统一为过滤引擎要求的 { key: Set }，空条件直接丢弃。
+     * 宏入口（randomDraw）与弹窗快照（抽取分派）共用。
+     * @param {Object<string, string[]|Set>} [raw] 原始筛选条件
+     * @returns {Object<string, Set>} 规范化后的筛集
+     */
+    _normalizeFilters(raw) {
+        const filters = {};
+        for (const [key, values] of Object.entries(raw || {})) {
+            const set = values instanceof Set ? values : new Set((values ?? []).map(String));
+            if (set.size) filters[key] = set;
+        }
+        return filters;
+    }
+
+    /**
+     * 公开宏入口：按分类、筛选与搜索随机抽取物品，并把战利品卡发送到聊天栏。
+     * 与界面抽取同样走权重随机；不播放抽取演出，适合宏与自动化重复调用。
+     * @param {Object} [options]
+     * @param {string} [options.tab]     分类 id（TABS 之一），缺省用浏览器当前 Tab
+     * @param {Object<string, string[]|Set>} [options.filters] 筛选条件；宏传字符串数组，内部统一转 Set
+     * @param {string} [options.query=""] 搜索词，与筛选一起收窄候选池
+     * @param {number} [options.amount=1] 抽取数量，收敛到 [1, 100] 的整数，非法值按 1 处理
+     * @param {Object<number, number>} [options.weights] 品级权重（武学/内功为 tier 1-3，其余为 quality 0-4）；缺省用系统默认权重
+     * @param {string} [options.alias]   战利品卡发送者名，缺省为"江湖奇遇"
+     * @param {string} [options.title]   战利品卡标题，缺省为"随机战利品"
+     * @returns {Promise<Array>} 抽中的索引条目；候选池为空或全部品级权重为 0 时返回空数组
+     */
+    async randomDraw(options = {}) {
+        const tab = options.tab || this.browserState.activeTab;
+
+        // 世界刚就绪时自动索引可能仍在进行；loadData 内部做并发去重，宏不会触发二次全量重建
+        if (!this.isLoaded) await this.loadData();
+
+        const filters = this._normalizeFilters(options.filters);
+
+        const amount = normalizeDrawAmount(options.amount);
+        const items = await this.randomize({
+            tab,
+            filters,
+            query: options.query ?? "",
+            amount,
+            weighted: true,
+            customWeights: options.weights
+        });
+
+        if (items.length) {
+            await this._generateLootChatCard(items, {
+                alias: options.alias ?? game.i18n.localize("XJZL.CompendiumBrowser.Random.DefaultAlias"),
+                title: options.title ?? game.i18n.localize("XJZL.CompendiumBrowser.Random.Title")
+            });
+        }
+        return items;
+    }
+
+    /**
+     * 抽取/导出宏的共用侧边栏入口：打开配置弹窗（数量/发送者/标题/权重），
+     * 按弹窗内点击的动作分派——"抽取"走演出与战利品卡，"导出宏"把配置复制为宏代码。
+     */
     async _onRandomizeClick(event) {
         event.preventDefault();
-        const { DialogV2 } = foundry.applications.api;
-        const activeTab = this.browserState.activeTab;
-        // 候选池与 randomize 同条件：当前 Tab 筛选 + 搜索框输入（空参即回退到当前 Tab 状态）
-        const currentPool = this._filterItems(this.cachedData[activeTab] || []);
+        const result = await this._showRandomDialog();
+        if (!result) return;
 
-        if (currentPool.length === 0) return ui.notifications.warn(game.i18n.localize("XJZL.CompendiumBrowser.State.EmptyPool"));
+        if (result.action === "export") return this._exportRandomMacro(result);
 
-        const isTier = ["wuxue", "neigong"].includes(activeTab);
+        // 用打开弹窗时的快照抽取，而非提交时的实时状态（弹窗期间用户可能已切换分类/筛选）
+        const items = await this.randomize({
+            tab: result.snapshot.tab,
+            filters: this._normalizeFilters(result.snapshot.filters),
+            query: result.snapshot.query,
+            amount: result.amount,
+            weighted: true,
+            customWeights: result.weights
+        });
+        if (items.length) {
+            if (game.settings.get("xjzl-system", "enableCompendiumDrawAnimation")) {
+                await this._playDrawAnimation(items, result);
+            }
+            await this._generateLootChatCard(items, result);
+        }
+    }
 
+    /**
+     * 按分类返回品级权重行：武学/内功用 tier（1-3 = 人/地/天），其余用 quality（0-4 = 凡/铜/银/金/玉）。
+     * 配置弹窗与宏导出共用此映射，保证弹窗里的权重行与导出宏内的品级注释始终同源。
+     * @param {string} tab 分类 id
+     * @returns {Array<{name: string, label: string, value: number, color: string}>} 权重行；name 为 "w_<级别>"，供弹窗 input 使用
+     */
+    _getWeightRows(tab) {
         const localize = key => game.i18n.localize(`XJZL.CompendiumBrowser.Random.${key}`);
-
-        // 权重行数据驱动模板渲染；input name 保持 w_* 命名，callback 的取值逻辑不变
-        const weightList = isTier
+        return ["wuxue", "neigong"].includes(tab)
             ? [
                 { name: "w_1", label: localize("Tier1"), value: 100, color: "#666" },
                 { name: "w_2", label: localize("Tier2"), value: 20, color: "#8d6e63" },
@@ -956,6 +1073,42 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 { name: "w_3", label: localize("Quality3"), value: 10, color: "#d4af37" },
                 { name: "w_4", label: localize("Quality4"), value: 2, color: "#2ecc71" }
             ];
+    }
+
+    /**
+     * 抽取配置弹窗，抽取与导出宏共用（数量、权重等设置对两个动作同样生效）。
+     * 返回值携带打开弹窗时定格的配置快照（snapshot）：弹窗是独立窗口，浏览器在等待期间
+     * 仍可操作，提交时不能改读实时状态，否则会混合"新分类的筛选"与"旧分类的权重行"。
+     * @returns {Promise<Object|null>} { action: "draw"|"export", amount, alias, title, weights,
+     *   snapshot: { tab, filters: {key: string[]}, query } }；关闭弹窗或空候选池时为 null。
+     */
+    async _showRandomDialog() {
+        const { DialogV2 } = foundry.applications.api;
+        const activeTab = this.browserState.activeTab;
+        const state = this._currentTabState;
+        // 候选池与 randomize 同条件：当前 Tab 筛选 + 搜索框输入（空参即回退到当前 Tab 状态）
+        const currentPool = this._filterItems(this.cachedData[activeTab] || []);
+
+        // 空池终止必须显式返回 null：V14 的 ui.notifications.warn 返回通知对象（真值），
+        // 直接 return 会被调用方当成有效表单结果继续抽取，造成重复警告
+        if (currentPool.length === 0) {
+            ui.notifications.warn(game.i18n.localize("XJZL.CompendiumBrowser.State.EmptyPool"));
+            return null;
+        }
+
+        // 打开弹窗即定格分类/筛选/搜索，抽取与导出都以此为准
+        const snapshot = {
+            tab: activeTab,
+            query: state.searchQuery,
+            filters: Object.fromEntries(Object.entries(state.filters).map(([key, set]) => [key, [...set]]))
+        };
+
+        const isTier = ["wuxue", "neigong"].includes(activeTab);
+
+        const localize = key => game.i18n.localize(`XJZL.CompendiumBrowser.Random.${key}`);
+
+        // 权重行数据驱动模板渲染；input name 保持 w_* 命名，callback 的取值逻辑不变
+        const weightList = this._getWeightRows(activeTab);
 
         const content = await renderTemplate(
             "systems/xjzl-system/templates/apps/compendiumbrowser/random-dialog.hbs",
@@ -973,36 +1126,123 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             }
         );
 
-        const result = await DialogV2.wait({
+        // 两个动作读取同一份表单，仅在返回值里带上各自 action 供调用方分派
+        const readForm = action => (event, button) => {
+            const form = button.form;
+            const w = {};
+            if (isTier) [1, 2, 3].forEach(i => w[i] = parseInt(form.elements[`w_${i}`].value) || 0);
+            else[0, 1, 2, 3, 4].forEach(i => w[i] = parseInt(form.elements[`w_${i}`].value) || 0);
+
+            return {
+                action,
+                amount: parseInt(form.elements.amount.value) || 1,
+                alias: form.elements.alias.value || game.i18n.localize("XJZL.CompendiumBrowser.Random.DefaultAlias"),
+                title: form.elements.title.value || game.i18n.localize("XJZL.CompendiumBrowser.Random.Title"),
+                weights: w,
+                snapshot
+            };
+        };
+
+        return DialogV2.wait({
             window: { title: localize("Title"), icon: "fas fa-dice-d20", resizable: false },
             content: content,
-            buttons: [{
-                action: "ok", label: localize("Draw"), icon: "fas fa-check",
-                callback: (event, button) => {
-                    const form = button.form;
-                    const w = {};
-                    if (isTier) [1, 2, 3].forEach(i => w[i] = parseInt(form.elements[`w_${i}`].value) || 0);
-                    else[0, 1, 2, 3, 4].forEach(i => w[i] = parseInt(form.elements[`w_${i}`].value) || 0);
-
-                    return {
-                        amount: parseInt(form.elements.amount.value) || 1,
-                        alias: form.elements.alias.value || game.i18n.localize("XJZL.CompendiumBrowser.Random.DefaultAlias"),
-                        title: form.elements.title.value || game.i18n.localize("XJZL.CompendiumBrowser.Random.Title"),
-                        weights: w
-                    };
-                }
-            }],
+            buttons: [
+                { action: "draw", label: localize("Draw"), icon: "fas fa-check", callback: readForm("draw") },
+                { action: "export", label: game.i18n.localize("XJZL.CompendiumBrowser.Filter.ExportMacro"), icon: "fas fa-scroll", callback: readForm("export") }
+            ],
             close: () => null
         });
+    }
 
-        if (result) {
-            const items = await this.randomize({ amount: result.amount, weighted: true, customWeights: result.weights });
-            if (items.length) {
-                if (game.settings.get("xjzl-system", "enableCompendiumDrawAnimation")) {
-                    await this._playDrawAnimation(items, result);
-                }
-                await this._generateLootChatCard(items, result);
-            }
+    /**
+     * 把弹窗快照（分类/筛选/搜索）与弹窗配置（数量、权重、卡片信息）固化为随机抽取宏代码，并复制到系统剪贴板。
+     * 宏内为每个字段生成中文注释（分类枚举、筛选可选值、品级含义），玩家可照注释直接改参数。
+     * 宏通过公开入口 game.xjzl.compendiumBrowser.randomDraw 复现本次抽取的范围与权重。
+     * @param {Object} result _showRandomDialog 的结果（amount/alias/title/weights/snapshot）。
+     * @returns {Promise<string|undefined>} 已复制的宏代码；复制失败时返回 undefined。
+     */
+    async _exportRandomMacro({ amount, alias, title, weights, snapshot }) {
+        // 使用打开弹窗时的快照而非提交时的实时状态，保证导出的配置与弹窗显示的候选池、权重行一致
+        const { tab, query } = snapshot;
+        const filters = snapshot.filters; // 快照里已是 { key: string[] }，直接用于宏文本
+
+        // 分类枚举注释：让玩家不必查文档就能换抽取分类
+        const tabOptions = XJZLCompendiumBrowser.TABS
+            .map(t => `${t.id}=${game.i18n.localize(t.label)}`)
+            .join("  ");
+
+        // 筛选块：为每个已选字段生成"字段含义 + 全部可选值"注释；
+        // 可选值取自筛选面板同源的 filterConfig，注释里抄的取值必然能被过滤引擎识别
+        const filterConfigs = this.filterConfig[tab] || [];
+        const filterEntries = Object.entries(filters);
+        let filtersBlock = "{}";
+        if (filterEntries.length > 0) {
+            const lines = [];
+            filterEntries.forEach(([key, values], index) => {
+                const cfg = filterConfigs.find(c => c.key === key);
+                const label = cfg ? game.i18n.localize(cfg.label) : key;
+                const optionsText = cfg
+                    ? "，可选值：" + Object.entries(cfg.options).map(([v, labelKey]) => `${v}=${game.i18n.localize(labelKey)}`).join("  ")
+                    : "";
+                const comma = index < filterEntries.length - 1 ? "," : "";
+                lines.push(`    // ${label}${optionsText}`);
+                lines.push(`    ${JSON.stringify(key)}: [${values.map(v => JSON.stringify(v)).join(", ")}]${comma}`);
+            });
+            filtersBlock = `{\n${lines.join("\n")}\n  }`;
+        }
+
+        // 权重块：复用弹窗的品级行，把 "w_2" 之类的 input 名还原成级别号，
+        // 使宏内逐行注释的品级名与玩家在弹窗里看到的完全一致
+        const weightLabelByKey = {};
+        for (const row of this._getWeightRows(tab)) {
+            weightLabelByKey[row.name.slice(2)] = row.label;
+        }
+        const weightEntries = Object.entries(weights);
+        const weightLines = weightEntries.map(([key, value], index) => {
+            const comma = index < weightEntries.length - 1 ? "," : "";
+            const label = weightLabelByKey[key] ? `  // ${weightLabelByKey[key]}` : "";
+            return `    ${key}: ${value}${comma}${label}`;
+        }).join("\n");
+
+        const command = `// =========================================================
+// 侠界之旅 · 随机抽取宏
+// 由江湖万卷阁按当前筛选与权重设置导出，参数可按注释自行修改
+// =========================================================
+if (!game.xjzl?.compendiumBrowser?.randomDraw) {
+  return ui.notifications.error(game.i18n.localize("XJZL.CompendiumBrowser.Macro.ApiUnavailable"));
+}
+await game.xjzl.compendiumBrowser.randomDraw({
+  // 抽取分类，可选：${tabOptions}
+  tab: ${JSON.stringify(tab)},
+
+  // 筛选条件：同一字段的多个取值之间为"或"，不同字段之间为"且"；取值改为 [] 或删除该行即取消这项筛选
+  filters: ${filtersBlock},
+
+  // 搜索词：与筛选同时生效，不需要时留空 ""
+  query: ${JSON.stringify(query)},
+
+  // 单次抽取数量（上限 ${MAX_DRAW_AMOUNT}，超出按上限处理）
+  amount: ${amount},
+
+  // 各品级权重：数值越大越容易抽中，改为 0 该品级便不会出现
+  weights: {
+${weightLines}
+  },
+
+  // 战利品卡发送者名
+  alias: ${JSON.stringify(alias)},
+
+  // 战利品卡标题
+  title: ${JSON.stringify(title)}
+});`;
+
+        try {
+            await game.clipboard.copyPlainText(command);
+            ui.notifications.info(game.i18n.localize("XJZL.CompendiumBrowser.Macro.Copied"));
+            return command;
+        } catch (error) {
+            console.error("XJZL | 复制抽取宏代码失败:", error);
+            ui.notifications.error(game.i18n.localize("XJZL.CompendiumBrowser.Macro.CopyFailed"));
         }
     }
 
@@ -2056,6 +2296,11 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         });
     }
 
+    /**
+     * 发送战利品聊天卡。
+     * @returns {Promise<ChatMessage>} 创建的消息；调用方 await 本方法即可等到消息真正创建，
+     *   创建失败会向上抛出而不是被吞掉。
+     */
     async _generateLootChatCard(items, { alias, title }) {
         const renderData = {
             title: title,
@@ -2071,7 +2316,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         };
 
         const content = await renderTemplate("systems/xjzl-system/templates/chat/loot-card.hbs", renderData);
-        ChatMessage.create({
+        return ChatMessage.create({
             author: game.user.id,
             speaker: ChatMessage.getSpeaker({ alias: alias }),
             content: content,
