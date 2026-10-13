@@ -4676,7 +4676,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，奋翅青云，一举万里，天下何小小。范围内所有友方可以不消耗速度移动 1 米。<br>范围内所有敌人需要进行难度 15 的[定力]检定，失败则万籁寂寥心情困顿，陷入“禁足”持续一回合。<br>音阶排序：徵、商、徵<br>天籁之音：移动距离+2，难度+2。</p>",
-                    "automationNote": "对敌方自动发起检定请求，失败自动禁足。友方移动手动。",
+                    "automationNote": "敌方定力DC15检定自动（按Token阵营识别敌方，同阵营与中立不触发），失败禁足一回合。友方免耗速移动1米手动。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -4694,7 +4694,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.target.type !== \"character\") {\n    const rootData = foundry.utils.deepClone(game.xjzl.api.effects.getStatus('root'));\n    if (rootData) rootData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 15,\n        label: \"抵抗飞鸣吟\",\n        onFail: rootData\n    });\n} else {\n    ui.notifications.info(`${args.target.name} 为玩家角色，请确认是否为敌方。若是友方请忽略。`);\n}"
+                            "script": "// 敌我判定与光环口径一致：敌方 = 与己方阵营对置的 Token（友方↔敌对互为对置，中立不算任何一方的敌人）\n// Token 优先取本次来源/目标的合成 Token；同一角色多 Token 参战等无法确定的场景放弃自动判定，保留人工确认\nconst atkToken = actor.token ?? (actor.getActiveTokens?.().length === 1 ? actor.getActiveTokens()[0] : null);\nconst tgtToken = args.target.token ?? (args.target.getActiveTokens?.().length === 1 ? args.target.getActiveTokens()[0] : null);\nconst myDisp = atkToken?.document?.disposition ?? atkToken?.disposition;\nconst tgtDisp = tgtToken?.document?.disposition ?? tgtToken?.disposition;\nif (myDisp === undefined || tgtDisp === undefined) {\n    ui.notifications.warn(`${args.target.name} 无法确定阵营，请手动判定定力检定结果。`);\n    return;\n}\nconst hostileDisp = myDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE ? CONST.TOKEN_DISPOSITIONS.FRIENDLY : CONST.TOKEN_DISPOSITIONS.HOSTILE;\nif (tgtDisp !== hostileDisp) return;\nconst rootTpl = game.xjzl.api.effects.getStatus('root');\nconst rootData = rootTpl ? foundry.utils.deepClone(rootTpl) : null;\nif (rootData) rootData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 15,\n    label: \"抵抗飞鸣吟\",\n    onFail: rootData\n});"
                         }
                     ],
                     "actionType": "buff"
@@ -4713,7 +4713,7 @@
                     "isUltimate": false,
                     "tier": null,
                     "description": "<p>蓄力动作，奋翅青云，一举万里，天下何小小。范围内所有友方可以不消耗速度移动 1 米。<br>范围内所有敌人需要进行难度 15 的[定力]检定，失败则万籁寂寥心情困顿，陷入“禁足”持续一回合。<br>音阶排序：徵、商、徵<br>天籁之音：移动距离+2，难度+2。</p>",
-                    "automationNote": "演奏检定与音阶由玩家自行判定。敌方定力DC17检定自动，失败禁足一回合；敌方由操作者自行圈选。友方免耗速移动3米手动。",
+                    "automationNote": "演奏检定与音阶由玩家自行判定。敌方定力DC17检定自动（按Token阵营识别敌方，同阵营与中立不触发），失败禁足一回合。友方免耗速移动3米手动。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -4731,7 +4731,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const rootTpl = game.xjzl.api.effects.getStatus('root');\nconst rootData = rootTpl ? foundry.utils.deepClone(rootTpl) : null;\nif (rootData) rootData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 17,\n    label: \"抵抗飞鸣吟·天籁\",\n    onFail: rootData\n});"
+                            "script": "// 敌我判定与光环口径一致：敌方 = 与己方阵营对置的 Token（友方↔敌对互为对置，中立不算任何一方的敌人）\n// Token 优先取本次来源/目标的合成 Token；同一角色多 Token 参战等无法确定的场景放弃自动判定，保留人工确认\nconst atkToken = actor.token ?? (actor.getActiveTokens?.().length === 1 ? actor.getActiveTokens()[0] : null);\nconst tgtToken = args.target.token ?? (args.target.getActiveTokens?.().length === 1 ? args.target.getActiveTokens()[0] : null);\nconst myDisp = atkToken?.document?.disposition ?? atkToken?.disposition;\nconst tgtDisp = tgtToken?.document?.disposition ?? tgtToken?.disposition;\nif (myDisp === undefined || tgtDisp === undefined) {\n    ui.notifications.warn(`${args.target.name} 无法确定阵营，请手动判定定力检定结果。`);\n    return;\n}\nconst hostileDisp = myDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE ? CONST.TOKEN_DISPOSITIONS.FRIENDLY : CONST.TOKEN_DISPOSITIONS.HOSTILE;\nif (tgtDisp !== hostileDisp) return;\nconst rootTpl = game.xjzl.api.effects.getStatus('root');\nconst rootData = rootTpl ? foundry.utils.deepClone(rootTpl) : null;\nif (rootData) rootData.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 17,\n    label: \"抵抗飞鸣吟·天籁\",\n    onFail: rootData\n});"
                         }
                     ]
                 }
