@@ -147,6 +147,15 @@ passive / calc（持续被动与面板计算）
 
 治疗和 Buff 招式同样执行 `attack`、`check`、`hit`、`hit_once`，但不进入标准伤害防御链。`creature` 使用独立的体力伤害分支；`container` 不参与脚本、伤害或治疗生命周期。
 
+普攻（含趁虚而入、野兽攻击）复用招式的 `attack`、`check`、`hit`、`hit_once` 流程，`args.move` 是 `type` 为 `basic` 的虚拟招式，`move.id` 依次为 `basic-attack`、`opportunity-attack`、`creature-attack`。规则中"出招"类效果不应被普攻触发、但应被趁虚而入触发；是否同时排除治疗/Buff 卡按具体规则判断，标准写法：
+
+```javascript
+// 是否排除治疗/Buff 卡按规则选用（hit/attack 上下文以动作类型区分）
+if (['heal', 'buff'].includes(args.actionType)) return;
+// 出招类效果：排除普攻（趁虚而入不算普攻）
+if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;
+```
+
 | 需求 | 优先使用 |
 |---|---|
 | 持续增加属性、伤害修正或状态标记 | `passive` |

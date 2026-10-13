@@ -184,7 +184,7 @@ export class ChatCardManager {
         if (flags.actionType === "basic-attack") {
             // 构造虚拟 Item 对象
             // 满足后续 _applyDamage 对 item.name, item.img, item.actor 的调用需求
-            const moveId = flags.moveId || "basic";
+            const moveId = flags.moveId || "basic-attack";
             item = {
                 id: "basic",
                 name: "普通攻击",
@@ -451,7 +451,7 @@ export class ChatCardManager {
             hasNewTargets = true;
             // B. 现场计算优劣势 (跑 CHECK 脚本)
             // const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
-            const move = item.system.moves.find(m => m.id === flags.moveId);
+            const move = item.system.moves.find(m => m.id === (flags.moveId || "basic-attack"));
             const checkContext = {
                 target: targetActor,
                 attacker: attacker,    // 攻击者 (脚本中既可以用 args.actor 也可以用 args.attacker)
@@ -484,7 +484,7 @@ export class ChatCardManager {
 
             // 强制修正趁虚而入
             // 这样即使是重算（没有缓存），也能保证无视架招生效
-            if (flags.moveId === "opportunity") {
+            if (flags.moveId === "opportunity-attack") {
                 finalIgnoreBlock = true;
                 finalIgnoreStance = true;
             }
@@ -1298,7 +1298,7 @@ export class ChatCardManager {
         if (!hitResults) return;
         // 2. 虚招“漏网之鱼”检查
         // 检查是否有：目标开了架招 && 是虚招攻击 && 还没有对抗结果 && 被命中
-        const move = item.system.moves.find(m => m.id === flags.moveId);
+        const move = item.system.moves.find(m => m.id === (flags.moveId || "basic-attack"));
         const moveElement = move ? (move.element || "none") : "none";
         const feintResults = flags.feintResults || {};
         const isFeintMove = move?.type === "feint";
@@ -1549,7 +1549,7 @@ export class ChatCardManager {
             // 判定伤害来源 (source)
             let damageSource = "move";
             if (flags.actionType === "basic-attack") {
-                damageSource = flags.moveId === "opportunity" ? "both" : "basic";
+                damageSource = flags.moveId === "opportunity-attack" ? "both" : "basic";
             }
             // C. 调用 Actor 伤害处理
             const damageResult = skipDefaultDamage ? {
@@ -2017,7 +2017,7 @@ export class ChatCardManager {
         // 4. 循环应用
         const summary = [];
         let hitCount = 0;
-        const move = item.system.moves.find(m => m.id === flags.moveId);
+        const move = item.system.moves.find(m => m.id === (flags.moveId || "basic-attack"));
         const moveElement = move ? (move.element || "none") : "none";
 
         for (const target of targets) {
@@ -2126,7 +2126,7 @@ export class ChatCardManager {
             let damageSource = "move";
             if (flags.actionType === "basic-attack") {
                 // 如果是趁虚而入，既算普攻也算招式
-                damageSource = flags.moveId === "opportunity" ? "both" : "basic";
+                damageSource = flags.moveId === "opportunity-attack" ? "both" : "basic";
             }
 
             // 调用 Actor 伤害接口
@@ -3105,7 +3105,7 @@ export class ChatCardManager {
         // 1. 准备数据
         // 从 flags 中读取“面板数值”。对于 Buff 招式，这里可能是 0。
         const baseAmount = flags.damage || 0;
-        const move = item.system.moves.find(m => m.id === flags.moveId);
+        const move = item.system.moves.find(m => m.id === (flags.moveId || "basic-attack"));
 
         // 检查动作类型
         const isBuffType = flags.actionType === "buff";

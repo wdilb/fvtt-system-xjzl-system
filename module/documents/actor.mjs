@@ -3391,6 +3391,8 @@ export class XJZLActor extends Actor {
       move: virtualMove,
       item: virtualItem, // 注入虚拟物品
       attacker: this,    // 明确 attacker
+      // 与招式管线对齐：普攻恒为攻击动作；此前缺失该字段会让依赖 args.actionType 的脚本对普攻读到 undefined
+      actionType: "attack",
       costConsumed: costConsumed,
       flags: {
         level: attackStartStatuses.attackLevel || 0,
