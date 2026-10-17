@@ -175,6 +175,15 @@ export class ChatCardManager {
 
         if (!attacker) return ui.notifications.warn("无法找到发起攻击的角色。");
 
+        // 0. 特殊处理4：濒死/死亡卡按钮 (前置拦截)
+        // 投掷者是 Speaker 对应角色，不需要源物品与目标；若落入通用目标解析，
+        // 点击时未选中任何 Token 会被兜底校验拦截，导致投掷被静默中止。
+        if (action === "rollDeathSave" || action === "rollDisability") {
+            if (action === "rollDeathSave") await ChatCardManager._rollDeathSave(attacker);
+            else await rollDisabilityTable(attacker);
+            return;
+        }
+
         // 注意：如果是 _onDefendFeint，这里的 actor 是防御者
 
         // 2. 获取源物品
@@ -296,14 +305,6 @@ export class ChatCardManager {
                 // 这是攻击者点的
                 if (!item) return ui.notifications.warn("源物品数据已丢失。");
                 await ChatCardManager._rollFeintContest(attacker, item, flags, targets, message, isShiftPressed);
-                break;
-            case "rollDisability":
-                // 调用 utils 中的投掷逻辑
-                await rollDisabilityTable(attacker);
-                break;
-
-            case "rollDeathSave":
-                await ChatCardManager._rollDeathSave(attacker);
                 break;
         }
     }
