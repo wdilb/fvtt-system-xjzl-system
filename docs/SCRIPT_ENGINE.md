@@ -775,7 +775,7 @@ const change = status.system.changes[0]; // 命中返回可安全修改的深拷
 - 优劣势：`attackLevel`、`grantAttackLevel`、`feintLevel`、`defendFeintLevel`、`globalCheckLevel`、`<属性或技能>CheckLevel`。
 - 资源封锁：`noRecoverRage`、`noRecoverNeili`、`noRecoverHP`、`noRageOnHit`。
 - 行为限制：`blockShiZhao`、`blockXuZhao`、`blockQiZhao`、`blockCounter`、`blockUltimate`、`blockStance`、`forceUnarmed`、`silence`、`stun`。
-- 穿透与防御：`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`passiveBlock`、`brokenDefense`、`ignoreArmorEffects`。
+- 穿透与防御：`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`passiveBlock`、`brokenDefense`、`ignoreArmorEffects`、`dyingTargetMpAbsorbOneToOne`。
 - 自动资源变化：`regenHp/Mp/Rage` 加 `TurnStart`、`TurnEnd` 或 `Attack` 后缀。
 
 AE 变更写在 `system.changes` 中：数值计数器通常使用 `type: "add"`，布尔覆盖通常使用 `type: "override"`。新增键必须先进入 `CONFIG.XJZL.statusFlags`，不能只在数据中自创系统状态键。

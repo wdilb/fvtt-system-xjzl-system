@@ -596,6 +596,7 @@ XJZL.statusFlags = {
   ignoreBlock: "XJZL.Status.IgnoreBlock",       // 攻击无视格挡
   ignoreDefense: "XJZL.Status.IgnoreDefense",   // 攻击无视防御
   ignoreStance: "XJZL.Status.IgnoreStance",     // 攻击无视/不触发架招特效
+  dyingTargetMpAbsorbOneToOne: "XJZL.Status.DyingTargetMpAbsorbOneToOne", // 对原已濒死目标的内力抵伤比例按 1:1（魍魉心诀）
 
   // --- G. 自动化回复/消耗 (Regen/Deplete) ---
   // 命名规则: regen + Resource + Timing

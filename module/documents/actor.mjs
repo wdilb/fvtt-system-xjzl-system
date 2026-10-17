@@ -2189,6 +2189,14 @@ export class XJZLActor extends Actor {
       source = "extra"    // 伤害来源标识 (move, basic, both, dot, extra)，默认是extra也就是额外伤害，用来处理哪些伤害应该触发濒死、易伤等问题
     } = data;
 
+    // 魍魉心诀类能力：攻击者携带 dyingTargetMpAbsorbOneToOne 标记（由内功 passive 声明，随派生数据每轮重建），
+    // 且目标在本笔结算开始前已处于濒死时，第一轮常规伤害的内力抵伤比例按 1:1。
+    // 两项都在实际伤害入口读取：本笔伤害才使目标进入濒死的不享受，后续独立伤害重新判断；
+    // 脚本追加伤害、延期请求卡后果只要正确传入 attacker，即经过同一判断。
+    const hasDyingMpAbsorbOneToOne = attacker?.xjzlStatuses?.dyingTargetMpAbsorbOneToOne === true;
+    // 按有效状态集合判断（appliedEffects 已剔除禁用/抑制），避免把已禁用的濒死效果当作生效状态
+    const targetWasDying = (this.appliedEffects ?? this.effects).some(e => e.statuses.has("dying"));
+
     // 构建可配置对象 (Mutable Config)
     // 这里的属性允许被 PRE_DEFENSE 脚本修改
     const config = {
@@ -2440,8 +2448,8 @@ export class XJZLActor extends Actor {
       return res;
     }
 
-    // 第一轮：常规伤害 (内/外功 5:1抵扣，其他 1:1)
-    const standardRatio = (type === "waigong" || type === "neigong") ? 5 : 1;
+    // 第一轮：常规伤害 (内/外功 5:1抵扣，其他 1:1)；攻击者具备能力且目标原已濒死时按 1:1
+    const standardRatio = (hasDyingMpAbsorbOneToOne && targetWasDying) ? 1 : ((type === "waigong" || type === "neigong") ? 5 : 1);
     const stdRes = applyDeduction(finalDamage, standardRatio);
     stdHutiLost = stdRes.h; stdHpLost = stdRes.p; stdMpLost = stdRes.m;
 
