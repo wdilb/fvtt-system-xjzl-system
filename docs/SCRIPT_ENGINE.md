@@ -329,6 +329,8 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `config.ignoreMinDamage` | `boolean` | **可写** | 是否忽略最低 1 点伤害保底。 |
 | `isManual` | `boolean` | 条件提供 | 手动伤害结算时为 `true`。 |
 
+`targets` 数组中直接存放的目标 Actor 与 `args.target` 一样受权限代理覆盖：非 owner 目标经数组元素调用 `update()` 等方法同样进入 GM 委托，同一文档（含同时出现在 `target` 与 `targets` 中的情况）复用同一个代理。代理只替换数组直接元素并在触发结束后还原；`hit_once.targets[].target` 等更深层嵌套数据不会自动代理，不要依赖任意嵌套位置拿到的文档具备 GM 委托。
+
 #### 攻击侧数值修正
 
 `allowDamageModifiers` 默认 `true`，声明只接纳本招式自身 `preAttack` 脚本的选择。外部来源的改写在该段脚本结束后还原；阶段结束后固定此布尔值，`attack`、`preDamage` 中只读，脚本改写不能解除限制或影响卡片保存值。有无系数、面板是否为零不会自动改变它，也不会改变 `calc` 的规则。

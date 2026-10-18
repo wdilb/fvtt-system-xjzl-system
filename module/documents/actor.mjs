@@ -4732,6 +4732,13 @@ export class XJZLActor extends Actor {
 
     replaceDocuments(sandbox);
     replaceDocuments(sandbox.args);
+    // targets 是目标 Actor 数组而非文档属性，上面的替换不会进入数组元素；不补做一次，
+    // 脚本从 targets 中取出与 args.target 相同的角色再 update() 就会绕过代理而权限不足。
+    // 仅替换直接元素并原位写回（不复制、不重建数组），恢复函数负责还原元素；
+    // sandbox.targets 与 args.targets 在 _createScriptSandbox 中共用同一数组，处理一次即覆盖两处。
+    if (Array.isArray(sandbox.args?.targets)) {
+      replaceDocuments(sandbox.args.targets);
+    }
 
     return () => {
       for (const restore of restorations.reverse()) restore();
