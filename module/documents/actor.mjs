@@ -48,6 +48,26 @@ const RESOURCE_TRANSACTION_OPTIONS = new Set([
   "xjzlResourceDelta"
 ]);
 
+// 架招作为“背景状态”时允许响应的触发器白名单：只有这些时机才收集架招脚本。
+// 严禁包含 'attack', 'hit', 'calc' 等进攻性时机，防止架招逻辑污染主动攻击。
+const STANCE_BACKGROUND_TRIGGERS = Object.freeze([
+  SCRIPT_TRIGGERS.PASSIVE,
+  SCRIPT_TRIGGERS.AVOIDED,     // 我闪避时
+  SCRIPT_TRIGGERS.PRE_DEFENSE, // 防御计算前
+  SCRIPT_TRIGGERS.PRE_TAKE,    // 扣血前 (护盾)
+  SCRIPT_TRIGGERS.DAMAGED,     // 受伤后 (反伤)
+  SCRIPT_TRIGGERS.DYING,
+  SCRIPT_TRIGGERS.DEATH,
+  SCRIPT_TRIGGERS.RESOURCE_CHANGED
+]);
+
+// 战斗开始、回合开始、回合结束：全部武学招式都可以触发的时机。
+const GLOBAL_WUXUE_TRIGGERS = Object.freeze([
+  SCRIPT_TRIGGERS.COMBAT_START,
+  SCRIPT_TRIGGERS.TURN_START,
+  SCRIPT_TRIGGERS.TURN_END
+]);
+
 /**
  * 将资源触发上下文压缩为可通过 socket 传输的形式。
  * 文档对象由 GM 端按 UUID 恢复，招式数据保持为普通对象。
@@ -427,6 +447,8 @@ export class XJZLActor extends Actor {
   /**
    * 判断资源更新中是否包含显式增量描述。
    * 普通数字仍表示绝对值；只有 { delta: number } 才表示在锁内基于当前值增减。
+   * 增量契约：显式增量必须以完整资源路径作为 updates 的顶层键，
+   * 例如 { "system.resources.rage.value": { delta: 1 } }；不解析更深层的嵌套对象。
    */
   _hasResourceDeltaUpdates(updates = {}) {
     return Object.values(updates).some(value => value
@@ -437,6 +459,8 @@ export class XJZLActor extends Actor {
 
   /**
    * 将显式资源增量解析为锁内读取到的绝对值。
+   * 增量契约：updates 的顶层键必须是完整资源路径（如 "system.resources.rage.value"），
+   * 值为 { delta: number }；只解析这一层顶层键，普通绝对值更新对嵌套对象的支持不受影响。
    * @param {Object} updates - 支持资源路径到 { delta: number } 的更新对象。
    * @returns {Object} 可直接交给 Actor.update 的绝对值更新对象。
    */
@@ -1298,19 +1322,7 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 架招开启后，应当视为常驻被动效果，直到关闭
     const martial = this.system.martial;
-    // 定义架招作为“背景状态”时允许响应的触发器白名单
-    // 只有在这些时机下，后台架招的脚本才会被收集
-    // 严禁包含 'attack', 'hit', 'calc' 等进攻性时机，防止架招逻辑污染主动攻击
-    const STANCE_BACKGROUND_TRIGGERS = [
-      SCRIPT_TRIGGERS.PASSIVE,
-      SCRIPT_TRIGGERS.AVOIDED,     // 我闪避时
-      SCRIPT_TRIGGERS.PRE_DEFENSE, // 防御计算前
-      SCRIPT_TRIGGERS.PRE_TAKE,    // 扣血前 (护盾)
-      SCRIPT_TRIGGERS.DAMAGED,     // 受伤后 (反伤)
-      SCRIPT_TRIGGERS.DYING,
-      SCRIPT_TRIGGERS.DEATH,
-      SCRIPT_TRIGGERS.RESOURCE_CHANGED
-    ];
+    // 架招背景触发器白名单见模块作用域的 STANCE_BACKGROUND_TRIGGERS
     // 检查：架招激活 + 有记录的 Move ID + 有记录的 Item ID
     if (martial?.stanceActive && martial?.stance && martial?.stanceItemId) {
       // 如果当前触发器不在白名单内，直接跳过架招脚本收集
@@ -1401,6 +1413,8 @@ export class XJZLActor extends Actor {
       const effectScripts = effect.scripts; // 获取数组
 
       effectScripts.forEach(s => {
+        // AE 脚本存储在 flags 中，不经过其他来源相同的 Schema 默认值处理，
+        // 因此缺少 active 时按启用兼容，只有明确为 false 才禁用。
         if (s.trigger === trigger && s.active !== false) {
           scripts.push({
             script: s.script,
@@ -1414,13 +1428,6 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 7. 战斗开始、回合开始、回合结束，全部武学都可以触发
     // =====================================================
-    // 使用 appliedEffects 自动获得过滤后的列表 (已剔除禁用/未装备/过期)
-    // 如果没有 appliedEffects (旧版本)，使用 this.effects.filter(...)
-    const GLOBAL_WUXUE_TRIGGERS = [
-      SCRIPT_TRIGGERS.COMBAT_START,
-      SCRIPT_TRIGGERS.TURN_START,
-      SCRIPT_TRIGGERS.TURN_END
-    ];
     if (GLOBAL_WUXUE_TRIGGERS.includes(trigger)) {
       // 获取这名角色身上所有的武学物品
       const wuxueItems = this.itemTypes.wuxue;
