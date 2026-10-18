@@ -1476,19 +1476,7 @@ export class XJZLActor extends Actor {
       : null;
 
     // 2. 准备基础沙盒变量
-    const sandbox = {
-      ...context,           // 展开传入的上下文
-      args: context,        // 将上下文打包为 args 对象，方便传递给辅助函数
-      actor: this,          // 始终提供 actor
-      system: this.system,  // 始终提供 system
-      S: this.system,       // 简写别名
-      console: console,     // 允许打印日志
-      game: game,           // 允许访问 game
-      ui: ui,               // 允许访问 ui
-      trigger: trigger,      // 告诉脚本当前是什么时机
-      // 注入宏工具
-      Macros: XJZLMacros  // 脚本里可以用 Macros.requestSave(...)
-    };
+    const sandbox = this._createScriptSandbox(trigger, context);
 
     // 为无权限对象注入本次运行专用的 Document Proxy；runScripts 结束后恢复上下文中的原文档引用。
     const restoreSandboxDocuments = this._proxifySandbox(sandbox);
@@ -1506,6 +1494,29 @@ export class XJZLActor extends Actor {
     } finally {
       restoreSandboxDocuments?.();
     }
+  }
+
+  /**
+   * [内部] 构建脚本基础沙盒。仅负责注入公共变量，供 runScripts 与动态固定值等
+   * 局部同步执行路径复用；不包含脚本收集、权限代理和执行逻辑。
+   * @param {String} trigger - 触发时机
+   * @param {Object} context - 传给脚本的上下文变量；args 及其嵌套对象（如 output）保持原引用
+   * @returns {Object} 基础沙盒；属性顺序即脚本函数参数顺序，新增公共变量只需改这里
+   */
+  _createScriptSandbox(trigger, context = {}) {
+    return {
+      ...context,           // 展开传入的上下文
+      args: context,        // 将上下文打包为 args 对象，方便传递给辅助函数
+      actor: this,          // 始终提供 actor
+      system: this.system,  // 始终提供 system
+      S: this.system,       // 简写别名
+      console: console,     // 允许打印日志
+      game: game,           // 允许访问 game
+      ui: ui,               // 允许访问 ui
+      trigger: trigger,      // 告诉脚本当前是什么时机
+      // 注入宏工具
+      Macros: XJZLMacros  // 脚本里可以用 Macros.requestSave(...)
+    };
   }
 
   /**

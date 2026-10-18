@@ -1376,11 +1376,8 @@ export class XJZLItem extends Item {
               output: calcOutput
             };
 
-            // 构建局部沙盒，直接调用内部同步执行器
-            const sandbox = {
-              ...context, args: context, actor: actor, system: actor.system, S: actor.system,
-              console: console, game: game, ui: ui, trigger: SCRIPT_TRIGGERS.CALC, Macros: XJZLMacros
-            };
+            // 复用 Actor 的基础沙盒构建，直接调用内部同步执行器
+            const sandbox = actor._createScriptSandbox(SCRIPT_TRIGGERS.CALC, context);
 
             actor._runScriptsSync(localScripts, sandbox);
           }
