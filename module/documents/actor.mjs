@@ -598,7 +598,7 @@ export class XJZLActor extends Actor {
         changes,
         error: err
       });
-      ui.notifications.error(`资源变动脚本派发失败：${this.name}`);
+      ui.notifications.error(game.i18n.format("XJZL.Script.Notifications.ResourceDispatchFailed", { name: this.name }));
     } finally {
       this._resourceEventContext = previousContext;
     }
@@ -1704,7 +1704,7 @@ export class XJZLActor extends Actor {
         await fn(...paramValues);
       } catch (err) {
         console.error(`[XJZL] 异步脚本错误 [${entry.label}]:`, err);
-        ui.notifications.error(`特效脚本执行失败: ${entry.label}`);
+        ui.notifications.error(game.i18n.format("XJZL.Script.Notifications.EffectExecutionFailed", { label: entry.label }));
       } finally {
         restoreExternalDamageInput(sandbox, externalDamageInput);
         restoreMove?.();

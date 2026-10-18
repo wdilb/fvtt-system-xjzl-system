@@ -96,7 +96,8 @@ export function notifySyncScriptViolation(err) {
   const now = Date.now();
   if (now - (notifiedKeys.get(key) || 0) < NOTIFY_THROTTLE_MS) return;
   notifiedKeys.set(key, now);
-  globalThis.ui.notifications.error(
-    `特效脚本被阻止：${context.label ?? "未知脚本"}（${context.trigger ?? "同步"} 阶段不能写入或消耗资源，详见控制台）`
-  );
+  globalThis.ui.notifications.error(game.i18n.format("XJZL.Script.Notifications.SyncWriteBlocked", {
+    label: context.label ?? "未知脚本",
+    trigger: context.trigger ?? "同步"
+  }));
 }

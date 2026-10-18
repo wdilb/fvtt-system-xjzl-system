@@ -83,8 +83,8 @@ export class XJZLMacros {
      * 缺失、非 number 类型或负数视为录入错误，拒绝本笔结算并报告（不做字符串、布尔等值的数值折算）。
      */
     static async requestSave({ target, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText, removeStanceOnSuccess = false, removeStanceOnFail = false, item, move, source, isBroken, isSkill, targetKanpo }) {
-        if (!target) return ui.notifications.error("requestSave: 缺少目标 (target)");
-        if (!type) return ui.notifications.error("requestSave: 缺少属性类型 (type)");
+        if (!target) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestSaveNoTarget"));
+        if (!type) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestSaveNoType"));
 
         // 1. 准备显示数据
         // 兼容 stats 和 skills 的 Label 查找
@@ -193,8 +193,8 @@ export class XJZLMacros {
      * applyHealing 缺省行为结算，也没有单笔来源覆盖参数。
      */
     static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome, attBonus = 0, defBonus = 0, item, move, source, isBroken, isSkill, targetKanpo }) {
-        if (!attacker || !defender) return ui.notifications.error("对抗请求缺少参与双方。");
-        if (!type) return ui.notifications.error("对抗请求缺少属性类型。");
+        if (!attacker || !defender) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestContestNoActors"));
+        if (!type) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestContestNoType"));
 
         const defenderType = defType || type; // 默认同属性对抗
 
