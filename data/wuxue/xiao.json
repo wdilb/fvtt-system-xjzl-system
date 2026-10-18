@@ -4323,7 +4323,13 @@
                                 "label": "爆发增伤",
                                 "trigger": "calc",
                                 "active": true,
-                                "script": "const bonus = Number(thisEffect.getFlag(\"xjzl-system\", \"bahuang_bonus\")) || 0;\nif (bonus > 0 && (args.move.type !== \"basic\" || args.move.id === 'opportunity-attack') && args.move.type !== \"qi\" && args.move.type !== \"stance\") {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`八荒之气加成: +${bonus}`);\n    thisEffect.delete();\n}"
+                                "script": "// 面板计算可重复执行（打开角色卡/预览都会跑 calc），这里只读取并展示加成；\n// 一次性消耗在 attack 阶段的「消耗八荒之气」脚本完成，避免预览误删。\n// 加成值由「八荒凝聚」按实际消耗内力写入本 AE 的 system.changes。\nconst bahuangChange = (thisEffect?.system?.changes || []).find(c => c.key === \"flags.xjzl-system.bahuang_bonus\");\nconst bonus = Number(bahuangChange?.value) || 0;\nif (bonus > 0 && (args.move.type !== \"basic\" || args.move.id === 'opportunity-attack') && args.move.type !== \"qi\" && args.move.type !== \"stance\") {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`八荒之气加成: +${bonus}`);\n}"
+                            },
+                            {
+                                "label": "消耗八荒之气",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "// 消耗在 attack 阶段（资源已扣、伤害面板已按 calc 结果生成），一次性删除并 await。\n// 消耗条件与 calculateMoveDamage 的外部 calc 分支一致：只有带系数（scalings）的招式\n// 面板才执行 AE 等外部 calc，八荒之气也只在这些面板生效；\n// isFixed 仅在无系数时改由本招自身 calc 出值，不是独立排除条件，否则会出现加伤不消耗。\n// 趁虚而入走普攻面板（_calculateBasicAttackDamage 无条件执行外部 calc），正常消耗。\nif (args.flags.abort) return;\n// calc 读取原始招式；弹窗只覆写出招副本，消耗判定需与面板保持一致。\nconst panelMove = args.item?.system?.moves?.find(m => m.id === move.id) ?? move;\nconst isOpportunity = panelMove.type === 'basic' && panelMove.id === 'opportunity-attack';\nif (!isOpportunity) {\n    if (panelMove.type === \"basic\" || panelMove.type === \"qi\" || panelMove.type === \"stance\") return;\n    if (!(panelMove.calculation?.scalings?.length > 0)) return;\n}\nconst bahuangChange = (thisEffect?.system?.changes || []).find(c => c.key === \"flags.xjzl-system.bahuang_bonus\");\nif (!(Number(bahuangChange?.value) > 0)) return;\nawait game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 1);"
                             }
                         ]
                     }
