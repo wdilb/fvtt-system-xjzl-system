@@ -2,6 +2,7 @@ import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./managers/encounter-manager.mjs";
 import { XJZLContainerTransactionManager } from "./managers/container-transaction-manager.mjs";
 import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
+import { assertNoSyncScriptWrite } from "./utils/sync-script-guard.mjs";
 import { AuraLedger } from "./region/xjzl-aura-ledger.mjs";
 import { renderHitEffect } from "./managers/combat-fx-manager.mjs";
 import { renderUltimateEffect } from "./managers/ultimate-fx-manager.mjs";
@@ -13,6 +14,14 @@ const documentUpdateQueues = new Map();
 
 export function setupSocket() {
     xjzlSocket = socketlib.registerSystem("xjzl-system");
+
+    // 同步脚本写入防护：GM 委托是无权限文档写入（含脚本沙盒代理）的总入口，
+    // 在委托真正发出之前同步阻断 passive/calc 期间的调用。
+    const rawExecuteAsGM = xjzlSocket.executeAsGM.bind(xjzlSocket);
+    xjzlSocket.executeAsGM = (...args) => {
+        assertNoSyncScriptWrite(`socket.executeAsGM(${String(args[0])})`);
+        return rawExecuteAsGM(...args);
+    };
 
     // 注册所有需要 GM 权限的方法
     xjzlSocket.register("applyDamage", _socketApplyDamage);

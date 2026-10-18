@@ -9,6 +9,11 @@ import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { DEFAULT_CONTAINER_IMAGES } from "../data/actor/container.mjs";
+import {
+  enterSyncScriptContext,
+  assertNoSyncScriptWrite,
+  notifySyncScriptViolation
+} from "../utils/sync-script-guard.mjs";
 
 // 尝试突破经脉花费固定为500
 const JINGMAI_ATTEMPT_COST = 500;
@@ -188,11 +193,18 @@ export class XJZLActor extends Actor {
 
   /**
    * 统一资源事务入口：提交成功后按实际差值触发 resourceChanged。
+   * 入口保持同步：passive/calc 同步脚本调用时在任何 await 之前抛错阻断。
    * @param {Object} updates - Actor.update 使用的绝对值对象；资源路径也支持显式 { delta: number }
    * @param {Object} context - cause、item、move、sourceActor 等触发上下文
    * @returns {Promise<Document|null|undefined>} 原始 Actor 更新结果或 socket 空结果
    */
-  async changeResources(updates = {}, context = null) {
+  changeResources(updates = {}, context = null) {
+    assertNoSyncScriptWrite("Actor.changeResources", { document: this.name });
+    return this._changeResources(updates, context);
+  }
+
+  /** changeResources 的异步实现体；除同步防护入口外与原行为一致。 */
+  async _changeResources(updates = {}, context = null) {
     context = inheritScriptResourceContext(this, inheritResourceChain(context, this._resourceEventContext));
     if (!this.isOwner) {
       const socketResult = await xjzlSocket.executeAsGM(
@@ -217,8 +229,16 @@ export class XJZLActor extends Actor {
   /**
    * 统一包装 Actor 更新，使未迁移的直接 update 也能获得资源变动兜底。
    * 无资源字段或当前没有脚本时直接走父类更新，不创建快照、不构建沙盒。
+   * 入口保持同步：passive/calc 同步脚本调用时在进入任何 await 之前抛错阻断，
+   * 避免产生被丢弃的 rejected Promise。
    */
-  async update(changes = {}, operation = {}) {
+  update(changes = {}, operation = {}) {
+    assertNoSyncScriptWrite("Actor.update", { document: this.name });
+    return this._updateWithResourceFallback(changes, operation);
+  }
+
+  /** update 的异步实现体；除同步防护入口外与原 update 行为一致。 */
+  async _updateWithResourceFallback(changes = {}, operation = {}) {
     const context = inheritScriptResourceContext(
       this,
       inheritResourceChain(operation?.xjzlResourceContext, this._resourceEventContext)
@@ -242,6 +262,42 @@ export class XJZLActor extends Actor {
       await this._dispatchResourceChanges(transaction.changes, context);
     }
     return transaction.result;
+  }
+
+  /* ------------------------------------------------------------------
+   * 同步脚本写入防护入口：以下覆写只在 passive/calc 执行期间生效，
+   * 常规流程直接透传父类行为。入口必须同步（非 async），保证阻断时
+   * 抛出的是可被同步执行器捕获的异常，而不是被丢弃的 rejected Promise。
+   * ------------------------------------------------------------------ */
+
+  delete(options) {
+    assertNoSyncScriptWrite("Actor.delete", { document: this.name });
+    return super.delete(options);
+  }
+
+  createEmbeddedDocuments(embeddedName, data, context) {
+    assertNoSyncScriptWrite(`Actor.createEmbeddedDocuments(${embeddedName})`, { document: this.name });
+    return super.createEmbeddedDocuments(embeddedName, data, context);
+  }
+
+  deleteEmbeddedDocuments(embeddedName, ids, context) {
+    assertNoSyncScriptWrite(`Actor.deleteEmbeddedDocuments(${embeddedName})`, { document: this.name });
+    return super.deleteEmbeddedDocuments(embeddedName, ids, context);
+  }
+
+  updateEmbeddedDocuments(embeddedName, documents, context) {
+    assertNoSyncScriptWrite(`Actor.updateEmbeddedDocuments(${embeddedName})`, { document: this.name });
+    return super.updateEmbeddedDocuments(embeddedName, documents, context);
+  }
+
+  setFlag(scope, key, value) {
+    assertNoSyncScriptWrite(`Actor.setFlag(${scope}.${key})`, { document: this.name });
+    return super.setFlag(scope, key, value);
+  }
+
+  unsetFlag(scope, key) {
+    assertNoSyncScriptWrite(`Actor.unsetFlag(${scope}.${key})`, { document: this.name });
+    return super.unsetFlag(scope, key);
   }
 
   /**
@@ -1499,6 +1555,8 @@ export class XJZLActor extends Actor {
       let restoreMove = null;
       // 无资格脚本运行前快照攻击输入，脚本结束后立即还原；finally 中也要可访问，须在 try 外声明。
       let externalDamageInput = null;
+      // 同步写入防护的恢复函数：脚本执行期间（含嵌套派生/面板计算）保持生效，异常退出同样恢复。
+      let exitSyncGuard = null;
       try {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
@@ -1538,6 +1596,12 @@ export class XJZLActor extends Actor {
           actionMove: actionContext?.move || null,
           actionSource: actionContext?.source || null
         });
+        // 记录同步执行来源：本段脚本内的文档写入/资源消耗/GM 委托会被同步阻断
+        exitSyncGuard = enterSyncScriptContext({
+          actorName: this.name,
+          trigger: sandbox.trigger,
+          label: entry.label
+        });
         if (externalDamageInputLocked) externalDamageInput = captureExternalDamageInput(sandbox, actionMove, entry);
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
@@ -1547,11 +1611,12 @@ export class XJZLActor extends Actor {
         const fn = getCompiledScript(Function, paramNames, entry.script);
         fn(...paramValues);
       } catch (err) {
-        console.error(`[XJZL] 同步脚本错误 [${entry.label}]:`, err);
-        // 可选：开发模式下弹出提示
-        // ui.notifications.error(`脚本错误: ${entry.label}`);
+        console.error(`[XJZL] 同步脚本错误 [${sandbox.trigger}] [${entry.label}] (${this.name}):`, err);
+        // 写入防护的违规向操作者节流提示，避免每次渲染刷屏；普通脚本错误仍只写控制台
+        notifySyncScriptViolation(err);
       }
       finally {
+        exitSyncGuard?.();
         restoreExternalDamageInput(sandbox, externalDamageInput);
         restoreMove?.();
         // 出栈：无论成功失败，保证栈的清洁
@@ -2010,10 +2075,17 @@ export class XJZLActor extends Actor {
    * [核心] 伤害结算处理函数
    * 流程：AVOIDED -> PRE_DEFENSE -> (计算暴击/防御) -> PRE_TAKE -> (扣血) -> DAMAGED
    * 结算完成后广播受击视觉反馈；特效失败不改变结算结果。
+   * 入口保持同步：passive/calc 同步脚本调用时在任何 await 之前抛错阻断。
    * @param {Object} data - 伤害参数包
    * @returns {Object} 结算结果
    */
-  async applyDamage(data) {
+  applyDamage(data) {
+    assertNoSyncScriptWrite("Actor.applyDamage", { document: this.name });
+    return this._applyDamage(data);
+  }
+
+  /** applyDamage 的异步实现体；除同步防护入口外与原行为一致。 */
+  async _applyDamage(data) {
     // [权限拦截]
     if (!this.isOwner) {
       // 统一走资源上下文序列化：attacker/item 等 Document 转 UUID，GM 端按 UUID 还原，避免跨 Socket 丢失。
@@ -2782,7 +2854,13 @@ export class XJZLActor extends Actor {
      * @param {string} [data.source="extra"] - 资源来源标识
      * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
      */
-  async applyHealing(data) {
+  applyHealing(data) {
+    assertNoSyncScriptWrite("Actor.applyHealing", { document: this.name });
+    return this._applyHealing(data);
+  }
+
+  /** applyHealing 的异步实现体；除同步防护入口外与原行为一致。 */
+  async _applyHealing(data) {
     // 在权限路由前固化来源，否则目标交由 GM 处理后，调用者的脚本栈已经不可见。
     const hasExplicitHealer = Object.prototype.hasOwnProperty.call(data, "healer");
     const inputHealer = data.healer ?? null;
@@ -4565,40 +4643,62 @@ export class XJZLActor extends Actor {
     const getProxy = (doc) => {
       let proxy = proxies.get(doc);
       if (!proxy) {
+        // 权限委托方法的异步实现体；对外暴露的必须是同步入口：先做写入防护检查再调用，
+        // 否则同步脚本中的违规会在 async 包装内变成 rejected Promise，脚本无法被同步中断。
+        const delegated = {
+          update: async (data, context) => {
+            const operation = { ...(context || {}) };
+            operation.xjzlResourceContext = serializeResourceContext(inheritScriptResourceContext(
+              host,
+              inheritResourceChain(operation.xjzlResourceContext, host._resourceEventContext)
+            ));
+            return unwrapResourceSocketResult(await xjzlSocket.executeAsGM("updateDocument", doc.uuid, data, operation));
+          },
+          changeResources: async (data, context) => {
+            const resourceContext = inheritScriptResourceContext(
+              host,
+              inheritResourceChain(context, host._resourceEventContext)
+            );
+            return unwrapResourceSocketResult(await xjzlSocket.executeAsGM(
+              "changeResources",
+              doc.uuid,
+              data,
+              serializeResourceContext(resourceContext)
+            ));
+          },
+          createEmbeddedDocuments: async (type, data, context) => xjzlSocket.executeAsGM("createEmbedded", doc.uuid, type, data, context),
+          deleteEmbeddedDocuments: async (type, ids, context) => xjzlSocket.executeAsGM("deleteEmbedded", doc.uuid, type, ids, context)
+        };
         proxy = new Proxy(doc, {
           get(target, prop) {
-            // 权限委托方法：走 GM socket，并携带当前脚本宿主与资源链。
+            // 权限委托方法：同步入口先阻断同步脚本违规，再走 GM socket 并携带当前脚本宿主与资源链。
             if (prop === "update") {
-              return async (data, context) => {
-                const operation = { ...(context || {}) };
-                operation.xjzlResourceContext = serializeResourceContext(inheritScriptResourceContext(
-                  host,
-                  inheritResourceChain(operation.xjzlResourceContext, host._resourceEventContext)
-                ));
-                return unwrapResourceSocketResult(await xjzlSocket.executeAsGM("updateDocument", target.uuid, data, operation));
+              return (data, context) => {
+                assertNoSyncScriptWrite("Actor.update（权限代理）", { document: target.name });
+                return delegated.update(data, context);
               };
             }
             if (prop === "changeResources" && typeof target.changeResources === "function") {
-              return async (data, context) => {
-                const resourceContext = inheritScriptResourceContext(
-                  host,
-                  inheritResourceChain(context, host._resourceEventContext)
-                );
-                return unwrapResourceSocketResult(await xjzlSocket.executeAsGM(
-                  "changeResources",
-                  target.uuid,
-                  data,
-                  serializeResourceContext(resourceContext)
-                ));
+              return (data, context) => {
+                assertNoSyncScriptWrite("Actor.changeResources（权限代理）", { document: target.name });
+                return delegated.changeResources(data, context);
               };
             }
             if (prop === "createEmbeddedDocuments") {
-              return async (type, data, context) => xjzlSocket.executeAsGM("createEmbedded", target.uuid, type, data, context);
+              return (type, data, context) => {
+                assertNoSyncScriptWrite(`Actor.createEmbeddedDocuments(${type})（权限代理）`, { document: target.name });
+                return delegated.createEmbeddedDocuments(type, data, context);
+              };
             }
             if (prop === "deleteEmbeddedDocuments") {
-              return async (type, ids, context) => xjzlSocket.executeAsGM("deleteEmbedded", target.uuid, type, ids, context);
+              return (type, ids, context) => {
+                assertNoSyncScriptWrite(`Actor.deleteEmbeddedDocuments(${type})（权限代理）`, { document: target.name });
+                return delegated.deleteEmbeddedDocuments(type, ids, context);
+              };
             }
             // 其他属性和方法转发到原文档，方法绑定到 target，避免 Proxy this 破坏私有字段。
+            // updateEmbeddedDocuments 无对应委托通道，经 fall-through 调用真实方法，
+            // 其类级防护覆写同样会在同步脚本中同步抛错。
             const value = Reflect.get(target, prop, target);
             return typeof value === "function" ? value.bind(target) : value;
           }

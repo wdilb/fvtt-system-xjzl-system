@@ -100,7 +100,21 @@
 | 同步 | `passive`、`calc` | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
 | 异步 | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
 
-同步脚本异常会写入控制台；异步脚本异常还会向操作者显示错误通知。单个脚本失败不会回滚此前脚本或数据库操作。
+所有脚本异常都会写入控制台；异步脚本异常和同步写入违规还会通知操作者。单个脚本失败不会回滚此前脚本或数据库操作。
+
+### 同步脚本写入防护
+
+系统会阻止 `passive`/`calc` 直接调用以下常用写入入口，包括对其他角色、物品或 AE 的操作：
+
+- 文档操作：`Actor`、`Item`、`ActiveEffect` 的 `update` / `delete` / `setFlag` / `unsetFlag`；`Actor` 与 `Item` 的 `createEmbeddedDocuments` / `updateEmbeddedDocuments` / `deleteEmbeddedDocuments`。
+- 资源与效果：`Actor.changeResources` / `applyDamage` / `applyHealing`、`Item.use()`、`game.xjzl.api.effects.addEffect` / `removeEffect`。
+- GM 委托：`game.xjzl.socket.executeAsGM`。
+
+被阻止的操作会抛错，未捕获时中止当前脚本。错误会定位角色、触发器和脚本来源；同一来源的界面通知会节流。一次性消耗或状态增删应放在 `attack`、`hit` 等异步触发器中并 `await`。
+
+修改 `S`/`system` 的可重算派生字段、`args.output`、`actor.xjzlStatuses` 或调用 `actor.registerEffectImmunities(...)` 等内存计算不受影响。
+
+防护只覆盖上述入口，不是安全沙盒。静态批量写入（`createDocuments` / `updateDocuments` / `deleteDocuments`）、`ChatMessage.create`、宏请求卡、光环写入和异步回调等仍可能产生副作用，同样禁止在同步脚本中使用。
 
 ### 脚本来源与生效范围
 

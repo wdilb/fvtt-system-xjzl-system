@@ -8,6 +8,7 @@ import { xjzlSocket } from "../socket.mjs";
 import { queueUltimateEffect } from "../managers/ultimate-fx-manager.mjs";
 import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { XJZLActiveEffect } from "./active-effect.mjs";
+import { assertNoSyncScriptWrite } from "../utils/sync-script-guard.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 
@@ -15,6 +16,47 @@ export class XJZLItem extends Item {
   /* -------------------------------------------- */
   /*  核心交互逻辑                                */
   /* -------------------------------------------- */
+
+  /* ------------------------------------------------------------------
+   * 同步脚本写入防护入口：以下覆写只在 passive/calc 执行期间生效，
+   * 常规流程直接透传父类行为。入口必须同步（非 async），保证阻断时
+   * 抛出的是可被同步执行器捕获的异常，而不是被丢弃的 rejected Promise。
+   * ------------------------------------------------------------------ */
+
+  update(changes, context) {
+    assertNoSyncScriptWrite("Item.update", { document: this.name });
+    return super.update(changes, context);
+  }
+
+  delete(options) {
+    assertNoSyncScriptWrite("Item.delete", { document: this.name });
+    return super.delete(options);
+  }
+
+  setFlag(scope, key, value) {
+    assertNoSyncScriptWrite(`Item.setFlag(${scope}.${key})`, { document: this.name });
+    return super.setFlag(scope, key, value);
+  }
+
+  unsetFlag(scope, key) {
+    assertNoSyncScriptWrite(`Item.unsetFlag(${scope}.${key})`, { document: this.name });
+    return super.unsetFlag(scope, key);
+  }
+
+  updateEmbeddedDocuments(embeddedName, documents, context) {
+    assertNoSyncScriptWrite(`Item.updateEmbeddedDocuments(${embeddedName})`, { document: this.name });
+    return super.updateEmbeddedDocuments(embeddedName, documents, context);
+  }
+
+  createEmbeddedDocuments(embeddedName, data, context) {
+    assertNoSyncScriptWrite(`Item.createEmbeddedDocuments(${embeddedName})`, { document: this.name });
+    return super.createEmbeddedDocuments(embeddedName, data, context);
+  }
+
+  deleteEmbeddedDocuments(embeddedName, ids, context) {
+    assertNoSyncScriptWrite(`Item.deleteEmbeddedDocuments(${embeddedName})`, { document: this.name });
+    return super.deleteEmbeddedDocuments(embeddedName, ids, context);
+  }
 
   /**
    * @override
@@ -72,8 +114,16 @@ export class XJZLItem extends Item {
   /**
    * 统一的使用接口
    * 外部调用 item.use() 即可，无需关心具体类型
+   * 入口保持同步：passive/calc 同步脚本调用时在任何 await 之前抛错阻断，
+   * 防止面板计算触发消耗品扣减等资源消耗。
    */
-  async use(options = {}) {
+  use(options = {}) {
+    assertNoSyncScriptWrite("Item.use", { document: this.name });
+    return this._use(options);
+  }
+
+  /** use 的异步实现体；除同步防护入口外与原行为一致。 */
+  async _use(options = {}) {
     if (!this.actor) return ui.notifications.warn("该物品不在角色身上，无法使用。");
 
     // 1. 触发使用前钩子 (允许外部取消使用)

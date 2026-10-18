@@ -3,7 +3,34 @@
  * 核心职责：实现“基于装备状态的自动抑制”
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
+import { assertNoSyncScriptWrite } from "../utils/sync-script-guard.mjs";
 export class XJZLActiveEffect extends ActiveEffect {
+
+  /* ------------------------------------------------------------------
+   * 同步脚本写入防护入口：以下覆写只在 passive/calc 执行期间生效，
+   * 常规流程直接透传父类行为。入口必须同步（非 async），保证阻断时
+   * 抛出的是可被同步执行器捕获的异常，而不是被丢弃的 rejected Promise。
+   * ------------------------------------------------------------------ */
+
+  update(changes, context) {
+    assertNoSyncScriptWrite("ActiveEffect.update", { document: this.name });
+    return super.update(changes, context);
+  }
+
+  delete(options) {
+    assertNoSyncScriptWrite("ActiveEffect.delete", { document: this.name });
+    return super.delete(options);
+  }
+
+  setFlag(scope, key, value) {
+    assertNoSyncScriptWrite(`ActiveEffect.setFlag(${scope}.${key})`, { document: this.name });
+    return super.setFlag(scope, key, value);
+  }
+
+  unsetFlag(scope, key) {
+    assertNoSyncScriptWrite(`ActiveEffect.unsetFlag(${scope}.${key})`, { document: this.name });
+    return super.unsetFlag(scope, key);
+  }
 
   /**
    * ---------------------------------------------------------------

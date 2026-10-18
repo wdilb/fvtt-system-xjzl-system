@@ -1,6 +1,7 @@
 // module/managers/active-effect-manager.mjs
 import { XJZLActiveEffect } from "../documents/active-effect.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { assertNoSyncScriptWrite } from "../utils/sync-script-guard.mjs";
 export class ActiveEffectManager {
 
     /**
@@ -199,12 +200,20 @@ export class ActiveEffectManager {
 
     /**
      * 核心方法：向 Actor 添加或叠加特效
+     * 入口保持同步：passive/calc 同步脚本调用时在任何 await 之前抛错阻断，
+     * 防止面板计算反复施加/刷新效果。
      * @param {Actor} actor - 目标角色
      * @param {Object} effectDataOrId - 特效源数据 (普通 Object或者系统状态 ID)
      * @param {Number} [count=1] - 添加的层数，默认为 1
      * @returns {Promise<ActiveEffect|undefined>} 返回更新或创建的特效；免疫、豁免、特殊转化或未施加时均可能返回 undefined
      */
-    static async addEffect(actor, effectDataOrId, count = 1) {
+    static addEffect(actor, effectDataOrId, count = 1) {
+        assertNoSyncScriptWrite("effects.addEffect", { document: actor?.name ?? "未知角色" });
+        return this._addEffect(actor, effectDataOrId, count);
+    }
+
+    /** addEffect 的异步实现体；除同步防护入口外与原行为一致。 */
+    static async _addEffect(actor, effectDataOrId, count = 1) {
         if (!actor || !effectDataOrId) return;
 
         // [权限拦截]
@@ -603,11 +612,18 @@ export class ActiveEffectManager {
 
     /**
      * 核心方法：移除或减少层数
-     * @param {Actor} actor 
+     * 入口保持同步：passive/calc 同步脚本调用时在任何 await 之前抛错阻断。
+     * @param {Actor} actor
      * @param {string} targetId - 可以是 Effect ID，也可以是 Slug
      * @param {number} amount - 移除的层数，默认 1
      */
-    static async removeEffect(actor, targetId, amount = 1) {
+    static removeEffect(actor, targetId, amount = 1) {
+        assertNoSyncScriptWrite("effects.removeEffect", { document: actor?.name ?? "未知角色" });
+        return this._removeEffect(actor, targetId, amount);
+    }
+
+    /** removeEffect 的异步实现体；除同步防护入口外与原行为一致。 */
+    static async _removeEffect(actor, targetId, amount = 1) {
         if (!actor || !targetId) return;
         // [权限拦截]
         if (!actor.isOwner) return await xjzlSocket.executeAsGM("removeEffect", actor.uuid, targetId, amount);
