@@ -586,19 +586,13 @@
             "damage": 20,
             "block": 10,
             "description": "传闻铸造时恰逢皓月当空，突然炉火绽放出耀眼光芒，刀光斩杀苍天青龙，嗜龙血回炉而成。又称“关刀”，重八十二斤。<br>进入战斗后，以该武器施展的第一招必定暴击，且招式伤害+10点。",
-            "automationNote": "部分自动化：首刀必爆已实现。战斗状态重置需手动清理 Flag。",
+            "automationNote": "部分自动化：首刀必爆与首刀+10伤害已实现。战斗状态重置需手动清理 Flag。",
             "scripts": [
                 {
-                    "label": "青龙-首刀必爆",
+                    "label": "青龙-首刀必爆增伤",
                     "trigger": "attack",
                     "active": true,
-                    "script": "const used = actor.getFlag('xjzl-system', 'weapon_qinglong_used');\nif (!used) {\n    args.flags.critThresholdMod += 20;\n    // 设置临时标记供 calc 脚本使用\n    actor.tempQinglongActive = true;\n    // 标记已使用\n    await actor.setFlag('xjzl-system', 'weapon_qinglong_used', true);\n    ui.notifications.warn('青龙偃月刀：拖刀计触发！');\n}"
-                },
-                {
-                    "label": "青龙-首刀增伤",
-                    "trigger": "calc",
-                    "active": true,
-                    "script": "if (actor.tempQinglongActive) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push('青龙首刀(+10)');\n    // 清理临时标记\n    delete actor.tempQinglongActive;\n}"
+                    "script": "const used = actor.getFlag('xjzl-system', 'weapon_qinglong_used');\nif (!used) {\n    args.flags.critThresholdMod += 20;\n    // 首刀+10伤害：伤害面板在 attack 之前已经算好（calc 先于 attack），\n    // 直接改写本卡伤害结果；不能放 calc——calc 会因打开面板/预览反复执行\n    if (args.actionType === 'attack' && args.flags.damageResult) {\n        args.flags.damageResult.damage += 10;\n        args.flags.damageResult.breakdown += '\\n+ 青龙首刀(+10)';\n    }\n    // 标记已使用\n    await actor.setFlag('xjzl-system', 'weapon_qinglong_used', true);\n    ui.notifications.warn('青龙偃月刀：拖刀计触发！');\n}"
                 }
             ]
         }
