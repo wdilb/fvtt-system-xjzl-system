@@ -70,6 +70,8 @@ import { registerCombatFxSetting } from "./module/managers/combat-fx-manager.mjs
 import { registerUltimateFxSetting, openUltimatePreview, playUltimatePreview, stopAllUltimateEffects } from "./module/managers/ultimate-fx-manager.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
+import { runResourceSync, isResourceSyncRunning } from "./module/managers/resource-sync-manager.mjs";
+import { XJZLResourceSyncReport } from "./module/applications/resource-sync-report.mjs";
 import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
 
 // 导入配置
@@ -877,6 +879,7 @@ Hooks.once("ready", async function () {
 //  在 getSceneControlButtons 阶段注入按钮
 // 首次渲染登记前暂存伤害工具实例，供连续打开时复用。
 let damageToolPending = null;
+let resourceSyncPending = null;
 
 /**
  * 统一打开伤害工具，复用已登记或首次渲染中的实例。
@@ -929,6 +932,37 @@ async function openDamageTool() {
   );
 }
 
+/** 扫描并更新世界角色资源，完成后打开可筛选、可导出的报告窗口。 */
+async function openResourceSync() {
+  if (!game.user.isGM) return ui.notifications.warn(game.i18n.localize("XJZL.Settings.ResourceSync.GMOnly"));
+  if (resourceSyncPending || isResourceSyncRunning()) {
+    return ui.notifications.info(game.i18n.localize("XJZL.Settings.ResourceSync.AlreadyRunning"));
+  }
+  const confirmed = await foundry.applications.api.DialogV2.confirm({
+    window: {
+      title: game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmTitle"),
+      icon: "fas fa-arrows-rotate"
+    },
+    content: `<p>${game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmContent")}</p>`,
+    rejectClose: false
+  });
+  if (!confirmed) return undefined;
+  ui.notifications.info(game.i18n.localize("XJZL.Settings.ResourceSync.Starting"));
+  resourceSyncPending = runResourceSync();
+  try {
+    const report = await resourceSyncPending;
+    const app = new XJZLResourceSyncReport({ report });
+    await app.render(true);
+    return app;
+  } catch (error) {
+    console.error("XJZL | 角色资源同步报告打开失败:", error);
+    ui.notifications.error(game.i18n.localize("XJZL.Settings.ResourceSync.Failed"));
+    return undefined;
+  } finally {
+    resourceSyncPending = null;
+  }
+}
+
 /** 向 Token 控制组添加系统工具；controls 须包含 tokens.tools，原有同名工具优先。 */
 Hooks.on('getSceneControlButtons', (controls) => {
   const tools = controls.tokens?.tools;
@@ -966,6 +1000,17 @@ Hooks.on('getSceneControlButtons', (controls) => {
         }
       };
     }
+  }
+
+  if (isGM && !tools["resource-sync"]) {
+    tools["resource-sync"] = {
+      name: "resource-sync",
+      title: "XJZL.Settings.ResourceSync.Toolbar",
+      icon: "fas fa-arrows-rotate",
+      visible: true,
+      button: true,
+      onChange: () => openResourceSync()
+    };
   }
 
   if (game.settings.get("xjzl-system", "enableCombatStats")) {
@@ -1817,6 +1862,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/tab-config.hbs",
     "systems/xjzl-system/templates/actor/character/audit-log.hbs",
     "systems/xjzl-system/templates/actor/character/manage-xp.hbs",
+    "systems/xjzl-system/templates/apps/resource-sync-report.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
     "systems/xjzl-system/templates/actor/container/loot-workbench.hbs",

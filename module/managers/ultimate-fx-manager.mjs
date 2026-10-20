@@ -18,7 +18,7 @@ function presetFor(id) {
   return ULTIMATE_PRESETS.find(preset => preset.id === (id === "qi" ? "stars" : id));
 }
 
-/** 注册本客户端的持久开关、Token 工具栏按钮和画布生命周期清理。 */
+/** 注册本客户端的持久开关和画布生命周期清理。 */
 export function registerUltimateFxSetting() {
   game.settings.register("xjzl-system", SETTING, {
     name: "XJZL.Settings.UltimateEffects.Name",
@@ -36,24 +36,6 @@ export function registerUltimateFxSetting() {
         });
       }
     }
-  });
-  Hooks.on("getSceneControlButtons", controls => {
-    const tools = controls.tokens?.tools;
-    if (!tools || tools["ultimate-effects"]) return;
-    tools["ultimate-effects"] = {
-      name: "ultimate-effects",
-      title: "XJZL.Settings.UltimateEffects.Name",
-      icon: "fa-solid fa-wand-sparkles",
-      order: Object.keys(tools).length,
-      visible: true,
-      toggle: true,
-      active: isEnabled(),
-      onChange: (_event, enabled) => {
-        Promise.resolve(game.settings.set("xjzl-system", SETTING, enabled)).catch(error => {
-          console.error("XJZL | 切换绝招演出失败。", error);
-        });
-      }
-    };
   });
   Hooks.on("canvasTearDown", stopAllUltimateEffects);
   Hooks.on("destroyToken", token => {

@@ -638,8 +638,9 @@ export class XJZLActor extends Actor {
   _onUpdateEmbeddedDocuments(embeddedName, documents, result, options, userId) {
     super._onUpdateEmbeddedDocuments(embeddedName, documents, result, options, userId);
     this._resourceScriptCache = undefined;
-    // 只由当前操作的用户执行，防止多客户端重复写入
-    if (userId !== game.user.id) return;
+    // 只由当前操作的用户执行，防止多客户端重复写入；合集同步只替换规则源，
+    // 不应因新规则降低上限而顺带持久化截断角色当前气血/内力。
+    if (userId !== game.user.id || options?.xjzlResourceSync) return;
 
     void this._enforceResourceIntegrity().catch(err => {
       console.error("XJZL | 内嵌文档更新后的资源完整性检查失败:", err);
