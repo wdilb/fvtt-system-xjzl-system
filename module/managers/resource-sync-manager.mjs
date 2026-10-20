@@ -299,13 +299,6 @@ function isGeneratedEffectPath(path) {
   ].includes(path);
 }
 
-/** 将完整路径转换为 Foundry 的嵌套删除语法，-= 必须位于被删除字段名之前。 */
-function toDeletionKey(path) {
-  const separator = path.lastIndexOf(".");
-  if (separator === -1) return `-=${path}`;
-  return `${path.slice(0, separator)}.-=${path.slice(separator + 1)}`;
-}
-
 /** 构造完整的 AE 规则更新，删除合集已移除的字段并重建单层基准。 */
 function prepareEffectUpdateData(existing, desiredData) {
   const updateData = clone(desiredData);
@@ -320,7 +313,9 @@ function prepareEffectUpdateData(existing, desiredData) {
   const currentData = effectData(existing);
   for (const path of collectRemovedPaths(currentData, updateData)) {
     if (isGeneratedEffectPath(path)) continue;
-    updateData[toDeletionKey(path)] = null;
+    // ForcedDeletion 在本地 updateSource 中消解为删除差异后随纯数据广播；
+    // 旧式 "-=" 删除键语法自 V12 起只做兼容转换并触发控制台弃用警告。
+    foundry.utils.setProperty(updateData, path, new foundry.data.operators.ForcedDeletion());
   }
   return updateData;
 }

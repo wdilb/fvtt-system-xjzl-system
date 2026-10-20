@@ -1,56 +1,105 @@
-<div class="xjzl-resource-sync-report-root">
-<header class="xjzl-resource-sync-header">
-  <div>
-    <div class="xjzl-resource-sync-kicker"><i class="fas fa-compass"></i> {{localize "XJZL.Settings.ResourceSync.Kicker"}}</div>
-    <h2>{{localize "XJZL.Settings.ResourceSync.Header"}}</h2>
-    <p>{{localize "XJZL.Settings.ResourceSync.Description"}}</p>
-  </div>
-  <button type="button" data-action="export" class="xjzl-resource-sync-export"><i class="fas fa-download"></i> {{localize "XJZL.Settings.ResourceSync.Export"}}</button>
-</header>
+<div class="xjzl-resource-sync-root">
 
-<section class="xjzl-resource-sync-cards" aria-label="同步统计">
-  {{#each cards}}
-    <div class="xjzl-resource-sync-card {{key}}">
-      <i class="fas {{icon}}"></i>
-      <span class="value">{{value}}</span>
-      <span class="label">{{label}}</span>
+  {{! ── 顶栏：标题区 + 完成时间与导出 ──}}
+  <header class="xjzl-rsync-header">
+    <div class="xjzl-rsync-heading">
+      <span class="xjzl-rsync-kicker"><i class="fas fa-compass"></i>{{localize "XJZL.Settings.ResourceSync.Kicker"}}</span>
+      <h2>{{localize "XJZL.Settings.ResourceSync.Header"}}</h2>
+      <p>{{localize "XJZL.Settings.ResourceSync.Description"}}</p>
     </div>
-  {{/each}}
-</section>
+    <div class="xjzl-rsync-heading-side">
+      {{#if generatedAtLabel}}<span class="xjzl-rsync-time"><i class="fas fa-clock"></i>{{generatedAtLabel}}</span>{{/if}}
+      <button type="button" data-action="export" class="xjzl-rsync-export">
+        <i class="fas fa-download"></i>{{localize "XJZL.Settings.ResourceSync.Export"}}
+      </button>
+    </div>
+  </header>
 
-<div class="xjzl-resource-sync-note"><i class="fas fa-circle-info"></i> {{localize "XJZL.Settings.ResourceSync.ScopePolicy"}}</div>
-<div class="xjzl-resource-sync-note"><i class="fas fa-location-dot"></i> {{tokenPolicy}}</div>
-{{#if fatalError}}<div class="xjzl-resource-sync-error"><i class="fas fa-triangle-exclamation"></i> {{fatalError}}</div>{{/if}}
-
-<div class="xjzl-resource-sync-toolbar">
-  <label><i class="fas fa-filter"></i><input class="xjzl-resource-sync-filter" type="search" placeholder="{{localize 'XJZL.Settings.ResourceSync.FilterPlaceholder'}}"></label>
-  <span class="xjzl-resource-sync-time">{{generatedAtLabel}}</span>
-</div>
-
-<section class="xjzl-resource-sync-list">
-  {{#each actors}}
-    <details class="xjzl-resource-sync-actor" data-search="{{searchText}}" open>
-      <summary>
-        <span class="actor-name"><i class="fas fa-user-shield"></i> {{name}}</span>
-        <span class="actor-summary">
-          {{#each summary}}<b class="sync-mini {{status}}">{{count}}</b>{{/each}}
-          <button type="button" data-action="openActor" data-uuid="{{actorUuid}}" title="{{localize 'XJZL.Settings.ResourceSync.OpenActor'}}"><i class="fas fa-external-link-alt"></i></button>
-        </span>
-      </summary>
-      <div class="xjzl-resource-sync-items">
-        {{#each items}}
-          <article class="xjzl-resource-sync-item {{statusClass}}">
-            <div class="item-main"><i class="fas {{icon}}"></i><strong>{{name}}</strong><span class="item-type">{{typeLabel}}</span></div>
-            <span class="item-status">{{statusLabel}}</span>
-            {{#if sourcePack}}<span class="item-source">{{sourcePack}}</span>{{/if}}
-            {{#if details.length}}<div class="item-details">{{#each details}}<div>{{this}}</div>{{/each}}</div>{{/if}}
-          </article>
-        {{/each}}
+  {{! ── 同步结果统计 ──}}
+  <section class="xjzl-rsync-stats" aria-label="{{localize 'XJZL.Settings.ResourceSync.Title'}}">
+    {{#each cards}}
+      <div class="xjzl-rsync-stat {{key}}">
+        <i class="fas {{icon}}"></i>
+        <div class="xjzl-rsync-stat-body">
+          <span class="value">{{value}}</span>
+          <span class="label">{{label}}</span>
+        </div>
       </div>
-    </details>
-  {{else}}
-    <div class="xjzl-resource-sync-empty"><i class="fas fa-feather-pointed"></i><p>{{localize "XJZL.Settings.ResourceSync.Empty"}}</p></div>
-  {{/each}}
-</section>
-</div>
+    {{/each}}
+  </section>
 
+  {{#if fatalError}}
+    <div class="xjzl-rsync-fatal">
+      <i class="fas fa-triangle-exclamation"></i>
+      <span>{{fatalError}}</span>
+    </div>
+  {{/if}}
+
+  {{! ── 筛选与展开工具条 ──}}
+  <div class="xjzl-rsync-toolbar">
+    <label class="xjzl-rsync-search">
+      <i class="fas fa-magnifying-glass"></i>
+      <input class="xjzl-resource-sync-filter" type="search"
+        placeholder="{{localize 'XJZL.Settings.ResourceSync.FilterPlaceholder'}}">
+    </label>
+    <button type="button" data-action="expandAll" class="xjzl-rsync-tool"
+      data-tooltip="{{localize 'XJZL.Settings.ResourceSync.ExpandAll'}}" aria-label="{{localize 'XJZL.Settings.ResourceSync.ExpandAll'}}">
+      <i class="fas fa-angles-down"></i>
+    </button>
+    <button type="button" data-action="collapseAll" class="xjzl-rsync-tool"
+      data-tooltip="{{localize 'XJZL.Settings.ResourceSync.CollapseAll'}}" aria-label="{{localize 'XJZL.Settings.ResourceSync.CollapseAll'}}">
+      <i class="fas fa-angles-up"></i>
+    </button>
+  </div>
+
+  {{! ── 角色列表（唯一滚动区） ──}}
+  <section class="xjzl-resource-sync-list">
+    {{#each actors}}
+      <details class="xjzl-rsync-actor{{#if attention}} attention{{/if}}" data-search="{{searchText}}"
+        data-sync="actor-{{actorId}}" {{#if open}}open{{/if}}>
+        <summary>
+          <span class="xjzl-rsync-caret"><i class="fas fa-chevron-right"></i></span>
+          <span class="xjzl-rsync-actor-name"><i class="fas fa-user"></i><span class="actor-name">{{name}}</span></span>
+          <span class="xjzl-rsync-chips">
+            {{#each chips}}
+              <span class="chip {{status}}" data-tooltip="{{label}}">{{count}}</span>
+            {{/each}}
+          </span>
+          <button type="button" data-action="openActor" data-uuid="{{actorUuid}}" class="xjzl-rsync-open-actor"
+            data-tooltip="{{localize 'XJZL.Settings.ResourceSync.OpenActor'}}" aria-label="{{localize 'XJZL.Settings.ResourceSync.OpenActor'}}">
+            <i class="fas fa-up-right-from-square"></i>
+          </button>
+        </summary>
+        <div class="xjzl-rsync-items">
+          {{#each items}}
+            <article class="xjzl-rsync-item">
+              <i class="fas {{typeIcon}} item-type-icon" aria-hidden="true"></i>
+              <div class="item-main">
+                <strong class="item-name">{{name}}</strong>
+                <span class="item-type">{{typeLabel}}</span>
+                {{#if sourcePack}}<span class="item-source"><i class="fas fa-book-bookmark"></i>{{sourcePack}}</span>{{/if}}
+              </div>
+              <span class="item-status {{statusClass}}"><i class="fas {{icon}}"></i>{{statusLabel}}</span>
+              {{#if details.length}}
+                <ul class="item-details">
+                  {{#each details}}<li>{{this}}</li>{{/each}}
+                </ul>
+              {{/if}}
+            </article>
+          {{/each}}
+        </div>
+      </details>
+    {{else}}
+      <div class="xjzl-rsync-empty">
+        <i class="fas fa-feather-pointed"></i>
+        <p>{{localize "XJZL.Settings.ResourceSync.Empty"}}</p>
+      </div>
+    {{/each}}
+  </section>
+
+  {{! ── 底部同步范围说明 ──}}
+  <footer class="xjzl-rsync-notes">
+    <div class="xjzl-rsync-note"><i class="fas fa-circle-info"></i><span>{{localize "XJZL.Settings.ResourceSync.ScopePolicy"}}</span></div>
+    <div class="xjzl-rsync-note"><i class="fas fa-location-dot"></i><span>{{tokenPolicy}}</span></div>
+  </footer>
+</div>

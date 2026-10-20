@@ -938,12 +938,17 @@ async function openResourceSync() {
   if (resourceSyncPending || isResourceSyncRunning()) {
     return ui.notifications.info(game.i18n.localize("XJZL.Settings.ResourceSync.AlreadyRunning"));
   }
+  // 确认要点拆成短句列表：整段长文用户不会读，扫要点才能知情确认
+  const confirmPoints = ["ConfirmScope", "ConfirmEffects", "ConfirmSkip", "ConfirmOut"]
+    .map(key => `<li>${game.i18n.localize(`XJZL.Settings.ResourceSync.${key}`)}</li>`)
+    .join("");
   const confirmed = await foundry.applications.api.DialogV2.confirm({
+    classes: ["dialog", "xjzl-rsync-confirm-dialog"],
     window: {
       title: game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmTitle"),
       icon: "fas fa-arrows-rotate"
     },
-    content: `<p>${game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmContent")}</p>`,
+    content: `<div class="xjzl-rsync-confirm"><p>${game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmIntro")}</p><ul>${confirmPoints}</ul></div>`,
     rejectClose: false
   });
   if (!confirmed) return undefined;
