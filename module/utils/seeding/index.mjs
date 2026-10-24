@@ -11,6 +11,7 @@ import { seedNeigong } from "./seed-neigong.mjs";
 import { seedWuxue } from "./seed-wuxue.mjs";
 import { seedMacros } from "./seed-macros.mjs";
 import { seedTraits } from "./seed-traits.mjs";
+import { seedBeasts } from "./seed-beasts.mjs";
 
 const { DialogV2 } = foundry.applications.api;
 
@@ -27,6 +28,7 @@ export const SeedingManager = {
     wuxue: seedWuxue,
     macros: seedMacros,
     traits: seedTraits,
+    beasts: seedBeasts,
 
     /**
      * 一键生成所有 (全量重置)
@@ -51,6 +53,7 @@ export const SeedingManager = {
             await this.wuxue();
             await this.macros();
             await this.traits();
+            await this.beasts();
             ui.notifications.info("XJZL | 全量种子数据生成完成。");
         }
     }
