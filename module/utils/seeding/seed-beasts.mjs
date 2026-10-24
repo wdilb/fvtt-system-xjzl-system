@@ -8,7 +8,7 @@ const ICON_DIR = "systems/xjzl-system/assets/icons/creature";
 const FALLBACK_IMG = "icons/svg/mystery-man.svg";
 
 // 体型 → 原型 Token 占格数（与 creature-sheet 的 size 选项一一对应）
-const SIZE_TOKEN_SIZES = { small: 1, medium: 1, large: 2, huge: 3 };
+const SIZE_TOKEN_SIZES = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3 };
 
 // 品级 → 合集包文件夹名（对应 system.info.type，取值见 creature 数据模型）
 const GRADE_FOLDERS = { fan: "凡兽", meng: "猛兽", zhen: "珍兽" };
@@ -51,6 +51,21 @@ function normalizeResources(src) {
         resources.rage = { value: src.rage };
     }
     return resources;
+}
+
+/**
+ * 从保留原文中的“自动化”段落提取玩家提示；原文没有该标记时保持空值。
+ * 这样旧的 40 条源数据也能在卡片上显示手动边界，而无需改写规则正文。
+ * @param {Object} system 野兽 system 源数据
+ * @returns {void}
+ */
+function normalizeAbilityNotes(system) {
+    if (!Array.isArray(system.abilities)) return;
+    system.abilities = system.abilities.map(ability => {
+        if (ability.automationNote || typeof ability.description !== "string") return ability;
+        const match = ability.description.match(/<strong>自动化：<\/strong>([^<]+)/);
+        return match ? { ...ability, automationNote: match[1].trim() } : ability;
+    });
 }
 
 /**
@@ -112,6 +127,7 @@ export async function seedBeasts() {
     for (const beast of beastsData) {
         const system = foundry.utils.deepClone(beast.system ?? {});
         system.resources = normalizeResources(system);
+        normalizeAbilityNotes(system);
 
         const img = await resolveBeastImage(beast);
         if (img === FALLBACK_IMG) missingImages.push(beast.name);

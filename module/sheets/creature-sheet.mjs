@@ -5,39 +5,13 @@ import { localizeConfig } from "../utils/utils.mjs";
 import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } from "./behaviors/effect-interactions.mjs";
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { CreatureCheckEditor } from "../applications/creature-check-editor.mjs";
-import {
-    getCheckAttrChoices,
-    updateCreatureAbility
-} from "../data/actor/creature.mjs";
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-/**
- * 生成检定配置的卡上摘要文本（如"豁免 · 定力 DC 12（需命中）"）。
- * @param {Object} check 特性的 check 配置节点
- * @param {Object} attrChoices 属性 key → 本地化标签（getCheckAttrChoices 的结果）
- * @returns {String} 摘要文本
- */
-function buildCheckSummary(check, attrChoices) {
-    const signed = (n) => (Number(n) > 0 ? `+${n}` : `${Number(n) || 0}`);
-    let summary;
-    if (check.mode === "contest") {
-        summary = game.i18n.format("XJZL.Creature.Check.SummaryContest", {
-            att: attrChoices[check.contest.attAttr] || check.contest.attAttr,
-            attBonus: signed(check.contest.attBonus),
-            def: attrChoices[check.contest.defAttr] || check.contest.defAttr
-        });
-    } else {
-        summary = game.i18n.format("XJZL.Creature.Check.SummarySave", {
-            attr: attrChoices[check.save.attr] || check.save.attr,
-            dc: check.save.dc
-        });
-    }
-    if (check.requireHit) summary += game.i18n.localize("XJZL.Creature.Check.SummaryRequireHit");
-    return summary;
-}
-
 export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
+    // 只保存当前窗口的展开面板，不写入 Actor 数据；这样表单自动重渲染后仍停留在用户正在编辑的分区。
+    _openAbilityPanels = new Map();
+
     static DEFAULT_OPTIONS = {
         tag: "form",
         classes: ["xjzl-window", "actor", "creature", "theme-dark"],
@@ -57,10 +31,10 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             postAbility: XJZLCreatureSheet.prototype._onPostAbility,
             // 使用特性（攻击/命中/检定一体化流程）
             useAbility: XJZLCreatureSheet.prototype._onUseAbility,
-            // 切换特性的检定开关（按钮，不走表单提交路径）
-            toggleCheck: XJZLCreatureSheet.prototype._onToggleCheck,
-            // 打开检定配置编辑器
-            editCheck: XJZLCreatureSheet.prototype._onEditCheck,
+            // 状态与检定全部在独立编辑器中配置
+            editAbilityState: XJZLCreatureSheet.prototype._onEditAbilityState,
+            // 能力卡的轻量折叠面板（攻击 / 状态）
+            toggleAbilityPanel: XJZLCreatureSheet.prototype._onToggleAbilityPanel,
             // 特效交互（与人物卡一致）
             deleteEffect: XJZLCreatureSheet.prototype._onDeleteEffect,
             // 设为常用
@@ -79,10 +53,9 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         context.system = actor.system;
         context.creatureTypes = localizeConfig(CONFIG.XJZL.creatureTypes); // 用于下拉菜单
         context.choices = {
-            sizes: { small: "小型", medium: "中型", large: "大型", huge: "巨型" },
+            sizes: { tiny: "袖珍", small: "小型", medium: "中型", large: "大型", huge: "巨型" },
             damageTypes: localizeConfig(CONFIG.XJZL.damageTypes) // 攻击型特性伤害类型下拉
         };
-
         // 准备体力百分比
         const tili = actor.system.resources.tili;
         context.tiliPercent = tili.max ? Math.min(100, (tili.value / tili.max) * 100) : 0;
@@ -90,16 +63,20 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         // 准备非被动 AE（与人物卡共享同一逻辑）
         prepareEffects(this, context);
 
-        //解析常用招式 + 检定摘要（特性卡上仅显示开关与摘要，配置在编辑器弹窗完成）
+        // 解析常用招式与卡片摘要；状态与检定详情统一在独立编辑器配置。
         const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
-        const attrChoices = getCheckAttrChoices();
         if (context.system.abilities) {
             context.system.abilities.forEach((ab, index) => {
                 ab.isPinned = pinnedList.includes(`Ability.${index}`);
                 // 可发起：配置了攻击段或检定段
-                ab.canUse = ab.isAttack || ab.check?.enabled === true;
-                if (ab.check?.enabled) {
-                    ab.checkSummary = buildCheckSummary(ab.check, attrChoices);
+                ab.canUse = ab.isAttack || ab.check?.enabled === true || (ab.directEffects?.length > 0);
+                // 状态页包含直接状态与检定；说明文本仍归在状态页，避免卡片初始高度过长。
+                ab.stateConfigured = (ab.directEffects?.length > 0)
+                    || ab.check?.enabled === true
+                    || Boolean(ab.description || ab.automationNote);
+                if (ab.isAttack) {
+                    const damageType = context.choices.damageTypes[ab.damageType] || ab.damageType || "";
+                    ab.attackSummary = `${ab.damage ?? 0} · ${damageType}`;
                 }
             });
         }
@@ -144,12 +121,64 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         super._onRender(context, options);
         const html = this.element;
 
+        this._restoreAbilityPanels(html);
+
         // 特效交互：左键加层，右键减层（委托共享逻辑）
         const effectsContainer = html.querySelector(".active-effects-row");
         if (effectsContainer) {
             effectsContainer.addEventListener("click", (event) => this._onEffectAction(event, 1));
             effectsContainer.addEventListener("contextmenu", (event) => this._onEffectAction(event, -1));
         }
+    }
+
+    /**
+     * 恢复能力卡的展开分区，并同步 aria 状态；面板状态只属于当前 Sheet 实例。
+     * @param {HTMLElement} html 当前 Sheet 根节点
+     * @returns {void}
+     */
+    _restoreAbilityPanels(html) {
+        html.querySelectorAll(".ability-card").forEach((card) => {
+            const index = Number(card.dataset.abilityIndex);
+            const panel = this._openAbilityPanels.get(index) || null;
+            this._setAbilityPanelState(card, panel);
+        });
+    }
+
+    /**
+     * 切换能力卡的攻击/状态配置页，不改变能力数据；具体字段仍由表单提交保存。
+     * @param {Event} event 点击事件
+     * @param {HTMLElement} target 带 data-index/data-panel 的入口按钮
+     * @returns {void}
+     */
+    _onToggleAbilityPanel(event, target) {
+        event.preventDefault();
+        const card = target.closest(".ability-card");
+        const index = Number(target.dataset.index);
+        const panel = target.dataset.panel;
+        if (!card || !Number.isInteger(index) || !["attack", "state"].includes(panel)) return;
+
+        if (this._openAbilityPanels.get(index) === panel) this._openAbilityPanels.delete(index);
+        else this._openAbilityPanels.set(index, panel);
+        this._setAbilityPanelState(card, this._openAbilityPanels.get(index) || null);
+    }
+
+    /**
+     * 将某张能力卡切换到指定分区，并更新按钮箭头与辅助技术属性。
+     * @param {HTMLElement} card 能力卡根节点
+     * @param {string|null} openPanel 要展开的分区，null 表示全部收起
+     * @returns {void}
+     */
+    _setAbilityPanelState(card, openPanel) {
+        card.querySelectorAll("[data-ability-panel]").forEach((panel) => {
+            const isOpen = panel.dataset.abilityPanel === openPanel;
+            panel.classList.toggle("is-open", isOpen);
+            panel.setAttribute("aria-hidden", String(!isOpen));
+        });
+        card.querySelectorAll("[data-action='toggleAbilityPanel']").forEach((button) => {
+            const isOpen = button.dataset.panel === openPanel;
+            button.classList.toggle("is-open", isOpen);
+            button.setAttribute("aria-expanded", String(isOpen));
+        });
     }
 
     /* -------------------------------------------- */
@@ -177,6 +206,12 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         const index = Number(target.dataset.index);
         const abilities = foundry.utils.deepClone(this.document.system.abilities);
         abilities.splice(index, 1);
+        const nextPanels = new Map();
+        for (const [oldIndex, panel] of this._openAbilityPanels) {
+            if (oldIndex === index) continue;
+            nextPanels.set(oldIndex > index ? oldIndex - 1 : oldIndex, panel);
+        }
+        this._openAbilityPanels = nextPanels;
         await this.document.update({ "system.abilities": abilities });
     }
 
@@ -188,7 +223,7 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         const ability = this.document.system.abilities[index];
         if (!ability) return;
 
-        const content = `
+        let content = `
         <div class="xjzl-chat-card">
             <header class="card-header" style="border-bottom: 2px solid #444; margin-bottom: 10px;">
                 <h3 style="margin:0;">${ability.name}</h3>
@@ -197,6 +232,10 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
                 ${ability.description || "无描述"}
             </div>
         </div>`;
+
+        if (ability.automationNote && !/<strong>自动化：<\/strong>/.test(ability.description || "")) {
+            content += `<div style="font-size:0.8em;color:#666;margin-top:6px;"><strong>自动化：</strong>${foundry.utils.escapeHTML(ability.automationNote)}</div>`;
+        }
 
         ChatMessage.create({
             author: game.user.id,
@@ -214,24 +253,12 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         await this.document.useCreatureAbility(index);
     }
 
-    /**
-     * 切换特性的检定开关。开关是按钮而非表单复选框：abilities 数组元素按整体替换
-     * 合并，卡上表单不含 check 配置的其余字段，表单提交会清空它们；
-     * 因此开关通过完整元素写回（updateCreatureAbility），配置的编辑全部交给编辑器弹窗。
-     */
-    async _onToggleCheck(event, target) {
+    /** 打开野兽特性的状态/检定编辑器，所有非攻击配置在该窗口内保存。 */
+    _onEditAbilityState(event, target) {
         const index = Number(target.dataset.index);
         const ability = this.document.system.abilities[index];
-        if (!ability?.check) return;
-        await updateCreatureAbility(this.document, index, { check: { enabled: !ability.check.enabled } });
-    }
-
-    /** 打开检定配置编辑器（独立窗口，改动实时自动保存）。 */
-    _onEditCheck(event, target) {
-        const index = Number(target.dataset.index);
-        const ability = this.document.system.abilities[index];
-        if (!ability?.check) return;
-        return CreatureCheckEditor.open(this.document, index, ability.check);
+        if (!ability) return;
+        return CreatureCheckEditor.open(this.document, index, ability);
     }
 
     /**

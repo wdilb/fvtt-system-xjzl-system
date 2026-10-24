@@ -590,6 +590,7 @@ XJZL.statusFlags = {
   forceDodgeZero: "XJZL.Status.ForceDodgeZero", // 闪避归零 (禁足/定身)
   bloodLossLevel: "XJZL.Status.BloodLossLevel", // 失血层数
   mpCostMultiplier: "XJZL.Status.MpCostMultiplier", // 内力消耗额外倍率
+  beastHitBonus: "XJZL.Status.BeastHitBonus", // 象王等野兽命中加值
 
   // --- F. 攻击穿透类 (Attacker Penetration) ---
   // 攻击者拥有此状态时，其攻击将获得对应效果
@@ -1155,6 +1156,206 @@ XJZL.statusEffects = [
       { key: "flags.xjzl-system.grantAttackLevel", type: "add", value: "1" }
     ]
     }
+  },
+  {
+    id: "beast_panic",
+    name: "XJZL.Status.BeastPanic",
+    description: "XJZL.Status.BeastPanicDesc",
+    img: "systems/xjzl-system/assets/icons/ae/恐慌.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_panic", stackable: false } },
+    system: { changes: [
+      { key: "flags.xjzl-system.attackLevel", type: "add", value: "-1" },
+      { key: "flags.xjzl-system.feintLevel", type: "add", value: "-1" },
+      { key: "flags.xjzl-system.unstable", type: "override", value: "true" }
+    ] }
+  },
+  {
+    id: "beast_dazzled",
+    name: "XJZL.Status.BeastDazzled",
+    description: "XJZL.Status.BeastDazzledDesc",
+    img: "systems/xjzl-system/assets/icons/ae/夺目.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_dazzled", stackable: false } },
+    system: { changes: [{ key: "flags.xjzl-system.attackLevel", type: "add", value: "-1" }] }
+  },
+  {
+    id: "beast_roar",
+    name: "XJZL.Status.BeastRoar",
+    description: "XJZL.Status.BeastRoarDesc",
+    img: "systems/xjzl-system/assets/icons/ae/熊咆.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_roar", stackable: false } },
+    system: { changes: [
+      { key: "flags.xjzl-system.attackLevel", type: "add", value: "1" },
+      { key: "system.combat.crit_waigong", type: "add", value: "-1" },
+      { key: "system.combat.crit_neigong", type: "add", value: "-1" }
+    ] }
+  },
+  {
+    id: "beast_hunt",
+    name: "XJZL.Status.BeastHunt",
+    description: "XJZL.Status.BeastHuntDesc",
+    img: "systems/xjzl-system/assets/icons/ae/围狩.png",
+    showIcon: 2,
+    flags: { "xjzl-system": {
+      slug: "beast_hunt",
+      stackable: false,
+      scripts: [{
+        label: "围狩追加流失",
+        trigger: "damaged",
+        active: true,
+        script: `// 流失伤害本身不递归触发围狩；其余触发时机沿用 damaged。
+if (args.type === "liushi") return;
+
+const result = await actor.applyDamage({
+  amount: 5,
+  type: "liushi",
+  attacker: args.attacker || null,
+  targetTokenUuid: actor.token?.document?.uuid || null,
+  move: args.move || null,
+  item: args.item || null,
+  isHit: true
+});
+
+const actualLoss = Number(result?.hpLost || 0) + Number(result?.hutiLost || 0)
+  + Number(result?.mpLost || 0) + Number(result?.tiliLost || 0);
+const parts = [];
+if (Number(result?.hutiLost || 0) > 0) parts.push("护体 -" + result.hutiLost);
+if (Number(result?.hpLost || 0) > 0) parts.push("气血 -" + result.hpLost);
+if (Number(result?.mpLost || 0) > 0) parts.push("内力 -" + result.mpLost);
+if (Number(result?.tiliLost || 0) > 0) parts.push("体力 -" + result.tiliLost);
+const detail = parts.length > 0 ? parts.join("、") : "实际损失 0";
+await ChatMessage.create({
+  author: game.user.id,
+  speaker: ChatMessage.getSpeaker({ actor }),
+  content: '<div class="xjzl-chat-card" style="padding:4px 8px;border-left:3px solid #8b0000;background:rgba(139,0,0,0.05);"><b style="color:#8b0000;">围狩触发</b><div>追加 5 点气血流失（实际结算：' + detail + '，共 ' + actualLoss + ' 点）。</div></div>',
+  style: CONST.CHAT_MESSAGE_STYLES.OTHER
+});`
+      }]
+    } },
+    system: { changes: [] }
+  },
+  {
+    id: "beast_elephant_king",
+    name: "XJZL.Status.BeastElephantKing",
+    description: "XJZL.Status.BeastElephantKingDesc",
+    img: "systems/xjzl-system/assets/icons/ae/象王.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_elephant_king", stackable: true, maxStacks: 3 } },
+    system: { changes: [
+      { key: "system.combat.speed", type: "add", value: "2" },
+      { key: "flags.xjzl-system.beastHitBonus", type: "add", value: "10" }
+    ] }
+  },
+  {
+    id: "beast_crane_dance",
+    name: "XJZL.Status.BeastCraneDance",
+    description: "XJZL.Status.BeastCraneDanceDesc",
+    img: "systems/xjzl-system/assets/icons/ae/鹤舞.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_crane_dance", stackable: false } },
+    duration: { value: 1, units: "rounds", expiry: "turnStart", expired: false },
+    system: { changes: [{ key: "system.combat.dodge", type: "add", value: "5" }] }
+  },
+  {
+    id: "beast_grapple",
+    name: "XJZL.Status.BeastGrapple",
+    description: "XJZL.Status.BeastGrappleDesc",
+    img: "systems/xjzl-system/assets/icons/ae/擒抱.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_grapple", stackable: false } },
+    system: { changes: [] }
+  },
+  {
+    id: "beast_hunt_bonus",
+    name: "XJZL.Status.BeastHuntBonus",
+    description: "XJZL.Status.BeastHuntBonusDesc",
+    img: "systems/xjzl-system/assets/icons/ae/围猎加值.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_hunt_bonus", stackable: false } },
+    system: { changes: [] }
+  },
+  {
+    id: "beast_ambush_bonus",
+    name: "XJZL.Status.BeastAmbushBonus",
+    description: "XJZL.Status.BeastAmbushBonusDesc",
+    img: "systems/xjzl-system/assets/icons/ae/伏击加值.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_ambush_bonus", stackable: false } },
+    system: { changes: [] }
+  },
+  {
+    id: "beast_bear_bonus",
+    name: "XJZL.Status.BeastBearBonus",
+    description: "XJZL.Status.BeastBearBonusDesc",
+    img: "systems/xjzl-system/assets/icons/ae/熊罴加值.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_bear_bonus", stackable: false } },
+    system: { changes: [] }
+  },
+  {
+    id: "beast_search",
+    name: "XJZL.Status.BeastSearch",
+    description: "XJZL.Status.BeastSearchDesc",
+    img: "systems/xjzl-system/assets/icons/ae/寻猎.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_search", stackable: false } },
+    system: { changes: [
+      { key: "system.skills.tancha.checkMod", type: "add", value: "1" },
+      { key: "system.skills.zhuizong.checkMod", type: "add", value: "1" }
+    ] }
+  },
+  {
+    id: "beast_wayfinding",
+    name: "XJZL.Status.BeastWayfinding",
+    description: "XJZL.Status.BeastWayfindingDesc",
+    img: "systems/xjzl-system/assets/icons/ae/识途.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_wayfinding", stackable: false } },
+    system: { changes: [{ key: "system.skills.zhuizong.checkMod", type: "add", value: "1" }] }
+  },
+  {
+    id: "beast_cunning",
+    name: "XJZL.Status.BeastCunning",
+    description: "XJZL.Status.BeastCunningDesc",
+    img: "systems/xjzl-system/assets/icons/ae/狡黠.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_cunning", stackable: false } },
+    system: { changes: [{ key: "system.skills.qianxing.checkMod", type: "add", value: "2" }] }
+  },
+  {
+    id: "beast_benefactor",
+    name: "XJZL.Status.BeastBenefactor",
+    description: "XJZL.Status.BeastBenefactorDesc",
+    img: "systems/xjzl-system/assets/icons/ae/贵人.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_benefactor", stackable: false } },
+    system: { changes: [
+      { key: "system.skills.shuofu.checkMod", type: "add", value: "1" },
+      { key: "system.skills.jiaoyi.checkMod", type: "add", value: "1" }
+    ] }
+  },
+  {
+    id: "beast_fortune",
+    name: "XJZL.Status.BeastFortune",
+    description: "XJZL.Status.BeastFortuneDesc",
+    img: "systems/xjzl-system/assets/icons/ae/富贵.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_fortune", stackable: false } },
+    system: { changes: [
+      { key: "system.skills.shuofu.checkMod", type: "add", value: "2" },
+      { key: "system.skills.jiaoyi.checkMod", type: "add", value: "2" }
+    ] }
+  },
+  {
+    id: "beast_horse_spirit",
+    name: "XJZL.Status.BeastHorseSpirit",
+    description: "XJZL.Status.BeastHorseSpiritDesc",
+    img: "systems/xjzl-system/assets/icons/ae/神驹.png",
+    showIcon: 2,
+    flags: { "xjzl-system": { slug: "beast_horse_spirit", stackable: false } },
+    system: { changes: [{ key: "system.combat.initiative", type: "add", value: "5" }] }
   },
   {
     id: "deaf",

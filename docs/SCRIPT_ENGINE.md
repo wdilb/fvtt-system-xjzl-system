@@ -608,7 +608,7 @@ const result = await args.target.applyDamage({
 
 返回 `Promise<object>`，普通角色的常规结果包含 `finalDamage`、`hpLost`、`hutiLost`、`mpLost`、`tiliLost`、`isDying`、`isDead`、`rageGained`、`isHit`；未命中、免疫或其他提前返回路径可能只返回部分字段。容器 Actor 不受伤害，只返回 `{ finalDamage: 0 }`。
 
-`creature` 使用独立体力结算：伤害超过防护后扣除 `system.resources.tili.value`，可触发 `resourceChanged` 并在体力归零时直接添加死亡状态；它不执行 `avoided`、`preDefense`、`preTake`、`dying`、`death`、`damaged`。返回结果以 `tiliLost` 为主要实际损失字段。需要让野兽响应这些标准防御触发器时，必须先扩展代码流程，不能只添加脚本数据。
+`creature` 使用独立体力结算：伤害超过防护后扣除 `system.resources.tili.value`，可触发 `resourceChanged` 并在体力归零时直接添加死亡状态；它不执行 `avoided`、`preDefense`、`preTake`、`dying`、`death`、`damaged`，不能仅靠这些触发器的脚本处理野兽体力伤害。返回的 `tiliLost` 是规则换算的理论体力损失，可能超过剩余体力；实际差值以 `resourceChanged` 为准。
 
 伤害类型以 `CONFIG.XJZL.damageTypes` 为准。环境伤害可以把 `attacker` 设为 `null`；能确定来源时必须传入，以保留统计和反伤语义。
 
@@ -987,7 +987,7 @@ await Macros.requestSave({
 | `dc` | `number`，必填 | 难度；调用方应传入有效数值。 |
 | `attacker` / `label` | `Actor` / `string`，可选 | 来源 Actor 和卡片标题。 |
 | `level` / `bonus` | `number`，默认 `0` | 临时优劣势层级和数值修正。 |
-| `onSuccess` / `onFail` | 状态 ID、AE 数据或数组，可选 | 结果状态；不能传函数，函数会被忽略并警告。 |
+| `onSuccess` / `onFail` | 状态 ID、AE 数据或数组，可选 | 结果状态；AE 对象可带一次施加层数 `count`，见[请求状态后果](#请求状态后果)。不能传函数，函数会被忽略并警告。 |
 | `damageOnSuccess` / `damageOnFail` | `{ value, type, ... }`，可选 | 对应结果的伤害或资源流失；字段与默认值见[请求后果](#请求后果)。 |
 | `item` | `Item` 或 UUID 字符串，可选 | 延期原攻击的来源 Item；卡片只保存 UUID，本地或 GM 结算时还原，使[空]、北冥护体等受击脚本读到正确来源。 |
 | `move` | `Object`，可选 | 延期原攻击的招式；卡片只保存 `id`/`name`/`type`/`element`/`damageType`/`weaponType`/`currentCost` 普通字段，不保存描述或脚本数组。 |
@@ -1025,13 +1025,19 @@ await Macros.requestContest({
 | `outcome.win/lose` 字段 | 类型与作用 |
 |---|---|
 | `text` | 结果说明字符串。 |
-| `selfEffect` / `targetEffect` | 状态 ID、AE 数据对象或它们的数组；数组按顺序逐个应用。 |
+| `selfEffect` / `targetEffect` | 状态 ID、AE 数据对象或它们的数组；数组按顺序逐个应用，AE 对象可带 `count`，见[请求状态后果](#请求状态后果)。 |
 | `selfRecovery` | `{ value, type }`；给发起者恢复资源，`type` 应为 `applyHealing` 支持的资源类型。 |
 | `targetDamage` / `selfDamage` | `{ value, type, ... }`；分别对目标或发起者造成伤害/流失，字段见[请求后果](#请求后果)。 |
 
 自动化执行顺序为：发起者状态 → 对抗者状态 → 发起者恢复 → 对抗者伤害/流失 → 发起者反噬。返回创建聊天卡片的 `Promise<ChatMessage>`，平局判发起者获胜。
 
 伤害后果中，请求级来源参数只用于 `targetDamage`，包括发起者、`item`/`move`、`source`/`isBroken`/`isSkill` 和 `targetKanpo`。`selfDamage` 不继承原攻击来源，按伤害或资源 API 的默认行为结算；单笔后果不支持来源覆盖参数。
+
+### 请求状态后果
+
+`onSuccess` / `onFail` 和 `selfEffect` / `targetEffect` 均支持 `{ id: "chengfeng", count: 3, duration: { value: 1, units: "rounds", expiry: "turnStart" } }`：`id` 引用系统状态，其余 AE 字段覆盖该状态模板。
+
+`count` 表示本次尝试添加的层数，省略或转为数字后不是正整数时按 `1` 处理。结算时移除该临时字段，并作为第三参数传给 `addEffect`；是否叠层、上限、刷新和免疫仍由状态管理器处理。直接调用 `addEffect` 时仍显式传第三参数，不把 `count` 当作 AE 持久字段或用 `flags.xjzl-system.stacks` 代替本次增量。
 
 ### 请求后果
 

@@ -11,12 +11,12 @@ import {
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
- * 野兽"检定型特性"配置编辑器。
- * 特性卡上只保留启用开关与参数摘要，全部检定配置（模式/参数/两侧后果）在本窗口完成。
+ * 野兽特性的状态/检定配置编辑器。
+ * 特性卡上只保留攻击入口与状态入口；直接状态、叠层/持续时间、检定及说明
+ * 全部在本窗口完成，并通过同一份草稿实时保存。
  * 改动实时自动保存（与野兽卡的 submitOnChange 体验一致，无保存按钮）：
  * 任何输入变化经防抖后通过 updateCreatureAbility 整元素写回（abilities 数组元素
- * 在 update 中按整体替换合并，只写 check 会清空同级攻击字段，见 data/actor/creature.mjs）。
- * check.enabled 由角色卡上的检定开关独占，本窗口不展示也不写回该字段。
+ * 在 update 中按整体替换合并，因此状态字段和 check 一起提交，保留同级攻击配置）。
  * 关闭窗口前留存的防抖任务仍会执行，最后一次改动不丢失。
  * 编辑器按"特性下标 + 打开时的数组长度"寻址：卡片上增删特性会整体替换 abilities
  * 数组并改变长度，原下标可能指向另一条特性，此时自动保存会把草稿写进错误对象。
@@ -29,7 +29,7 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
         id: "xjzl-creature-check-editor",
         classes: ["xjzl-window", "xjzl-check-editor-window", "theme-dark"],
         window: {
-            title: "XJZL.Creature.Check.EditorTitle",
+            title: "XJZL.Creature.StateEditorTitle",
             icon: "fas fa-scroll",
             resizable: true
         },
@@ -41,7 +41,9 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
         },
         actions: {
             pickCheckEffects: CreatureCheckEditor.prototype._onPickCheckEffects,
-            removeCheckEffect: CreatureCheckEditor.prototype._onRemoveCheckEffect
+            removeCheckEffect: CreatureCheckEditor.prototype._onRemoveCheckEffect,
+            pickAbilityDirectEffects: CreatureCheckEditor.prototype._onPickAbilityDirectEffects,
+            removeAbilityDirectEffect: CreatureCheckEditor.prototype._onRemoveAbilityDirectEffect
         }
     };
 
@@ -52,7 +54,7 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
         }
     };
 
-    // 固定窗口 id：同时只能编辑一个检定配置，重复打开时替换旧实例
+    // 固定窗口 id：同时只能编辑一个状态/检定配置，重复打开时替换旧实例
     static #current = null;
 
     /** @type {Actor} 所属野兽 */
@@ -61,6 +63,8 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
     #abilityIndex;
     /** @type {Object} 编辑草稿（纯数据树，保存前不落库） */
     #draft;
+    /** @type {Object} 状态页草稿（直接状态与说明字段） */
+    #abilityDraft;
     // 防抖自动保存句柄（首次渲染时创建）
     #autosave = null;
     // 打开时的特性数组长度：增删特性必然改变长度，作为下标失效信号
@@ -68,12 +72,23 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
     // updateActor 监听句柄（close 时注销，防止泄漏）
     #updateHookId = null;
 
-    constructor({ actor, abilityIndex, check }) {
+    constructor({ actor, abilityIndex, ability, check }) {
         super({});
         this.#actor = actor;
         this.#abilityIndex = abilityIndex;
         this.#abilitiesLength = actor.system.abilities?.length ?? 0;
-        this.#draft = foundry.utils.deepClone(check?.toObject ? check.toObject() : check);
+        const source = ability?.check ? ability : actor.system.abilities?.[abilityIndex] || {};
+        const checkSource = check || source.check || {};
+        this.#draft = foundry.utils.deepClone(checkSource?.toObject ? checkSource.toObject() : checkSource);
+        this.#abilityDraft = foundry.utils.deepClone({
+            directEffects: source.directEffects || [],
+            directEffectStackable: source.directEffectStackable === true,
+            directEffectCount: source.directEffectCount ?? 1,
+            directEffectMaxStacks: source.directEffectMaxStacks ?? 0,
+            directEffectDuration: source.directEffectDuration || { value: 0, units: "rounds", expiry: "turnStart" },
+            description: source.description || "",
+            automationNote: source.automationNote || ""
+        });
         this.#updateHookId = Hooks.on("updateActor", doc => this.#onActorUpdate(doc));
     }
 
@@ -96,10 +111,10 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
      * 打开（或替换为）检定配置编辑器。
      * @param {Actor} actor 野兽 Actor
      * @param {Number} abilityIndex 特性下标
-     * @param {Object} check 当前的 check 配置节点
+     * @param {Object} ability 当前的特性数据（兼容只传 check 节点的旧调用）
      * @returns {Promise<CreatureCheckEditor|undefined>} 渲染中的实例；旧窗口关闭失败时为 undefined
      */
-    static async open(actor, abilityIndex, check) {
+    static async open(actor, abilityIndex, ability) {
         const previous = CreatureCheckEditor.#current;
         if (previous) {
             CreatureCheckEditor.#current = null;
@@ -112,7 +127,9 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
                 return undefined;
             }
         }
-        const app = new CreatureCheckEditor({ actor, abilityIndex, check });
+        const source = ability?.check ? ability : actor.system.abilities?.[abilityIndex];
+        const legacyCheck = ability?.check ? undefined : ability;
+        const app = new CreatureCheckEditor({ actor, abilityIndex, ability: source, check: legacyCheck });
         CreatureCheckEditor.#current = app;
         app.render(true).then(
             () => { },
@@ -132,7 +149,14 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
             statusNames[id] = game.i18n.localize(def.name);
         }
         const isSave = this.#draft.mode === "save";
-        context.abilityName = this.#actor.system.abilities[this.#abilityIndex]?.name || "";
+        const ability = this.#actor.system.abilities[this.#abilityIndex];
+        context.abilityName = ability?.name || "";
+        // “伤害后发起检定”只对攻击型特性有意义；纯豁免/对抗特性没有伤害结算点。
+        context.hasAttack = ability?.isAttack === true;
+        context.invalidDirectEffectsWithCheck = context.hasAttack !== true
+            && this.#abilityDraft.directEffects.length > 0
+            && this.#draft.enabled === true;
+        context.ability = this.#abilityDraft;
         context.check = this.#draft;
         context.statusNames = statusNames;
         // 后果两列（左=不利后果侧，右=目标抵御成功/野兽未得手侧）；
@@ -169,7 +193,21 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
         this.element.querySelectorAll("input, select, textarea").forEach(el => {
             el.addEventListener("change", () => {
                 this.#syncFormToDraft();
-                if (el.name === "mode") this.render();
+                const currentAbility = this.#actor.system.abilities[this.#abilityIndex];
+                if (el.name === "enabled"
+                    && el.checked
+                    && currentAbility?.isAttack !== true
+                    && this.#abilityDraft.directEffects.length > 0) {
+                    this.#draft.enabled = false;
+                    ui.notifications.warn(game.i18n.localize("XJZL.Creature.Check.InvalidDirectEffectsWithCheck"));
+                    this.render();
+                    return;
+                }
+                if (el.name === "mode"
+                    || el.name === "ability.directEffectStackable"
+                    || String(el.name).toLowerCase().endsWith("effectstackable")) {
+                    this.render();
+                }
                 this.#autosave();
             });
         });
@@ -177,8 +215,7 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
 
     /**
      * 立即把当前草稿写回 Actor（状态挑选/移除等 DOM 外改动直接调用，其余走防抖）。
-     * enabled 由角色卡的检定开关独占：本窗口不展示该字段，保存时也剔除，
-     * 避免开关在窗口打开期间被关闭后，自动保存又用打开时的旧值重新开启检定。
+     * 状态页的所有字段（包括 check.enabled）一起保存，避免卡片上出现第二套开关。
      * 下标已不存在时静默跳过：正常时序下特性增删会先经 #onActorUpdate 关闭编辑器，
      * 此检查只兜底"保存在途时数组恰好被改写"的窄窗口竞态。
      */
@@ -186,8 +223,11 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
         if (!this.#actor.system.abilities[this.#abilityIndex]) return;
         try {
             const check = foundry.utils.deepClone(this.#draft);
-            delete check.enabled;
-            await updateCreatureAbility(this.#actor, this.#abilityIndex, { check });
+            if (this.#actor.system.abilities[this.#abilityIndex]?.isAttack !== true) {
+                check.afterDamage = false;
+            }
+            const abilityPatch = foundry.utils.deepClone(this.#abilityDraft);
+            await updateCreatureAbility(this.#actor, this.#abilityIndex, { ...abilityPatch, check });
         } catch (error) {
             console.error("XJZL | 检定配置自动保存失败:", error);
             ui.notifications.error(game.i18n.localize("XJZL.Creature.Check.AutosaveFailed"));
@@ -196,7 +236,7 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
 
     /**
      * 把表单当前值同步进草稿：按草稿的数据树遍历（string/number/boolean），
-     * 以字段 name 反查表单元素取值；effects 等数组不进表单，由状态选择器维护，
+     * 以字段 name 反查表单元素取值；effects 与 directEffects 等数组不进表单，由状态选择器维护，
      * 因此重渲染（切换模式/挑选状态）不会丢失表单外的已选内容。
      */
     #syncFormToDraft() {
@@ -224,6 +264,7 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
             }
         };
         syncNode(this.#draft, "");
+        syncNode(this.#abilityDraft, "ability");
     }
 
     /**
@@ -248,6 +289,33 @@ export class CreatureCheckEditor extends HandlebarsApplicationMixin(ApplicationV
         const path = target.dataset.path;
         const current = foundry.utils.getProperty(this.#draft, path) || [];
         foundry.utils.setProperty(this.#draft, path, current.filter(e => e !== target.dataset.id));
+        this.render();
+        await this.#saveNow();
+    }
+
+    /**
+     * 为特性挑选不经过命中/豁免的直接状态；叠层与持续时间仍由本窗口的字段控制。
+     * @param {Event} event 点击事件
+     * @returns {Promise<void>}
+     */
+    async _onPickAbilityDirectEffects(event) {
+        this.#syncFormToDraft();
+        const ability = this.#actor.system.abilities[this.#abilityIndex];
+        if (ability?.isAttack !== true && this.#draft.enabled === true) {
+            return ui.notifications.warn(game.i18n.localize("XJZL.Creature.Check.InvalidDirectEffectsWithCheck"));
+        }
+        const picked = await StatusIdPicker.pick({ selected: this.#abilityDraft.directEffects || [] });
+        if (picked === null) return;
+        this.#abilityDraft.directEffects = picked;
+        this.render();
+        await this.#saveNow();
+    }
+
+    /** 移除一个直接状态，并立即保存剩余状态配置。 */
+    async _onRemoveAbilityDirectEffect(event, target) {
+        this.#syncFormToDraft();
+        this.#abilityDraft.directEffects = (this.#abilityDraft.directEffects || [])
+            .filter(effectId => effectId !== target.dataset.id);
         this.render();
         await this.#saveNow();
     }

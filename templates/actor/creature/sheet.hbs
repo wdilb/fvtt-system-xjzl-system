@@ -186,7 +186,7 @@
 
             <div class="ability-list">
                 {{#each system.abilities as |ability i|}}
-                <div class="ability-card">
+                <div class="ability-card" data-ability-index="{{i}}">
                     {{!-- 头部：名称 + 操作工具（可发起的特性显示收藏与掷骰） --}}
                     <div class="ability-header">
                         <input type="text" class="ability-name" name="system.abilities.{{i}}.name"
@@ -212,46 +212,58 @@
                         </div>
                     </div>
 
-                    {{!-- 攻击段：伤害与类型（检定为附带效果，两段在"使用特性"时一体发起） --}}
-                    <div class="ability-attack-row">
-                        <label class="ability-attack-toggle">
-                            <input type="checkbox" name="system.abilities.{{i}}.isAttack" {{checked
-                                ability.isAttack}} />
+                    {{!-- 能力卡只显示两个主入口；详细字段按需展开，避免常见的攻击配置被说明文本挤到下方。 --}}
+                    <div class="ability-mode-tabs" role="tablist">
+                        <button type="button" class="ability-mode-tab ability-attack-tab" data-action="toggleAbilityPanel"
+                            data-index="{{i}}" data-panel="attack" aria-controls="ability-attack-{{i}}"
+                            aria-expanded="false">
                             <i class="fas fa-gavel"></i>
-                            <span>{{localize "XJZL.Creature.AbilityIsAttack"}}</span>
-                        </label>
+                            <span class="ability-tab-title">{{localize "XJZL.Creature.AbilityIsAttack"}}</span>
+                            <span class="ability-tab-state">
+                                {{#if ability.isAttack}}{{ability.attackSummary}}{{else}}{{localize "XJZL.Creature.AbilityNotConfigured"}}{{/if}}
+                            </span>
+                            <i class="fas fa-chevron-down ability-tab-chevron"></i>
+                        </button>
+                        <button type="button" class="ability-mode-tab ability-state-tab" data-action="editAbilityState"
+                            data-index="{{i}}" data-tooltip="{{localize 'XJZL.Creature.AbilityStateOpenHint'}}">
+                            <i class="fas fa-sparkles"></i>
+                            <span class="ability-tab-title">{{localize "XJZL.Creature.AbilityState"}}</span>
+                            <span class="ability-tab-state">
+                                {{#if ability.stateConfigured}}{{localize "XJZL.Creature.AbilityConfigured"}}{{else}}{{localize "XJZL.Creature.AbilityNotConfigured"}}{{/if}}
+                            </span>
+                            <i class="fas fa-arrow-up-right-from-square ability-tab-external"></i>
+                        </button>
+                    </div>
 
-                        {{#if ability.isAttack}}
-                        <div class="ability-damage-strip" data-tooltip="{{localize 'XJZL.Equipment.Damage'}}">
-                            <input type="number" class="ability-damage" name="system.abilities.{{i}}.damage"
-                                value="{{ability.damage}}" placeholder="0" />
-                            <select class="ability-damage-type" name="system.abilities.{{i}}.damageType">
-                                {{selectOptions @root.choices.damageTypes selected=ability.damageType localize=true}}
-                            </select>
+                    <div id="ability-attack-{{i}}" class="ability-config-panel" data-ability-panel="attack"
+                        aria-hidden="true">
+                        <div class="ability-panel-heading">
+                            <span>{{localize "XJZL.Creature.AbilityAttackSettings"}}</span>
+                            <small>{{localize "XJZL.Creature.AbilityAttackSettingsHint"}}</small>
                         </div>
+                        <label class="ability-config-switch">
+                            <input type="checkbox" name="system.abilities.{{i}}.isAttack" {{checked ability.isAttack}} />
+                            <span>{{localize "XJZL.Creature.AbilityEnableAttack"}}</span>
+                        </label>
+                        {{#if ability.isAttack}}
+                        <div class="ability-attack-fields">
+                            <label class="ability-config-field">
+                                <span>{{localize "XJZL.Equipment.Damage"}}</span>
+                                <input type="number" class="ability-damage" name="system.abilities.{{i}}.damage"
+                                    value="{{ability.damage}}" placeholder="0" />
+                            </label>
+                            <label class="ability-config-field">
+                                <span>{{localize "XJZL.Wuxue.Moves.DamageType"}}</span>
+                                <select name="system.abilities.{{i}}.damageType">
+                                    {{selectOptions @root.choices.damageTypes selected=ability.damageType localize=true}}
+                                </select>
+                            </label>
+                        </div>
+                        {{else}}
+                        <div class="ability-panel-empty">{{localize "XJZL.Creature.AbilityAttackDisabledHint"}}</div>
                         {{/if}}
                     </div>
 
-                    {{!-- 检定段：开关（按钮，实时写回）+ 摘要入口（点击打开配置编辑器弹窗） --}}
-                    <div class="ability-check-row">
-                        <button type="button" class="ability-check-toggle{{#if ability.check.enabled}} on{{/if}}"
-                            data-action="toggleCheck" data-index="{{i}}"
-                            data-tooltip="{{localize 'XJZL.Creature.Check.EnabledHint'}}">
-                            <i class="fas fa-hand-sparkles"></i>
-                            <span>{{localize "XJZL.Creature.Check.Enabled"}}</span>
-                        </button>
-
-                        {{#if ability.check.enabled}}
-                        <button type="button" class="check-summary-btn" data-action="editCheck" data-index="{{i}}"
-                            data-tooltip="{{localize 'XJZL.Creature.Check.EditCheck'}}">
-                            <span>{{ability.checkSummary}}</span>
-                            <i class="fas fa-pen-to-square"></i>
-                        </button>
-                        {{/if}}
-                    </div>
-
-                    <textarea class="ability-desc" name="system.abilities.{{i}}.description" rows="2"
-                        placeholder="{{localize 'XJZL.Creature.AbilityDescPlaceholder'}}">{{ability.description}}</textarea>
                 </div>
                 {{else}}
                 <div class="empty-hint">{{localize "XJZL.Creature.NoAbilities"}}</div>

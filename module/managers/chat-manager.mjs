@@ -3,10 +3,12 @@
  * 职责：监听聊天消息渲染，处理按钮点击，执行战斗结算流程
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
+import * as MacrosModule from "../utils/macros.mjs";
 import { rollDisabilityTable } from "../utils/utils.mjs";
 import { ActiveEffectManager } from "./active-effect-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
+const { XJZLMacros, buildCreatureSaveOutcome, buildCreatureContestOutcome, buildCreatureEffectConfigs } = MacrosModule;
 
 export class ChatCardManager {
 
@@ -476,7 +478,9 @@ export class ChatCardManager {
                 }
             }; //换成优劣势计数
 
-            await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
+            if (!isCreatureAttack) {
+                await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
+            }
 
             // 合并逻辑 (Base OR Script)
             let finalIgnoreBlock = baseIgnoreBlock || checkContext.flags.ignoreBlock;
@@ -1288,9 +1292,94 @@ export class ChatCardManager {
     }
 
     /**
-     * 应用伤害
+     * 野兽攻击最终结算后的轻量后效：直接状态和需要最终命中的检定都在这里处理。
+     * @param {Actor} attacker 发起攻击的野兽
+     * @param {Actor} targetActor 最终结算目标
+     * @param {Object} ability 攻击卡保存的特性快照
+     * @param {Object} damageResult applyDamage 返回的最终结果
+     * @param {ChatMessage} message 原攻击卡
+     * @param {boolean} isHit 最终命中结果
      */
+    static async _applyCreaturePostDamage(attacker, targetActor, ability, damageResult, message, isHit) {
+        if (!ability || !targetActor || !isHit) return;
+
+        const directEffects = buildCreatureEffectConfigs(ability.directEffects, {
+            stackable: ability.directEffectStackable === true,
+            count: ability.directEffectCount,
+            maxStacks: ability.directEffectMaxStacks,
+            duration: ability.directEffectDuration
+        });
+        if (directEffects.length > 0) {
+            for (const effect of directEffects) {
+                await ChatCardManager._applyEffectHelper(targetActor, effect, message);
+            }
+        }
+
+        const check = ability.check;
+        if (!check?.enabled || (check.requireHit !== true && check.afterDamage !== true)) return;
+        // 人物伤害结果已有实际资源损失字段；creature 分支只有理论体力损失，
+        // 无法在不扩展公共返回结构的前提下准确判断，交给说明/手动处理。
+        if (check.afterDamage === true) {
+            if (targetActor.type === "creature") {
+                const abilityName = foundry.utils.escapeHTML(String(ability.name || "野兽特性检定"));
+                const targetName = foundry.utils.escapeHTML(String(targetActor.name || "野兽目标"));
+                await ChatMessage.create({
+                    author: game.user.id,
+                    speaker: ChatMessage.getSpeaker({ actor: attacker || targetActor }),
+                    content: `<div class="xjzl-chat-card" style="padding:4px 8px;border-left:3px solid #8b6f00;background:rgba(139,111,0,0.06);"><b style="color:#8b6f00;">${game.i18n.localize("XJZL.Creature.Check.AfterDamageCreatureManualTitle")}</b><div>${abilityName}：${targetName}为野兽目标，${game.i18n.localize("XJZL.Creature.Check.AfterDamageCreatureManual")}</div></div>`,
+                    style: CONST.CHAT_MESSAGE_STYLES.OTHER
+                });
+                return;
+            }
+            const resourceLoss = Number(damageResult?.hpLost || 0)
+                + Number(damageResult?.hutiLost || 0)
+                + Number(damageResult?.mpLost || 0);
+            if (resourceLoss <= 0) return;
+        }
+        const label = ability.name || "野兽特性检定";
+        if (check.mode === "contest") {
+            const panel = check.contest || {};
+            await XJZLMacros.requestContest({
+                attacker,
+                defender: targetActor,
+                type: panel.attAttr,
+                defType: panel.defAttr,
+                attBonus: panel.attBonus,
+                defBonus: panel.defBonus,
+                label,
+                outcome: {
+                    win: buildCreatureContestOutcome(panel.win),
+                    lose: buildCreatureContestOutcome(panel.lose)
+                }
+            });
+            return;
+        }
+
+        const panel = check.save || {};
+        const success = buildCreatureSaveOutcome(panel.success);
+        const fail = buildCreatureSaveOutcome(panel.fail);
+        await XJZLMacros.requestSave({
+            target: targetActor,
+            attacker,
+            type: panel.attr,
+            dc: panel.dc,
+            level: panel.level,
+            bonus: panel.bonus,
+            label,
+            onSuccess: success.effects,
+            damageOnSuccess: success.damage,
+            successText: success.text,
+            removeStanceOnSuccess: success.removeStance === true,
+            onFail: fail.effects,
+            damageOnFail: fail.damage,
+            failureText: fail.text,
+            removeStanceOnFail: fail.removeStance === true
+        });
+    }
+
+    /** 应用聊天攻击卡伤害；野兽标记跳过人物攻击脚本并处理特性后效。 */
     static async _applyDamage(attacker, item, flags, targets, message) {
+        const isCreatureAttack = flags.isCreatureAttack === true;
         // 1. 命中复核
         const hitResults = await this._resolveHitRoll(attacker, item, flags, targets, message);
         // 提前初始化暴击标记，在循环中一并计算，避免二次遍历
@@ -1428,7 +1517,7 @@ export class ChatCardManager {
             } else {
                 isBroken = (feintStatus === "broken");
             }
-            if (isHit) {
+            if (isHit && !isCreatureAttack) {
                 const currentStance = targetActor.system.martial.stanceActive;
                 // 如果没有开架招、击破了、或者忽略了才算是有效的回怒目标
                 if (!currentStance || isBroken || ignoreStance) {
@@ -1488,8 +1577,8 @@ export class ChatCardManager {
                 ignoreMinDamage: false          // 默认为 false (保底1点伤害)
             };
 
-            // 2. 只有命中了才跑这个脚本 (未命中不需要改伤害类型)
-            if (isHit) {
+            // 2. 只有人物攻击命中了才跑攻击侧 PRE_DAMAGE；野兽攻击不读取人物脚本。
+            if (isHit && !isCreatureAttack) {
                 // 攻击侧数值修正资格：从卡片 flags 恢复 preAttack 声明后核心固定的布尔值；
                 // 旧卡片未携带该标志时保持 true。preDamage 中只读，脚本改写不能影响后续脚本。
                 const allowDamageModifiers = flags.allowDamageModifiers !== false;
@@ -1553,7 +1642,12 @@ export class ChatCardManager {
                 damageSource = flags.moveId === "opportunity-attack" ? "both" : "basic";
             }
             // C. 调用 Actor 伤害处理
-            const damageResult = skipDefaultDamage ? {
+            const creatureHasDamage = flags.creatureAbility
+                ? (flags.creatureAbility.hasDamage === true
+                    || (flags.creatureAbility.hasDamage === undefined && Number(flags.damage) > 0))
+                : false;
+            const noCreatureDamage = isCreatureAttack && flags.creatureAbility && !creatureHasDamage;
+            const damageResult = skipDefaultDamage || noCreatureDamage ? {
                 finalDamage: 0,
                 hpLost: 0,
                 hutiLost: 0,
@@ -1584,12 +1678,23 @@ export class ChatCardManager {
                 source: damageSource       // 注入来源标识
             });
 
+            if (flags.creatureAbility) {
+                await ChatCardManager._applyCreaturePostDamage(
+                    attacker,
+                    targetActor,
+                    flags.creatureAbility,
+                    damageResult,
+                    message,
+                    isHit
+                );
+            }
+
             // 命中即计入命中数：skipDamage 只取消默认伤害提交，不取消命中结果本身
             if (isHit) hitCount++;
 
             // 结算卡片只反映实际提交的默认伤害；取消提交时本笔不发卡，
             // 后续豁免/对抗请求卡由 hit 脚本创建，避免出现“0 伤害”误导卡。
-            if (isHit && !skipDefaultDamage) {
+            if (isHit && !skipDefaultDamage && !noCreatureDamage) {
                 const templateData = {
                     name: displayName,
                     img: targetActor.img || target.texture?.src, // 优先取 actor 图
@@ -1689,7 +1794,7 @@ export class ChatCardManager {
             };
 
             // 无论命中与否都执行，脚本内自己判断 if (args.isHit)
-            await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
+            if (!isCreatureAttack) await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
         }
 
         // =====================================================
@@ -1744,7 +1849,7 @@ export class ChatCardManager {
         // 放在这里执行满足 "AOE只回1点" 的需求
         // A. 攻击者回怒 (Attacker Rage)
         // 规则：只要本次出招命中了至少一个敌人，且是内外功伤害，攻击者回复 1 点怒气
-        if (validRageHits > 0) {
+        if (!isCreatureAttack && validRageHits > 0) {
             const attRage = attacker.system.resources.rage;
             // 检查封穴状态
             const attNoRecover = attacker.xjzlStatuses?.noRecoverRage;
@@ -1782,7 +1887,7 @@ export class ChatCardManager {
             scriptFlags: flags.scriptFlags || {}
         };
 
-        await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
+        if (!isCreatureAttack) await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
     }
 
     /**
@@ -1989,10 +2094,150 @@ export class ChatCardManager {
     }
 
     /**
+     * Shift 手动结算野兽攻击。野兽不执行人物攻击侧脚本，也不进入人物怒气/动作流程；
+     * 仍复用 Actor.applyDamage 和统一的野兽命中后效，保证自动与手动结果一致。
+     * @param {Actor} attacker 发起攻击的野兽
+     * @param {Item|null} item 虚拟或实际来源物品
+     * @param {Object} flags 攻击卡快照
+     * @param {ChatMessage} message 原攻击卡
+     * @returns {Promise<void>}
+     */
+    static async _handleManualCreatureDamage(attacker, item, flags, message) {
+        const targets = Array.from(game.user.targets).map(t => t.document);
+        if (targets.length === 0) {
+            return ui.notifications.warn("【手动模式】请先在场景中选中至少一个目标。");
+        }
+
+        const ability = flags.creatureAbility || null;
+        // 兼容早于 hasDamage 快照的旧卡：旧卡有正数面板伤害时仍按伤害攻击处理。
+        const hasDamage = ability
+            ? (ability.hasDamage === true || (ability.hasDamage === undefined && Number(flags.damage) > 0))
+            : Number(flags.damage) > 0;
+        const baseDamage = hasDamage ? Math.max(0, Number(flags.damage) || 0) : 0;
+        const config = await ChatCardManager._promptManualConfig(baseDamage, hasDamage, false);
+        if (!config) return;
+
+        const move = item?.system?.moves?.find(m => m.id === (flags.moveId || "basic-attack")) || null;
+        const moveElement = move?.element || "none";
+        const damageSource = flags.moveId === "opportunity-attack" ? "both" : "basic";
+
+        for (const target of targets) {
+            const targetActor = target?.actor || target;
+            if (!targetActor) continue;
+
+            const isHit = config.forceHit === true;
+            const amount = hasDamage ? Math.max(0, baseDamage + (Number(config.damageMod) || 0)) : 0;
+            let targetKanpo = 0;
+            if (isHit && config.isBroken && targetActor.system?.martial?.stanceActive) {
+                targetKanpo = targetActor.system.combat?.kanpoTotal || 0;
+                if (typeof targetActor.stopStance === "function") await targetActor.stopStance();
+                const statusConfig = CONFIG.statusEffects.pofang;
+                if (statusConfig) {
+                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [{
+                        ...statusConfig,
+                        name: game.i18n.localize(statusConfig.name),
+                        description: game.i18n.localize(statusConfig.description),
+                        origin: attacker?.uuid || message.uuid
+                    }]);
+                }
+                targetActor.showFloatyText?.("被击破架招！", { fill: "#ff0000" });
+            }
+            const damageResult = hasDamage
+                ? await targetActor.applyDamage({
+                    amount,
+                    type: flags.damageType,
+                    targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
+                    attacker,
+                    isHit,
+                    isCrit: false,
+                    applyCritDamage: false,
+                    isBroken: config.isBroken,
+                    targetKanpo,
+                    ignoreBlock: config.ignoreBlock,
+                    ignoreDefense: config.ignoreDefense,
+                    ignoreStance: config.ignoreStance,
+                    ignoreMinDamage: false,
+                    isSkill: move ? move.type !== "basic" : false,
+                    element: moveElement,
+                    move,
+                    item,
+                    source: damageSource
+                })
+                : {
+                    finalDamage: 0,
+                    hpLost: 0,
+                    hutiLost: 0,
+                    mpLost: 0,
+                    tiliLost: 0,
+                    isDying: false,
+                    isDead: false,
+                    rageGained: false,
+                    isHit
+                };
+
+            if (ability) {
+                await ChatCardManager._applyCreaturePostDamage(
+                    attacker,
+                    targetActor,
+                    ability,
+                    damageResult,
+                    message,
+                    isHit
+                );
+            }
+
+            // 无伤害控制能力只处理命中与后效，不制造 0 伤害结算卡。
+            if (!isHit || amount <= 0) continue;
+            const content = await renderTemplate(
+                "systems/xjzl-system/templates/chat/damage-card.hbs",
+                {
+                    name: target.name || targetActor.name,
+                    img: targetActor.img || target.texture?.src,
+                    finalDamage: damageResult.finalDamage,
+                    hutiLost: damageResult.hutiLost,
+                    hpLost: damageResult.hpLost,
+                    mpLost: damageResult.mpLost,
+                    tiliLost: damageResult.tiliLost,
+                    isDead: damageResult.isDead,
+                    isDying: damageResult.isDying,
+                    rageGained: damageResult.rageGained,
+                    isUndone: false,
+                    isCrit: false
+                }
+            );
+            ChatMessage.create({
+                author: game.user.id,
+                speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                content,
+                flags: {
+                    "xjzl-system": {
+                        type: "damage-card",
+                        undoData: {
+                            attackerUuid: attacker.uuid,
+                            targetUuid: target.uuid,
+                            hpLost: damageResult.hpLost,
+                            hutiLost: damageResult.hutiLost,
+                            mpLost: damageResult.mpLost,
+                            tiliLost: damageResult.tiliLost,
+                            gainedDead: damageResult.isDead,
+                            gainedDying: damageResult.isDying,
+                            gainedRage: damageResult.rageGained
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /**
      * 处理 Shift+点击 的手动伤害应用
      * 特点：使用当前目标，忽略命中检定，允许 GM 强行覆盖参数
      */
     static async _handleManualDamage(attacker, item, flags, message) {
+        if (flags.isCreatureAttack === true) {
+            return this._handleManualCreatureDamage(attacker, item, flags, message);
+        }
+
         // 1. 强制获取当前选中的目标
         const targets = Array.from(game.user.targets).map(t => t.document);
 
@@ -2287,7 +2532,27 @@ export class ChatCardManager {
     /**
      * 弹出详细的手动伤害配置窗口
      */
-    static async _promptManualConfig(baseDamage) {
+    static async _promptManualConfig(baseDamage, allowDamageModifier = true, allowCritical = true) {
+        const damageModifierControl = allowDamageModifier
+            ? `<input type="number" name="damageMod" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
+                <p class="notes">在原伤害基础上增减数值</p>`
+            : `<input type="number" name="damageMod" value="0" disabled style="text-align:center; background:rgba(0,0,0,0.05);"/>
+                <p class="notes">该特性没有伤害，手动结算只处理命中与后效。</p>`;
+        const criticalControl = allowCritical
+            ? `<div class="form-group">
+                <label>是否暴击</label>
+                <input type="checkbox" name="isCrit"/>
+            </div>
+
+            <div class="form-group">
+                <label>可以造成暴击伤害</label>
+                <input type="checkbox" name="applyCritDamage" checked/>
+            </div>`
+            : `<div class="form-group">
+                <label>暴击</label>
+                <input type="checkbox" disabled/>
+                <p class="notes">${game.i18n.localize("XJZL.Creature.Check.BeastNoCritical")}</p>
+            </div>`;
         const content = `
         <div class="xjzl-dialog-content" style="padding:5px;">
             <div class="form-group">
@@ -2299,8 +2564,7 @@ export class ChatCardManager {
 
             <div class="form-group">
                 <label>伤害修正</label>
-                <input type="number" name="damageMod" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
-                <p class="notes">在原伤害基础上增减数值</p>
+                ${damageModifierControl}
             </div>
 
             <div class="form-group">
@@ -2308,15 +2572,7 @@ export class ChatCardManager {
                 <input type="checkbox" name="forceHit" checked/>
             </div>
 
-            <div class="form-group">
-                <label>是否暴击</label>
-                <input type="checkbox" name="isCrit"/>
-            </div>
-
-            <div class="form-group">
-                <label>可以造成暴击伤害</label>
-                <input type="checkbox" name="applyCritDamage" checked/>
-            </div>
+            ${criticalControl}
 
             <div class="form-group">
                 <label>强制破架(击破架招)</label>
@@ -2460,8 +2716,15 @@ export class ChatCardManager {
                                 effectData = { ...e, origin: message.uuid, disabled: false };
                             }
 
+                            const count = Number(effectData.count);
+                            delete effectData.count;
+
                             // 调用核心管理器
-                            const createdEffect = await ActiveEffectManager.addEffect(actor, effectData);
+                            const createdEffect = await ActiveEffectManager.addEffect(
+                                actor,
+                                effectData,
+                                Number.isInteger(count) && count > 0 ? count : 1
+                            );
                             if (createdEffect) {
                                 appliedNames.push(createdEffect.name);
                             }
@@ -2968,8 +3231,14 @@ export class ChatCardManager {
         // 4. 注入来源 (必须步骤)
         effectData.origin = message.uuid;
 
-        // 5. 调用你的管理器
-        const created = await ActiveEffectManager.addEffect(actor, effectData);
+        // 5. 调用你的管理器；请求卡可在对象中携带一次性叠层数。
+        const count = Number(effectData.count);
+        delete effectData.count;
+        const created = await ActiveEffectManager.addEffect(
+            actor,
+            effectData,
+            Number.isInteger(count) && count > 0 ? count : 1
+        );
         return created ? created.name : null;
     }
 

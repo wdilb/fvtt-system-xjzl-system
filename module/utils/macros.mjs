@@ -67,15 +67,56 @@ export function buildOutcomeDamageConfig(damage) {
 }
 
 /**
+ * 将野兽特性中的状态 ID 转为请求卡可持久化的状态引用。
+ * duration/层数只在明确配置时写入，普通旧数据仍保持字符串 ID 兼容。
+ * @param {string[]|Object[]} ids 状态 ID 或已构造的状态对象
+ * @param {Object} [options] count/stackable/maxStacks/duration 配置；duration 统一按战斗回合处理
+ * @returns {Object[]} 可传给 ActiveEffectManager 的状态数据
+ */
+export function buildCreatureEffectConfigs(ids, options = {}) {
+    return (ids || []).filter(Boolean).map(id => {
+        const effect = typeof id === "string" ? { id } : foundry.utils.deepClone(id);
+        const count = Number(options.count);
+        const maxStacks = Number(options.maxStacks);
+        // 只在用户明确勾选“允许叠层”时覆盖状态定义；未勾选时保留状态原本的叠层规则。
+        if (options.stackable === true) {
+            effect.flags = effect.flags || {};
+            effect.flags["xjzl-system"] = {
+                ...(effect.flags["xjzl-system"] || {}),
+                stackable: true,
+                // 0 明确表示无限上限，因此即使状态定义自带上限也要覆盖为 0。
+                maxStacks: Number.isInteger(maxStacks) && maxStacks >= 0 ? maxStacks : 0
+            };
+        }
+        if (Number.isInteger(count) && count > 1) effect.count = count;
+        const duration = options.duration;
+        if (duration && Number(duration.value) > 0) {
+            effect.duration = {
+                value: Number(duration.value),
+                // 野兽配置界面只提供“回合”，避免用户接触 Foundry 内部单位名。
+                units: "rounds",
+                expiry: duration.expiry || "turnStart"
+            };
+        }
+        return effect;
+    });
+}
+
+/**
  * 将豁免后果配置转换为 requestSave 的单侧参数集。
  * 只保留已配置的键；空配置返回空对象（发起端把空值直接传给宏即可，宏侧按缺省跳过）。
  * @param {Object} [outcome] check.save.success / check.save.fail 节点
- * @returns {{text?: String, effects?: String[], damage?: Object, removeStance?: Boolean}}
+ * @returns {{text?: String, effects?: Object[], damage?: Object, removeStance?: Boolean}}
  */
 export function buildCreatureSaveOutcome(outcome) {
     const cfg = {};
     if (outcome?.text) cfg.text = outcome.text;
-    const effects = (outcome?.effects || []).filter(Boolean);
+    const effects = buildCreatureEffectConfigs(outcome?.effects, {
+        stackable: outcome?.effectStackable === true,
+        count: outcome?.effectCount,
+        maxStacks: outcome?.effectMaxStacks,
+        duration: outcome?.effectDuration
+    });
     if (effects.length > 0) cfg.effects = effects;
     const damage = buildOutcomeDamageConfig(outcome?.damage);
     if (damage) cfg.damage = damage;
@@ -92,11 +133,21 @@ export function buildCreatureSaveOutcome(outcome) {
 export function buildCreatureContestOutcome(outcome) {
     const cfg = {};
     if (outcome?.text) cfg.text = outcome.text;
-    const targetEffects = (outcome?.effects || []).filter(Boolean);
+    const targetEffects = buildCreatureEffectConfigs(outcome?.effects, {
+        stackable: outcome?.effectStackable === true,
+        count: outcome?.effectCount,
+        maxStacks: outcome?.effectMaxStacks,
+        duration: outcome?.effectDuration
+    });
     if (targetEffects.length > 0) cfg.targetEffect = targetEffects;
     const targetDamage = buildOutcomeDamageConfig(outcome?.damage);
     if (targetDamage) cfg.targetDamage = targetDamage;
-    const selfEffects = (outcome?.selfEffects || []).filter(Boolean);
+    const selfEffects = buildCreatureEffectConfigs(outcome?.selfEffects, {
+        stackable: outcome?.selfEffectStackable === true,
+        count: outcome?.selfEffectCount,
+        maxStacks: outcome?.selfEffectMaxStacks,
+        duration: outcome?.selfEffectDuration
+    });
     if (selfEffects.length > 0) cfg.selfEffect = selfEffects;
     const selfDamage = buildOutcomeDamageConfig(outcome?.selfDamage);
     if (selfDamage) cfg.selfDamage = selfDamage;

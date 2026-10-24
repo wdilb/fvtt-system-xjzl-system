@@ -107,9 +107,26 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
             // 目标侧伤害/流失与状态；effects 存 CONFIG.statusEffects 的状态 ID
             damage: checkDamage(),
             effects: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+            // 未勾选时沿用所选状态自身的叠层设定；勾选后允许本次后果叠层。
+            effectStackable: new fields.BooleanField({ initial: false }),
+            effectCount: new fields.NumberField({ initial: 1, min: 1, integer: true }),
+            effectMaxStacks: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+            effectDuration: new fields.SchemaField({
+                value: new fields.NumberField({ initial: 0, min: 0 }),
+                units: new fields.StringField({ initial: "rounds" }),
+                expiry: new fields.StringField({ initial: "turnStart" })
+            }),
             ...(isContest ? {
                 selfDamage: checkDamage(),
                 selfEffects: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+                selfEffectStackable: new fields.BooleanField({ initial: false }),
+                selfEffectCount: new fields.NumberField({ initial: 1, min: 1, integer: true }),
+                selfEffectMaxStacks: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+                selfEffectDuration: new fields.SchemaField({
+                    value: new fields.NumberField({ initial: 0, min: 0 }),
+                    units: new fields.StringField({ initial: "rounds" }),
+                    expiry: new fields.StringField({ initial: "turnStart" })
+                }),
                 selfRecovery: new fields.SchemaField({
                     value: new fields.NumberField({ initial: 0, min: 0 }),
                     // 野兽只持久化 tili/rage，hp 恢复会被静默丢弃，默认与选项都限定这两项
@@ -153,7 +170,7 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
                 type: new fields.StringField({ initial: "fan", choices: ["fan", "meng", "zhen"], label: "XJZL.Creature.Type" }),
                 difficulty: new fields.NumberField({ initial: 10, label: "XJZL.Creature.Difficulty" }), // 捕捉难度
                 price: new fields.StringField({ initial: "", label: "XJZL.Equipment.Price" }), // 饲养价格
-                size: new fields.StringField({ initial: "medium", label: "XJZL.Info.Height" }) // 体型
+                size: new fields.StringField({ initial: "medium", choices: ["tiny", "small", "medium", "large", "huge"], label: "XJZL.Info.Height" }) // 体型
             }),
 
             description: new fields.HTMLField({ label: "XJZL.Info.Bio" }), // 描述
@@ -162,6 +179,7 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
             abilities: new fields.ArrayField(new fields.SchemaField({
                 name: new fields.StringField(),
                 description: new fields.StringField(),
+                automationNote: new fields.StringField({ initial: "" }),
                 // 是否为攻击型特性：勾选后可点击发起一次纯攻击
                 isAttack: new fields.BooleanField({ initial: false, label: "XJZL.Creature.AbilityIsAttack" }),
                 // 攻击型特性的固定伤害数值
@@ -172,6 +190,17 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
                     choices: Object.keys(CONFIG.XJZL.damageTypes),
                     label: "XJZL.Wuxue.Moves.DamageType"
                 }),
+                // 不单独发起豁免/对抗的状态；攻击型特性仍先完成命中（击飞、落地等由 automationNote 提示手动处理）
+                directEffects: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+                // 未勾选时沿用状态自身的叠层设定；勾选后允许直接附加状态叠层。
+                directEffectStackable: new fields.BooleanField({ initial: false }),
+                directEffectCount: new fields.NumberField({ initial: 1, min: 1, integer: true }),
+                directEffectMaxStacks: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+                directEffectDuration: new fields.SchemaField({
+                    value: new fields.NumberField({ initial: 0, min: 0 }),
+                    units: new fields.StringField({ initial: "rounds" }),
+                    expiry: new fields.StringField({ initial: "turnStart" })
+                }),
                 // 检定型特性（豁免/对抗）：可与攻击段融合（先攻击，再按命中过滤发起请求卡）。
                 // 结算完全复用 XJZLMacros 请求卡管线，数据模型只存配置。
                 check: new fields.SchemaField({
@@ -180,6 +209,7 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
                     mode: new fields.StringField({ initial: "save", choices: ["save", "contest"], label: "XJZL.Creature.Check.Mode" }),
                     // 攻击+检定同时启用时生效：仅对本次攻击命中的目标发起检定
                     requireHit: new fields.BooleanField({ initial: false }),
+                    afterDamage: new fields.BooleanField({ initial: false }),
                     save: new fields.SchemaField({
                         attr: new fields.StringField({
                             initial: "dingli",

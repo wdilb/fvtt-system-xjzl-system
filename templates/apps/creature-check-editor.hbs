@@ -1,4 +1,4 @@
-{{!-- 野兽检定型特性配置编辑器：特性卡上只留开关与摘要，全部配置在此窗口完成。
+{{!-- 野兽状态/检定配置编辑器：特性卡上只留攻击与状态入口，全部状态配置在此窗口完成。
 布局采用两列对照（豁免=目标失败|目标成功，对抗=野兽获胜|野兽落败），
 后果列内部用"作用于目标/作用于野兽"小节明确作用对象。
 改动实时自动保存（防抖写回，无保存按钮）；特性列表增删时窗口自动失效关闭。--}}
@@ -12,6 +12,66 @@
             {{#if (eq check.mode "save")}}{{localize "XJZL.Creature.Check.ModeSave"}}{{else}}{{localize "XJZL.Creature.Check.ModeContest"}}{{/if}}
         </span>
     </div>
+
+    {{!-- 直接状态：不经过命中/豁免；叠层与持续时间和状态选择放在同一窗口。 --}}
+    <div class="ability-state-editor-section direct-state-editor" data-tooltip="{{localize 'XJZL.Creature.DirectEffectsHint'}}">
+        <div class="ability-editor-section-head">
+            <div>
+                <span class="ability-editor-section-title">{{localize "XJZL.Creature.DirectEffects"}}</span>
+                <small>{{localize "XJZL.Creature.DirectEffectsHint"}}</small>
+            </div>
+            <a class="check-effect-add" data-action="pickAbilityDirectEffects"
+                data-tooltip="{{localize 'XJZL.Creature.DirectEffectsAdd'}}"><i class="fas fa-plus"></i></a>
+        </div>
+        <div class="ability-direct-editor-row">
+            {{#each ability.directEffects as |eid|}}
+            <span class="check-effect-chip ability-direct-editor-chip">
+                {{lookup @root.statusNames eid}}
+                <a data-action="removeAbilityDirectEffect" data-id="{{eid}}"
+                    data-tooltip="{{localize 'XJZL.Creature.RemoveDirectEffect'}}"><i class="fas fa-times"></i></a>
+            </span>
+            {{/each}}
+            {{#unless ability.directEffects.length}}
+            <span class="ability-editor-empty">{{localize "XJZL.Creature.AbilityNoDirectEffects"}}</span>
+            {{/unless}}
+        </div>
+        {{#if ability.directEffects.length}}
+        <div class="ability-direct-editor-options">
+            <label data-tooltip="{{localize 'XJZL.Creature.DirectEffectsStackableHint'}}">
+                <input type="checkbox" name="ability.directEffectStackable" {{checked ability.directEffectStackable}} />
+                {{localize "XJZL.Creature.DirectEffectsStackable"}}
+            </label>
+            <label data-tooltip="{{localize 'XJZL.Creature.DirectEffectsCountHint'}}">
+                {{localize "XJZL.Creature.DirectEffectsCount"}}
+                <input type="number" name="ability.directEffectCount" value="{{ability.directEffectCount}}" min="1" step="1" />
+            </label>
+            {{#if ability.directEffectStackable}}
+            <label data-tooltip="{{localize 'XJZL.Creature.DirectEffectsMaxStacksHint'}}">
+                {{localize "XJZL.Creature.DirectEffectsMaxStacks"}}
+                <input type="number" name="ability.directEffectMaxStacks" value="{{ability.directEffectMaxStacks}}" min="0" step="1" />
+            </label>
+            {{/if}}
+            <label data-tooltip="{{localize 'XJZL.Creature.DirectEffectsDurationHint'}}">
+                {{localize "XJZL.Creature.DirectEffectsDuration"}}
+                <input type="number" name="ability.directEffectDuration.value"
+                    value="{{ability.directEffectDuration.value}}" min="0" step="1" />
+                <span>回合</span>
+            </label>
+        </div>
+        {{/if}}
+    </div>
+
+    {{#if invalidDirectEffectsWithCheck}}
+    <div class="xjzl-editor-warning" role="alert">
+        <i class="fas fa-triangle-exclamation"></i>
+        {{localize "XJZL.Creature.Check.InvalidDirectEffectsWithCheck"}}
+    </div>
+    {{/if}}
+
+    <label class="check-inline-toggle ability-check-enabled" data-tooltip="{{localize 'XJZL.Creature.Check.EnabledHint'}}">
+        <input type="checkbox" name="enabled" {{checked check.enabled}} />
+        <span class="diamond"></span>{{localize "XJZL.Creature.Check.Enable"}}
+    </label>
 
     {{!-- 模式开关：两张说明卡，二选一生效；未选中的一套配置保留但不发起 --}}
     <div class="editor-mode-row">
@@ -41,6 +101,12 @@
         <input type="checkbox" name="requireHit" {{checked check.requireHit}} />
         <span class="diamond"></span>{{localize "XJZL.Creature.Check.RequireHit"}}
     </label>
+    {{#if hasAttack}}
+    <label class="check-inline-toggle" data-tooltip="{{localize "XJZL.Creature.Check.AfterDamageHint"}}">
+        <input type="checkbox" name="afterDamage" {{checked check.afterDamage}} />
+        <span class="diamond"></span>{{localize "XJZL.Creature.Check.AfterDamage"}}
+    </label>
+    {{/if}}
 
     {{!-- 检定参数：豁免=四组字段；对抗=野兽 vs 目标对阵 --}}
     <div class="editor-sec-head">{{localize "XJZL.Creature.Check.ParamsSection"}}</div>
@@ -105,4 +171,20 @@
             </div>
         </div>
     </div>
+
+    <details class="ability-editor-notes">
+        <summary>{{localize "XJZL.Creature.AbilityNotes"}}</summary>
+        <div class="ability-editor-notes-fields">
+            <label>
+                <span>{{localize "XJZL.Info.Description"}}</span>
+                <textarea name="ability.description" rows="3"
+                    placeholder="{{localize 'XJZL.Creature.AbilityDescPlaceholder'}}">{{ability.description}}</textarea>
+            </label>
+            <label>
+                <span>{{localize "XJZL.Creature.AutomationNote"}}</span>
+                <textarea name="ability.automationNote" rows="2"
+                    placeholder="{{localize 'XJZL.Creature.AutomationNotePlaceholder'}}">{{ability.automationNote}}</textarea>
+            </label>
+        </div>
+    </details>
 </div>

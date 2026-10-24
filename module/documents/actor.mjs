@@ -2,8 +2,9 @@
  * 扩展核心 Actor 类
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
-import { XJZLMacros, buildCreatureSaveOutcome, buildCreatureContestOutcome } from "../utils/macros.mjs";
+import * as MacrosModule from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { queueHitEffect } from "../managers/combat-fx-manager.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
@@ -14,6 +15,8 @@ import {
   assertNoSyncScriptWrite,
   notifySyncScriptViolation
 } from "../utils/sync-script-guard.mjs";
+
+const { XJZLMacros, buildCreatureSaveOutcome, buildCreatureContestOutcome, buildCreatureEffectConfigs } = MacrosModule;
 
 // 尝试突破经脉花费固定为500
 const JINGMAI_ATTEMPT_COST = 500;
@@ -1027,7 +1030,8 @@ export class XJZLActor extends Actor {
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     // 需要特殊处理为数字的 Key 列表 (战斗类)
     const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel",
-      "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel", "mpCostMultiplier", "takeBleedDamageTurnStart"];
+      "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel", "mpCostMultiplier", "takeBleedDamageTurnStart",
+      "beastHitBonus"];
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
       // 如果是那数值型的 Key，单独处理，否则按布尔处理
@@ -1050,6 +1054,19 @@ export class XJZLActor extends Actor {
     for (const key of Object.keys(checkFlags)) {
       // 直接读取并转为 Int，默认为 0
       this.xjzlStatuses[key] = parseInt(this.getFlag("xjzl-system", key)) || 0;
+    }
+
+    // 野兽只保留自己的战斗数值：状态对速度、闪避和命中的修改在这里收口，
+    // 避免把人物武学/装备的派生加成带入野兽攻击。
+    if (this.type === "creature") {
+      const combat = this.system.combat;
+      const speed = combat.speed || 0;
+      combat.speedTotal = this.xjzlStatuses.forceSpeedZero
+        ? 0
+        : (this.xjzlStatuses.unstable ? Math.floor(speed / 2) : speed);
+      combat.dodgeTotal = this.xjzlStatuses.forceDodgeZero ? 0 : (combat.dodge || 0);
+      combat.hitWaigongTotal = (combat.hit || 0) + (this.xjzlStatuses.beastHitBonus || 0);
+      combat.hitNeigongTotal = combat.hitWaigongTotal;
     }
 
     // ----------------------------------------------------
@@ -3470,7 +3487,8 @@ export class XJZLActor extends Actor {
       isUltimate: false,
       img: isOpportunity ? "icons/skills/melee/strike-dagger-blood-red.webp" : (weapon ? weapon.img : "icons/skills/melee/unarmed-punch-fist.webp"), // 图标
       currentCost: { mp: 0, rage: 0, hp: 0 }, // 普攻无消耗
-      description: isOpportunity ? "发起一次趁虚而入。" : "发起一次基础攻击。"
+      description: isOpportunity ? "发起一次趁虚而入。" : "发起一次基础攻击。",
+      automationNote: isCreatureAttack ? (options.creatureAbility?.automationNote || "") : ""
     };
 
     // 资源处理 (趁虚而入特供)
@@ -3535,14 +3553,24 @@ export class XJZLActor extends Actor {
     if (isOpportunity) await this.processRegen("Attack");
     // TODO 暂时来说没有普通攻击触发的，以后会有吗？
 
-    // === 消耗次要动作 ===
-    ActionTracker.consumeAction(this, "次要动作");
+    // 野兽特性不进入人物动作追踪；人物普攻仍沿用原有次要动作消耗。
+    if (!isCreatureAttack) ActionTracker.consumeAction(this, "次要动作");
 
     // =====================================================
     // 4·5 提前计算基础伤害
     // =====================================================
     // 理由：让脚本能获取并修改这个结果
-    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
+    const calcResult = isCreatureAttack
+      ? {
+          damage: Math.max(0, Math.floor(baseDamage + (config.bonusDamage || 0))),
+          feint: 0,
+          breakdown: `野兽基础伤害: ${baseDamage}\n+ 本次手动修正: ${config.bonusDamage || 0}`,
+          feintBreakdown: "",
+          neigongBonus: "",
+          cost: { mp: 0, rage: 0, hp: 0 },
+          isWeaponMatch: false
+        }
+      : this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
 
     if (!calcResult) {
       ui.notifications.error("伤害计算失败");
@@ -3585,7 +3613,7 @@ export class XJZLActor extends Actor {
       get: () => true,
       enumerable: true
     });
-    await this.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, virtualMove);
+    if (!isCreatureAttack) await this.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, virtualMove);
     // 获取全局必中状态
     const isGlobalForceHit = attackContext.flags.forceHit || false;
     // 提取脚本计算出的命中修正
@@ -3647,8 +3675,8 @@ export class XJZLActor extends Actor {
         }
       };
 
-      // 普攻也触发 CHECK 脚本 (例如：某内功特效“普攻无视目标格挡”)
-      await this.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, virtualMove);
+      // 野兽攻击隔离人物脚本；人物普攻仍触发原有 CHECK 脚本。
+      if (!isCreatureAttack) await this.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, virtualMove);
 
       const tStatus = targetActor.xjzlStatuses || {};
       const targetGrant = tStatus.grantAttackLevel || 0;
@@ -3885,7 +3913,7 @@ export class XJZLActor extends Actor {
           alwaysHit: attackContext.flags.alwaysHit || false,
 
           costConsumed: costConsumed, // 记录消耗
-          allowDamageModifiers: true, // 普攻恒为 true；聊天结算层的 preDamage 按它重建只读上下文
+          allowDamageModifiers: isCreatureAttack ? false : true, // 野兽固定伤害不读取人物增伤脚本
           scriptFlags: attackFlagsSnapshot, // 出招阶段自定义 flags 快照，供结算脚本只读
           damage: calcResult.damage,
           feint: 0,
@@ -3893,6 +3921,11 @@ export class XJZLActor extends Actor {
           damageType: config.damageType,
           canCrit: config.canCrit,
           neverCrit: isCreatureAttack, // 野兽攻击永不暴击：抑制 isCrit 状态
+          isCreatureAttack,
+          creatureAbility: isCreatureAttack ? {
+            ...foundry.utils.deepClone(options.creatureAbility || {}),
+            hasDamage: Number(baseDamage) > 0
+          } : null,
           manualCritMod: config.manualCritMod,
           attackBonus: config.bonusAttack,
           contextLevel: {
@@ -3971,7 +4004,8 @@ export class XJZLActor extends Actor {
    * 使用野兽特性：攻击、命中与豁免/对抗检定的一体化流程（单一事实源）。
    * 角色卡按钮与 Token HUD 等所有发起入口都应调用本方法，保证融合语义一致：
    * 1. 读取 game.user.targets 作为目标（无目标提示并中止）；
-   * 2. 弹出野兽特性专用面板（_promptCreatureAbilityPanel），按配置显示攻击段 /
+   * 2. 无攻击/检定但配置 directEffects 时直接对玩家选定目标施加状态；否则弹出
+   *    野兽特性专用面板（_promptCreatureAbilityPanel），按配置显示攻击段 /
    *    命中段 / 检定段的临场参数（DC、加值、优劣势等）；取消即整体中止；
    * 3. 配置了攻击段时走 rollBasicAttack 管线（d20 命中 + 攻击卡，配置由面板注入）；
    *    纯检定 + 需要命中时走轻量命中判定（无攻击弹窗与攻击卡）；
@@ -3984,7 +4018,29 @@ export class XJZLActor extends Actor {
     const ability = this.system.abilities?.[index];
     if (!ability) return;
     const check = ability.check?.enabled ? ability.check : null;
-    if (!ability.isAttack && !check) return;
+    const directEffects = ability.directEffects || [];
+    const automationNote = ability.automationNote || ability.description?.match?.(/<strong>自动化：<\/strong>([^<]+)/)?.[1]?.trim() || "";
+    const postAbilityDescription = async () => {
+      const description = ability.description || automationNote || "无描述";
+      const note = automationNote && !/<strong>自动化：<\/strong>/.test(description)
+        ? `<div style="font-size:0.8em;color:#666;margin-top:6px;"><strong>自动化：</strong>${foundry.utils.escapeHTML(automationNote)}</div>`
+        : "";
+      await ChatMessage.create({
+        author: game.user.id,
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: `<div class="xjzl-chat-card"><header class="card-header"><h3>${foundry.utils.escapeHTML(ability.name || "野兽特性")}</h3></header><div class="card-description">${description}</div>${note}</div>`
+      });
+    };
+    if (!ability.isAttack && !check && directEffects.length === 0) {
+      await postAbilityDescription();
+      return;
+    }
+
+    // 纯检定没有攻击后的结算点，直接状态也不会有明确的先后语义；要求把状态
+    // 配置到检定后果中，避免旧数据在运行时静默丢掉 directEffects。
+    if (!ability.isAttack && check && directEffects.length > 0) {
+      return ui.notifications.warn(game.i18n.localize("XJZL.Creature.Check.InvalidDirectEffectsWithCheck"));
+    }
 
     // 行动限制在统一入口检查：晕眩时攻击段与纯检定段一并中止（普攻管线内另有同款检查）
     if (this.xjzlStatuses?.stun) {
@@ -3992,8 +4048,37 @@ export class XJZLActor extends Actor {
     }
 
     const targets = Array.from(game.user.targets);
-    if (targets.length === 0) {
+    if (targets.length === 0 && (ability.isAttack || check || directEffects.length > 0)) {
       return ui.notifications.warn(game.i18n.localize("XJZL.Creature.Check.NoTarget"));
+    }
+
+    // 直接附加状态不经过攻击/豁免管线，适用于咆哮、开屏等明确“直接生效”的特性。
+    // 目标选择仍交给玩家，避免引入野兽专用范围扫描和友敌判断。
+    if (!ability.isAttack && !check && directEffects.length > 0) {
+      const effects = buildCreatureEffectConfigs(directEffects, {
+        stackable: ability.directEffectStackable === true,
+        count: ability.directEffectCount,
+        maxStacks: ability.directEffectMaxStacks,
+        duration: ability.directEffectDuration
+      });
+      for (const token of targets) {
+        const targetActor = token.actor;
+        if (!targetActor) continue;
+        for (const sourceEffect of effects) {
+          const effect = foundry.utils.deepClone(sourceEffect);
+          const count = Number(effect.count);
+          delete effect.count;
+          await ActiveEffectManager.addEffect(targetActor, effect, Number.isInteger(count) && count > 0 ? count : 1);
+        }
+      }
+      if (automationNote) {
+        await ChatMessage.create({
+          author: game.user.id,
+          speaker: ChatMessage.getSpeaker({ actor: this }),
+          content: `<p><strong>${foundry.utils.escapeHTML(ability.name || "野兽特性")}</strong>：${foundry.utils.escapeHTML(automationNote)}</p>`
+        });
+      }
+      return;
     }
 
     // 1. 野兽特性专用面板：统一收集攻击段/命中段/检定段的临场参数（取消即中止）
@@ -4015,6 +4100,22 @@ export class XJZLActor extends Actor {
         damageTypes: CONFIG.XJZL.damageTypes,
         label: ability.name || "野兽攻击",
         config: panel.attack,
+        creatureAbility: {
+          name: ability.name,
+          automationNote,
+          directEffects: foundry.utils.deepClone(ability.directEffects || []),
+          directEffectStackable: ability.directEffectStackable === true,
+          directEffectCount: ability.directEffectCount,
+          directEffectMaxStacks: ability.directEffectMaxStacks,
+          directEffectDuration: foundry.utils.deepClone(ability.directEffectDuration),
+          check: check ? foundry.utils.mergeObject(
+            foundry.utils.deepClone(check),
+            check.mode === "contest"
+              ? { contest: panel.check || {} }
+              : { save: panel.check || {} },
+            { inplace: false }
+          ) : null
+        },
         // 面板打开期间瞄准可能变化：显式传入快照，保证攻击与后续检定处理同一批目标
         targets
       });
@@ -4023,7 +4124,10 @@ export class XJZLActor extends Actor {
       recipients = await this._rollCreatureAbilityHitCheck(label, targets, panel.hit);
     }
 
-    if (!check) return; // 纯攻击特性到此结束
+    // 延后检定只有攻击型特性存在“实际伤害后”这一结算点；旧数据即使残留
+    // afterDamage=true，纯豁免/对抗特性也必须按普通检定继续结算。
+    const deferCheck = ability.isAttack === true && (check?.requireHit === true || check?.afterDamage === true);
+    if (!check || deferCheck) return;
 
     // 3. 攻击段要求命中时，从攻击消息的命中快照过滤发起对象；
     //    targetsResultMap 的键把 UUID 中的 "." 替换为 "_"（与写卡逻辑一致）
@@ -4105,9 +4209,14 @@ export class XJZLActor extends Actor {
     let sectionsHtml = "";
 
     if (showAttack) {
+      const hasDamage = Number(ability.damage || 0) > 0;
       const damageTypes = Object.entries(CONFIG.XJZL.damageTypes)
         .map(([k, key]) => `<option value="${k}" ${k === ability.damageType ? "selected" : ""}>${game.i18n.localize(key)}</option>`)
         .join("");
+      const damageBonusControl = hasDamage
+        ? `<input type="number" name="attackDamageBonus" value="0" />`
+        : `<input type="number" name="attackDamageBonus" value="0" disabled />
+           <small>${game.i18n.localize("XJZL.Creature.Check.AttackDamageBonusDisabled")}</small>`;
       sectionsHtml += `
         <div class="panel-section">
             <div class="panel-section-title">${game.i18n.localize("XJZL.Creature.Check.PanelAttackSection")}</div>
@@ -4122,14 +4231,14 @@ export class XJZLActor extends Actor {
                 </div>
                 <div class="edit-field">
                     <label>${game.i18n.localize("XJZL.Creature.Check.AttackDamageBonus")}</label>
-                    <input type="number" name="attackDamageBonus" value="0" />
+                    ${damageBonusControl}
                 </div>
                 <div class="edit-field">
                     <label data-tooltip="${game.i18n.localize("XJZL.Creature.Check.LevelHint")}">${game.i18n.localize("XJZL.Creature.Check.AttackLevel")}</label>
                     <input type="number" name="attackLevel" value="0" />
                 </div>
                 <div class="edit-field">
-                    <label>${game.i18n.localize("XJZL.Creature.Check.AlwaysHit")}</label>
+                    <label data-tooltip="${game.i18n.localize("XJZL.Creature.Check.AlwaysHitHint")}">${game.i18n.localize("XJZL.Creature.Check.AlwaysHit")}</label>
                     <input type="checkbox" name="attackAlwaysHit" style="width:18px; height:18px; margin-top:5px;" />
                 </div>
             </div>
