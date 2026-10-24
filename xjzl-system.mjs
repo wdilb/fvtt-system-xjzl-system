@@ -1914,6 +1914,9 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/item/encounter/tab-fields.hbs",
     "systems/xjzl-system/templates/item/encounter/tab-support.hbs",
     "systems/xjzl-system/templates/chat/encounter-card.hbs",
+    //野兽检定特性配置 partial（配置编辑器内复用）
+    "systems/xjzl-system/templates/apps/partials/check-damage.hbs",
+    "systems/xjzl-system/templates/apps/partials/check-outcome.hbs",
     //聊天卡片
     "systems/xjzl-system/templates/chat/item-card.hbs", //物品使用
     "systems/xjzl-system/templates/chat/move-card.hbs", //招式使用
@@ -1931,6 +1934,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/effect-selection.hbs", //特效选择
     "systems/xjzl-system/templates/apps/attribute-test-config.hbs", //属性检定设置窗口
     "systems/xjzl-system/templates/apps/modifier-picker.hbs", //属性修正选择器
+    "systems/xjzl-system/templates/apps/status-id-picker.hbs", //系统状态ID选择器（野兽检定特性等配置场景）
+    "systems/xjzl-system/templates/apps/creature-check-editor.hbs", //野兽检定特性配置编辑器
     "systems/xjzl-system/templates/apps/compendiumbrowser/content.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/compendiumbrowser/navigation.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/compendiumbrowser/sidebar.hbs", // 合集浏览器

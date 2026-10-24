@@ -2,7 +2,7 @@
  * 扩展核心 Actor 类
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
-import { XJZLMacros } from "../utils/macros.mjs";
+import { XJZLMacros, buildCreatureSaveOutcome, buildCreatureContestOutcome } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { queueHitEffect } from "../managers/combat-fx-manager.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
@@ -3348,6 +3348,56 @@ export class XJZLActor extends Actor {
 
   }
 
+  /**
+   * 纯检定特性的轻量命中判定（内部方法，由 useCreatureAbility 调用）。
+   * 复刻普攻命中核心规则——骰 20 必中 / 骰 1 必失、1d20+命中 vs 目标闪避、
+   * 优劣势（自身 attackLevel 与目标 grantAttackLevel 状态，普攻也读这两处）——
+   * 但不产生攻击配置弹窗与攻击/伤害卡片，只发一条骰子消息并返回命中的目标。
+   * 优劣势与普攻管线完全对齐：任一目标的合计优劣势（自身 + 目标授予）非零即掷
+   * 2d20，优势取高骰、劣势取低骰、合计抵消为 0 取第一骰（不取最小值）。
+   * @param {String} label 特性名（消息 flavor 用）
+   * @param {Token[]} targets 瞄准目标
+   * @param {Object} [panel] 使用面板收集的命中段参数 { bonus = 0, level = 0 }
+   * @returns {Promise<Token[]>} 命中的目标（可能为空数组，调用方负责提示）
+   */
+  async _rollCreatureAbilityHitCheck(label, targets, { bonus = 0, level = 0 } = {}) {
+    const selfLevel = (this.xjzlStatuses?.attackLevel || 0) + level;
+    const hitMod = (this.system.combat?.hitWaigongTotal || 0) + bonus;
+    // 每目标合计优劣势（自身 + 目标授予）；掷几骰由全部目标共同决定，与普攻一致
+    const targetLevels = targets.map(token =>
+      selfLevel + (token.actor?.xjzlStatuses?.grantAttackLevel || 0));
+    const needsTwoDice = targets.length === 0
+      ? selfLevel !== 0
+      : targetLevels.some(l => l !== 0);
+    const roll = new Roll(needsTwoDice ? "2d20 + @hit" : "1d20 + @hit", { hit: hitMod });
+    await roll.evaluate();
+    const dice = roll.dice[0].results.map(r => r.result);
+
+    const hitTargets = [];
+    for (const [i, token] of targets.entries()) {
+      const target = token.actor;
+      if (!target) continue;
+      const targetLevel = targetLevels[i];
+      // 合计为 0（自身与目标授予抵消）时取第一骰，与普攻管线的"平"分支一致
+      const dieUsed = dice.length > 1
+        ? (targetLevel > 0 ? Math.max(...dice) : targetLevel < 0 ? Math.min(...dice) : dice[0])
+        : dice[0];
+      const total = dieUsed + hitMod;
+      const dodge = target.system.combat?.dodgeTotal ?? 10;
+      const isHit = dieUsed === 20 ? true : (dieUsed === 1 ? false : total >= dodge);
+      if (isHit) hitTargets.push(token);
+    }
+
+    await roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      flavor: game.i18n.format("XJZL.Creature.Check.HitCheckFlavor", {
+        label, hit: hitTargets.length, total: targets.length
+      }),
+      flags: { "xjzl-system": { type: "creature-ability-hit-check" } }
+    });
+    return hitTargets;
+  }
+
   /* -------------------------------------------- */
   /*  普通攻击 (Basic Attack)                      */
   /* -------------------------------------------- */
@@ -3357,6 +3407,10 @@ export class XJZLActor extends Actor {
    * 逻辑：构建虚拟招式 -> 弹窗配置 -> 运行脚本 -> 命中检定 -> 发送卡片
    * @param {Object} options - 额外配置
    * @param {String} [options.mode="basic"] - "basic" | "opportunity"
+   * @returns {Promise<ChatMessage|undefined>} 创建的攻击聊天消息（flags 含按目标命中快照
+   *   targetsResultMap，供野兽"攻击+检定"融合特性读取命中结果）；容器 Actor、用户取消弹窗、
+   *   晕眩阻断或脚本中止等所有未出招的情况一律返回 undefined（调用方以真值判断，不能把
+   *   ui.notifications 的返回对象当作攻击消息——V14 中它是真值）
    */
   async rollBasicAttack(options = {}) {
     if (this.type === "container") return; //容器直接返回
@@ -3366,8 +3420,13 @@ export class XJZLActor extends Actor {
     const isCreatureAttack = options.isCreatureAttack === true;
     const label = options.label || (isOpportunity ? "趁虚而入" : "普通攻击");
     // 0. 状态阻断检查 (Status Check)
+    // 只提示不返回通知对象：V14 的 ui.notifications.warn 返回真值的通知实例，
+    // 会被"以真值判断攻击消息"的调用方误当作攻击成功
     const s = this.xjzlStatuses || {};
-    if (s.stun) return ui.notifications.warn(`${this.name} 处于晕眩状态，无法行动！`);
+    if (s.stun) {
+      ui.notifications.warn(`${this.name} 处于晕眩状态，无法行动！`);
+      return;
+    }
 
     // 1. 获取当前主武器信息
     // 逻辑：寻找第一个已装备的武器，如果没有则视为徒手
@@ -3388,7 +3447,10 @@ export class XJZLActor extends Actor {
       alwaysHit: false //必定命中，默认否
     };
 
-    if (!options.skipDialog) {
+    // options.config：外部面板（野兽特性使用面板）已收集完整攻击配置，跳过弹窗直接使用
+    if (options.config) {
+      config = { ...config, ...options.config };
+    } else if (!options.skipDialog) {
       const dialogResult = await this._promptBasicAttackConfig(weaponName, options);
       if (!dialogResult) return; // 用户取消
       config = { ...config, ...dialogResult };
@@ -3483,7 +3545,8 @@ export class XJZLActor extends Actor {
     const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
 
     if (!calcResult) {
-      return ui.notifications.error("伤害计算失败");
+      ui.notifications.error("伤害计算失败");
+      return;
     }
 
     // 配置弹窗、趁虚而入资源处理和出招回复都可能异步刷新 Actor；攻击上下文应使用此时的最新状态。
@@ -3899,6 +3962,298 @@ export class XJZLActor extends Actor {
 
     // 插入 Hook：允许后续逻辑（如自动播放特效、自动化模组监听）
     Hooks.callAll("xjzl.basicAttack", this, virtualMove, message, calcResult);
+
+    // 返回消息供融合流程读取命中快照（野兽检定型特性按 targetsResultMap 过滤发起对象）
+    return message;
+  }
+
+  /**
+   * 使用野兽特性：攻击、命中与豁免/对抗检定的一体化流程（单一事实源）。
+   * 角色卡按钮与 Token HUD 等所有发起入口都应调用本方法，保证融合语义一致：
+   * 1. 读取 game.user.targets 作为目标（无目标提示并中止）；
+   * 2. 弹出野兽特性专用面板（_promptCreatureAbilityPanel），按配置显示攻击段 /
+   *    命中段 / 检定段的临场参数（DC、加值、优劣势等）；取消即整体中止；
+   * 3. 配置了攻击段时走 rollBasicAttack 管线（d20 命中 + 攻击卡，配置由面板注入）；
+   *    纯检定 + 需要命中时走轻量命中判定（无攻击弹窗与攻击卡）；
+   * 4. 检定发起对象：requireHit=仅命中的目标，否则全部瞄准目标；
+   * 5. 按面板参数逐目标发起请求卡，结算复用 XJZLMacros.requestSave/requestContest 管线。
+   * @param {Number} index 特性在 system.abilities 中的下标
+   * @returns {Promise<void>}
+   */
+  async useCreatureAbility(index) {
+    const ability = this.system.abilities?.[index];
+    if (!ability) return;
+    const check = ability.check?.enabled ? ability.check : null;
+    if (!ability.isAttack && !check) return;
+
+    // 行动限制在统一入口检查：晕眩时攻击段与纯检定段一并中止（普攻管线内另有同款检查）
+    if (this.xjzlStatuses?.stun) {
+      return ui.notifications.warn(`${this.name} 处于晕眩状态，无法行动！`);
+    }
+
+    const targets = Array.from(game.user.targets);
+    if (targets.length === 0) {
+      return ui.notifications.warn(game.i18n.localize("XJZL.Creature.Check.NoTarget"));
+    }
+
+    // 1. 野兽特性专用面板：统一收集攻击段/命中段/检定段的临场参数（取消即中止）
+    const panel = await this._promptCreatureAbilityPanel(ability, targets);
+    if (!panel) return;
+
+    const label = ability.name || game.i18n.localize("XJZL.Creature.Check.DefaultLabel");
+
+    // 2. 开头段：配置了攻击走完整攻击管线（配置由面板注入，不再弹普攻窗）；
+    //    纯检定 + 需要命中只掷轻量命中判定，不产生攻击卡
+    let attackMessage = null;
+    let recipients = targets;
+    if (ability.isAttack) {
+      attackMessage = await this.rollBasicAttack({
+        isCreatureAttack: true,
+        baseDamage: ability.damage || 0,
+        damageType: ability.damageType || "waigong",
+        defaultDamageType: ability.damageType || "waigong",
+        damageTypes: CONFIG.XJZL.damageTypes,
+        label: ability.name || "野兽攻击",
+        config: panel.attack,
+        // 面板打开期间瞄准可能变化：显式传入快照，保证攻击与后续检定处理同一批目标
+        targets
+      });
+      if (!attackMessage) return; // 攻击段被系统拦截中止（晕眩/取消/脚本 abort 均返回 undefined）
+    } else if (check?.requireHit === true) {
+      recipients = await this._rollCreatureAbilityHitCheck(label, targets, panel.hit);
+    }
+
+    if (!check) return; // 纯攻击特性到此结束
+
+    // 3. 攻击段要求命中时，从攻击消息的命中快照过滤发起对象；
+    //    targetsResultMap 的键把 UUID 中的 "." 替换为 "_"（与写卡逻辑一致）
+    if (ability.isAttack && check.requireHit) {
+      const resultMap = attackMessage?.flags?.["xjzl-system"]?.targetsResultMap || {};
+      recipients = recipients.filter(t => resultMap[t.document.uuid.replaceAll(".", "_")]?.isHit);
+    }
+    if (recipients.length === 0) {
+      return ui.notifications.info(game.i18n.localize("XJZL.Creature.Check.NoHitRecipients"));
+    }
+
+    // 4. 按面板参数逐目标发起请求卡；后果配置经 schema 同构转换，非法数值由宏侧结算校验报告
+    for (const token of recipients) {
+      const targetActor = token.actor;
+      if (!targetActor) continue;
+
+      if (check.mode === "contest") {
+        await XJZLMacros.requestContest({
+          attacker: this,
+          defender: targetActor,
+          type: check.contest.attAttr,
+          defType: panel.check.defAttr,
+          attBonus: panel.check.attBonus,
+          defBonus: panel.check.defBonus,
+          label,
+          outcome: {
+            win: buildCreatureContestOutcome(check.contest.win),
+            lose: buildCreatureContestOutcome(check.contest.lose)
+          }
+        });
+      } else {
+        const success = buildCreatureSaveOutcome(check.save.success);
+        const fail = buildCreatureSaveOutcome(check.save.fail);
+        await XJZLMacros.requestSave({
+          target: targetActor,
+          attacker: this,
+          type: check.save.attr,
+          dc: panel.check.dc,
+          level: panel.check.level,
+          bonus: panel.check.bonus,
+          label,
+          onSuccess: success.effects,
+          damageOnSuccess: success.damage,
+          successText: success.text,
+          removeStanceOnSuccess: success.removeStance === true,
+          onFail: fail.effects,
+          damageOnFail: fail.damage,
+          failureText: fail.text,
+          removeStanceOnFail: fail.removeStance === true
+        });
+      }
+    }
+  }
+
+  /**
+   * 野兽特性使用面板（内部方法，由 useCreatureAbility 调用）。
+   * 不复用普攻配置弹窗：按特性配置动态显示攻击段（有攻击）、命中段（纯检定要求
+   * 命中时的轻量判定参数）与检定段（豁免 DC/优劣势/加值，或对抗双方属性加值），
+   * 面板值仅作用于本次使用，不写回 Actor。
+   * @param {Object} ability 特性数据
+   * @param {Token[]} targets 瞄准目标（用于目标预览）
+   * @returns {Promise<Object|null>} { attack, hit, check } 各段配置；
+   *   未配置的段为 null；关闭/取消返回 null
+   */
+  async _promptCreatureAbilityPanel(ability, targets) {
+    const check = ability.check?.enabled ? ability.check : null;
+    const showAttack = ability.isAttack === true;
+    const showHit = !showAttack && check?.requireHit === true;
+    const showCheck = !!check;
+
+    const num = (fd, key, fallback) => {
+      const raw = fd.get(key);
+      if (raw === null || String(raw).trim() === "") return fallback;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    // ---- 分区渲染（每段一个 .panel-section，标题 + 字段行） ----
+    let sectionsHtml = "";
+
+    if (showAttack) {
+      const damageTypes = Object.entries(CONFIG.XJZL.damageTypes)
+        .map(([k, key]) => `<option value="${k}" ${k === ability.damageType ? "selected" : ""}>${game.i18n.localize(key)}</option>`)
+        .join("");
+      sectionsHtml += `
+        <div class="panel-section">
+            <div class="panel-section-title">${game.i18n.localize("XJZL.Creature.Check.PanelAttackSection")}</div>
+            <div class="panel-fields">
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Wuxue.Moves.DamageType")}</label>
+                    <select name="attackDamageType">${damageTypes}</select>
+                </div>
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.AttackBonus")}</label>
+                    <input type="number" name="attackBonus" value="0" />
+                </div>
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.AttackDamageBonus")}</label>
+                    <input type="number" name="attackDamageBonus" value="0" />
+                </div>
+                <div class="edit-field">
+                    <label data-tooltip="${game.i18n.localize("XJZL.Creature.Check.LevelHint")}">${game.i18n.localize("XJZL.Creature.Check.AttackLevel")}</label>
+                    <input type="number" name="attackLevel" value="0" />
+                </div>
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.AlwaysHit")}</label>
+                    <input type="checkbox" name="attackAlwaysHit" style="width:18px; height:18px; margin-top:5px;" />
+                </div>
+            </div>
+        </div>`;
+    }
+
+    if (showHit) {
+      sectionsHtml += `
+        <div class="panel-section">
+            <div class="panel-section-title">${game.i18n.localize("XJZL.Creature.Check.PanelHitSection")}</div>
+            <div class="panel-fields">
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.HitBonus")}</label>
+                    <input type="number" name="hitBonus" value="0" />
+                </div>
+                <div class="edit-field">
+                    <label data-tooltip="${game.i18n.localize("XJZL.Creature.Check.LevelHint")}">${game.i18n.localize("XJZL.Creature.Check.HitLevel")}</label>
+                    <input type="number" name="hitLevel" value="0" />
+                </div>
+            </div>
+        </div>`;
+    }
+
+    if (showCheck) {
+      let checkFields = "";
+      if (check.mode === "contest") {
+        // 属性下拉内联构建（与 getCheckAttrChoices 同源，避免静态依赖数据模型模块）
+        const attrOptions = Object.entries({
+          ...CONFIG.XJZL.attributes, ...CONFIG.XJZL.skills, ...CONFIG.XJZL.arts
+        }).map(([k, key]) => `<option value="${k}" ${k === check.contest.defAttr ? "selected" : ""}>${game.i18n.localize(key)}</option>`)
+          .join("");
+        checkFields = `
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.DefAttr")}</label>
+                    <select name="checkDefAttr">${attrOptions}</select>
+                </div>
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.AttBonus")}</label>
+                    <input type="number" name="checkAttBonus" value="${check.contest.attBonus}" />
+                </div>
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.DefBonus")}</label>
+                    <input type="number" name="checkDefBonus" value="${check.contest.defBonus}" />
+                </div>`;
+      } else {
+        checkFields = `
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.DC")}</label>
+                    <input type="number" name="checkDc" value="${check.save.dc}" min="0" />
+                </div>
+                <div class="edit-field">
+                    <label data-tooltip="${game.i18n.localize("XJZL.Creature.Check.LevelHint")}">${game.i18n.localize("XJZL.Creature.Check.Level")}</label>
+                    <input type="number" name="checkLevel" value="${check.save.level}" />
+                </div>
+                <div class="edit-field">
+                    <label>${game.i18n.localize("XJZL.Creature.Check.Bonus")}</label>
+                    <input type="number" name="checkBonus" value="${check.save.bonus}" />
+                </div>`;
+      }
+      sectionsHtml += `
+        <div class="panel-section">
+            <div class="panel-section-title">${check.mode === "contest" ? game.i18n.localize("XJZL.Creature.Check.ModeContest") : game.i18n.localize("XJZL.Creature.Check.ModeSave")}</div>
+            <div class="panel-fields">${checkFields}</div>
+        </div>`;
+    }
+
+    const targetChips = targets.map(t => {
+      const img = t.document?.texture?.src || t.actor?.img || "";
+      return `<span class="target-chip"><img src="${img}" alt="" />${foundry.utils.escapeHTML(t.name)}</span>`;
+    }).join("");
+
+    const content = `
+    <div class="xjzl-dialog-content xjzl-ability-panel">
+        <div class="target-list">
+            <span class="list-label">${game.i18n.localize("XJZL.Creature.Check.ConfirmTargets")}(${targets.length})</span>
+            ${targetChips}
+        </div>
+        ${sectionsHtml}
+    </div>`;
+
+    const result = await foundry.applications.api.DialogV2.prompt({
+        window: {
+            title: `${ability.name || game.i18n.localize("XJZL.Creature.Check.DefaultLabel")}`,
+            icon: "fas fa-dice",
+            width: 480
+        },
+        content,
+        ok: {
+            label: game.i18n.localize("XJZL.Creature.Check.PanelLaunch"),
+            icon: "fas fa-play",
+            callback: (event, button) => {
+                const fd = new FormData(button.form);
+                const panel = { attack: null, hit: null, check: null };
+                if (showAttack) {
+                    panel.attack = {
+                        damageType: String(fd.get("attackDamageType") || ability.damageType || "waigong"),
+                        bonusAttack: num(fd, "attackBonus", 0),
+                        bonusDamage: num(fd, "attackDamageBonus", 0),
+                        manualAttackLevel: num(fd, "attackLevel", 0),
+                        alwaysHit: fd.get("attackAlwaysHit") === "on"
+                    };
+                }
+                if (showHit) {
+                    panel.hit = { bonus: num(fd, "hitBonus", 0), level: num(fd, "hitLevel", 0) };
+                }
+                if (showCheck) {
+                    panel.check = check.mode === "contest"
+                        ? {
+                            defAttr: String(fd.get("checkDefAttr") || check.contest.defAttr),
+                            attBonus: num(fd, "checkAttBonus", check.contest.attBonus),
+                            defBonus: num(fd, "checkDefBonus", check.contest.defBonus)
+                        }
+                        : {
+                            dc: num(fd, "checkDc", check.save.dc),
+                            level: num(fd, "checkLevel", check.save.level),
+                            bonus: num(fd, "checkBonus", check.save.bonus)
+                        };
+                }
+                return panel;
+            }
+        },
+        rejectClose: false // 点击关闭或 ESC 返回 null
+    });
+    return result;
   }
 
   /**

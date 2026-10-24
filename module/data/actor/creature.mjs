@@ -8,10 +8,121 @@
  *    欺骗脚本引擎和战斗系统，使其认为这是一个"数值为0的侠客"。
  * ==========================================
  */
+import { localizeConfig } from "../../utils/utils.mjs";
+
+/**
+ * 检定后果可用的伤害/流失类型。
+ * 系统伤害类型（poison/bleed 等）走 applyDamage 完整抗性结算；
+ * 资源键（hp/mp/rage/tili）走 applyHealing 负数直接流失。
+ * 供后果配置下拉与 schema choices 共用，是两者的单一事实源。
+ * @returns {Object} key → 本地化标签
+ */
+export function getCheckOutcomeTypes() {
+    const types = {};
+    for (const [key, labelKey] of Object.entries(CONFIG.XJZL.damageTypes)) {
+        // "无"伤害类型服务于气招等攻击展示，对检定后果没有结算意义
+        if (key === "none") continue;
+        types[key] = game.i18n.localize(labelKey);
+    }
+    return { ...types, ...getCheckResourceTypes() };
+}
+
+/**
+ * 按完整元素写回单条野兽特性。
+ * abilities 数组元素在 Foundry update 中按"整体替换"处理：只提交部分字段
+ * （如仅 check）会把同级的 isAttack/damage 等重置为默认值。因此任何特性写入
+ * 都必须携带该特性的完整数据，以现有数据为底、partial 覆盖。
+ * @param {Actor} actor 野兽 Actor
+ * @param {Number} index 特性下标
+ * @param {Object} partial 要覆盖的字段（如 { check: {...} } 或 { isAttack: true }）
+ * @returns {Promise} update 结果
+ */
+export async function updateCreatureAbility(actor, index, partial) {
+    const ability = actor.system.abilities[index];
+    if (!ability) throw new Error(`XJZL | 特性下标不存在: ${index}`);
+    const full = ability.toObject?.() ?? foundry.utils.deepClone(ability);
+    await actor.update({ [`system.abilities.${index}`]: foundry.utils.mergeObject(full, partial) });
+}
+
+/**
+ * 检定后果"直接资源流失/恢复"可用的资源键（对应 applyHealing 的 type）。
+ * @returns {Object} key → 中文标签
+ */
+export function getCheckResourceTypes() {
+    return { hp: "气血", mp: "内力", rage: "怒气", tili: "体力" };
+}
+
+/**
+ * 野兽"自身恢复"可用的资源键（对应 applyHealing 的 type）。
+ * 野兽只持久化 tili 与 rage（见 resources schema）；hp 是 prepareDerivedData
+ * 派生的只读视图，applyHealing 恢复 hp 不会写回 tili，因此不进入选项。
+ * @returns {Object} key → 中文标签
+ */
+export function getSelfRecoveryTypes() {
+    return { tili: "体力", rage: "怒气" };
+}
+
+/**
+ * 检定/对抗可用的属性 key（属性 + 技能 + 技艺合并）。
+ * 野兽自身属性恒为 0，此列表主要用于目标侧检定属性与对抗属性。
+ * @returns {Object} key → 本地化标签
+ */
+export function getCheckAttrChoices() {
+    return localizeConfig({
+        ...CONFIG.XJZL.attributes,
+        ...CONFIG.XJZL.skills,
+        ...CONFIG.XJZL.arts
+    });
+}
+
 export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
 
     static defineSchema() {
         const fields = foundry.data.fields;
+
+        // --- 检定型特性（豁免/对抗）子结构 ---
+        // 字段契约与 XJZLMacros.requestSave / requestContest 的参数一一对应；
+        // 发起端（creature-sheet）通过 buildCreature*Outcome 转换，不在此处存请求参数。
+        // 一笔后果的伤害配置；value>0 才会生成实际后果
+        const checkDamage = () => new fields.SchemaField({
+            value: new fields.NumberField({ initial: 0, min: 0, label: "XJZL.Creature.Check.DamageValue" }),
+            type: new fields.StringField({
+                initial: "poison",
+                choices: Object.keys(getCheckOutcomeTypes()),
+                label: "XJZL.Wuxue.Moves.DamageType"
+            }),
+            isCrit: new fields.BooleanField({ initial: false }),
+            applyCritDamage: new fields.BooleanField({ initial: true }),
+            ignoreBlock: new fields.BooleanField({ initial: false }),
+            ignoreDefense: new fields.BooleanField({ initial: false }),
+            ignoreStance: new fields.BooleanField({ initial: false }),
+            element: new fields.StringField({ initial: "none", choices: Object.keys(CONFIG.XJZL.elements) }),
+            ignoreMinDamage: new fields.BooleanField({ initial: false })
+        });
+
+        // 一侧后果块：isContest=true 时额外携带野兽自身后果与恢复（对抗侧特有）
+        const checkOutcome = (isContest) => new fields.SchemaField({
+            // 结算卡上显示的描述文本（宏侧 successText/failureText 或 outcome.text）
+            text: new fields.StringField({ initial: "" }),
+            // 目标侧伤害/流失与状态；effects 存 CONFIG.statusEffects 的状态 ID
+            damage: checkDamage(),
+            effects: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+            ...(isContest ? {
+                selfDamage: checkDamage(),
+                selfEffects: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+                selfRecovery: new fields.SchemaField({
+                    value: new fields.NumberField({ initial: 0, min: 0 }),
+                    // 野兽只持久化 tili/rage，hp 恢复会被静默丢弃，默认与选项都限定这两项
+                    type: new fields.StringField({
+                        initial: "tili",
+                        choices: Object.keys(getSelfRecoveryTypes())
+                    })
+                })
+            } : {
+                // 豁免特有：判定后解除检定者的架招（宏侧 removeStanceOnSuccess/Fail）
+                removeStance: new fields.BooleanField({ initial: false })
+            })
+        });
 
         return {
             // === 1. 核心生存 ===
@@ -60,9 +171,68 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
                     initial: "waigong",
                     choices: Object.keys(CONFIG.XJZL.damageTypes),
                     label: "XJZL.Wuxue.Moves.DamageType"
+                }),
+                // 检定型特性（豁免/对抗）：可与攻击段融合（先攻击，再按命中过滤发起请求卡）。
+                // 结算完全复用 XJZLMacros 请求卡管线，数据模型只存配置。
+                check: new fields.SchemaField({
+                    enabled: new fields.BooleanField({ initial: false, label: "XJZL.Creature.Check.Enabled" }),
+                    // save=目标掷骰过 DC；contest=双方对抗（野兽属性恒 0，强度由 attBonus 体现）
+                    mode: new fields.StringField({ initial: "save", choices: ["save", "contest"], label: "XJZL.Creature.Check.Mode" }),
+                    // 攻击+检定同时启用时生效：仅对本次攻击命中的目标发起检定
+                    requireHit: new fields.BooleanField({ initial: false }),
+                    save: new fields.SchemaField({
+                        attr: new fields.StringField({
+                            initial: "dingli",
+                            choices: Object.keys(getCheckAttrChoices()),
+                            label: "XJZL.Creature.Check.AttrLabel"
+                        }),
+                        dc: new fields.NumberField({ initial: 10, min: 0, integer: true, label: "XJZL.Creature.Check.DC" }),
+                        // 预设优劣势（正=优）与加值，发起确认窗中可临场覆盖
+                        level: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Creature.Check.Level" }),
+                        bonus: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Creature.Check.Bonus" }),
+                        success: checkOutcome(false),
+                        fail: checkOutcome(false)
+                    }),
+                    contest: new fields.SchemaField({
+                        attAttr: new fields.StringField({
+                            initial: "liliang",
+                            choices: Object.keys(getCheckAttrChoices()),
+                            label: "XJZL.Creature.Check.AttAttr"
+                        }),
+                        defAttr: new fields.StringField({
+                            initial: "liliang",
+                            choices: Object.keys(getCheckAttrChoices()),
+                            label: "XJZL.Creature.Check.DefAttr"
+                        }),
+                        attBonus: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Creature.Check.AttBonus" }),
+                        defBonus: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Creature.Check.DefBonus" }),
+                        // 发起者视角：win=野兽获胜时的后果，lose=野兽落败时的后果
+                        win: checkOutcome(true),
+                        lose: checkOutcome(true)
+                    })
                 })
             }))
         };
+    }
+
+    /**
+     * @override 旧版 selfRecovery.type 默认 "hp"：野兽不持久化 hp（由 tili 派生），
+     * 恢复会被静默丢弃；choices 收紧为体力/怒气后，存量非法键若不迁移，
+     * 特性整元素写回（编辑器自动保存、卡片表单提交）会被字段校验拒绝。
+     * 加载时统一迁到 tili，幂等且不动合法值。
+     */
+    static migrateData(source) {
+        const abilities = source?.abilities;
+        // 表单展开后可能是数组或数字键对象，两种形态都按条目遍历；null/缺失直接跳过
+        if (!abilities || typeof abilities !== "object") return source;
+        const valid = Object.keys(getSelfRecoveryTypes());
+        for (const ability of Object.values(abilities)) {
+            for (const side of ["win", "lose"]) {
+                const recovery = ability?.check?.contest?.[side]?.selfRecovery;
+                if (recovery && !valid.includes(recovery.type)) recovery.type = "tili";
+            }
+        }
+        return source;
     }
 
     /**

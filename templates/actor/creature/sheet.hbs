@@ -187,18 +187,32 @@
             <div class="ability-list">
                 {{#each system.abilities as |ability i|}}
                 <div class="ability-card">
+                    {{!-- 头部：名称 + 操作工具（可发起的特性显示收藏与掷骰） --}}
                     <div class="ability-header">
                         <input type="text" class="ability-name" name="system.abilities.{{i}}.name"
                             value="{{ability.name}}"
                             placeholder="{{localize 'XJZL.Creature.AbilityNamePlaceholder'}}" />
                         <div class="ability-tools">
-                            <a data-action="postAbility" data-index="{{i}}"><i class="fas fa-comment-alt"></i></a>
+                            {{#if ability.canUse}}
+                            <a data-action="togglePinnedAbility" data-index="{{i}}"
+                                class="ability-pin-btn {{#if ability.isPinned}}pinned{{/if}}"
+                                data-tooltip="{{localize 'XJZL.UI.Cultivation.PinMove'}}"
+                                style="color: {{#if ability.isPinned}}#f1c40f{{else}}#ccc{{/if}};">
+                                <i class="fas fa-star"></i>
+                            </a>
+                            <a data-action="useAbility" data-index="{{i}}" class="ability-use-btn"
+                                data-tooltip="{{localize 'XJZL.Creature.UseAbility'}}"><i
+                                    class="fas fa-dice-d20"></i></a>
+                            {{/if}}
+                            <a data-action="postAbility" data-index="{{i}}"
+                                data-tooltip="{{localize 'XJZL.Creature.PostAbility'}}"><i
+                                    class="fas fa-comment-alt"></i></a>
                             <a data-action="deleteAbility" data-index="{{i}}" class="delete"><i
                                     class="fas fa-trash"></i></a>
                         </div>
                     </div>
 
-                    {{!-- 攻击型特性配置 --}}
+                    {{!-- 攻击段：伤害与类型（检定为附带效果，两段在"使用特性"时一体发起） --}}
                     <div class="ability-attack-row">
                         <label class="ability-attack-toggle">
                             <input type="checkbox" name="system.abilities.{{i}}.isAttack" {{checked
@@ -215,16 +229,24 @@
                                 {{selectOptions @root.choices.damageTypes selected=ability.damageType localize=true}}
                             </select>
                         </div>
+                        {{/if}}
+                    </div>
 
-                        <a data-action="togglePinnedAbility" data-index="{{i}}"
-class="ability-pin-btn {{#if ability.isPinned}}pinned{{/if}}" data-tooltip="{{localize 'XJZL.UI.Cultivation.PinMove'}}"
-                            style="margin-left: 8px; color: {{#if ability.isPinned}}#f1c40f{{else}}#ccc{{/if}};">
-                            <i class="fas fa-star"></i>
-                        </a>
+                    {{!-- 检定段：开关（按钮，实时写回）+ 摘要入口（点击打开配置编辑器弹窗） --}}
+                    <div class="ability-check-row">
+                        <button type="button" class="ability-check-toggle{{#if ability.check.enabled}} on{{/if}}"
+                            data-action="toggleCheck" data-index="{{i}}"
+                            data-tooltip="{{localize 'XJZL.Creature.Check.EnabledHint'}}">
+                            <i class="fas fa-hand-sparkles"></i>
+                            <span>{{localize "XJZL.Creature.Check.Enabled"}}</span>
+                        </button>
 
-                        <a data-action="rollAbilityAttack" data-index="{{i}}" class="ability-attack-btn"
-                            data-tooltip="{{localize 'XJZL.Creature.RollAbilityAttack'}}"><i
-                                class="fas fa-dice-d20"></i></a>
+                        {{#if ability.check.enabled}}
+                        <button type="button" class="check-summary-btn" data-action="editCheck" data-index="{{i}}"
+                            data-tooltip="{{localize 'XJZL.Creature.Check.EditCheck'}}">
+                            <span>{{ability.checkSummary}}</span>
+                            <i class="fas fa-pen-to-square"></i>
+                        </button>
                         {{/if}}
                     </div>
 

@@ -9,7 +9,8 @@ const RECENT_STATUS_LIMIT = 12;
 const FAVORITE_STATUS_LIMIT = 24;
 const DEFAULT_FAVORITE_STATUS_IDS = ["prone", "root", "unstable", "blind", "bleed_stack", "pain", "pofang", "unconscious", "dying", "dead"];
 
-const STATUS_CATEGORIES = [
+// 状态分类定义：本对话框用于"施加"场景；导出供其他配置类选择器（如野兽检定状态挑选）复用固定分类
+export const STATUS_CATEGORIES = [
     {
         id: "common",
         label: "XJZL.UI.EffectPicker.Category.Common",

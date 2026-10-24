@@ -41,6 +41,74 @@ function buildSourceFlags({ item, move, source, isBroken, isSkill, targetKanpo }
 }
 
 /**
+ * 将后果配置中的一笔伤害转为请求卡伤害参数。
+ * value 非有限正数（含 0/缺失）视为未配置该笔后果，返回 null；
+ * 单笔字段默认值与 requestSave/requestContest 的结算契约一致
+ * （isCrit=false、applyCritDamage=true、ignoreX=false、element="none"、ignoreMinDamage=false）。
+ * 定义于宏模块而非野兽数据模型，避免 documents/actor.mjs 依赖数据模型模块
+ * （数据模型类在部分 Node 回归的 foundry mock 下无法求值）。
+ * @param {Object} [damage] 后果配置中的 damage 节点
+ * @returns {Object|null} 可直接传给请求宏的单笔伤害参数；未配置时为 null
+ */
+export function buildOutcomeDamageConfig(damage) {
+    const value = Number(damage?.value);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    return {
+        value,
+        type: damage.type || "hp",
+        isCrit: damage.isCrit === true,
+        applyCritDamage: damage.applyCritDamage !== false,
+        ignoreBlock: damage.ignoreBlock === true,
+        ignoreDefense: damage.ignoreDefense === true,
+        ignoreStance: damage.ignoreStance === true,
+        element: damage.element || "none",
+        ignoreMinDamage: damage.ignoreMinDamage === true
+    };
+}
+
+/**
+ * 将豁免后果配置转换为 requestSave 的单侧参数集。
+ * 只保留已配置的键；空配置返回空对象（发起端把空值直接传给宏即可，宏侧按缺省跳过）。
+ * @param {Object} [outcome] check.save.success / check.save.fail 节点
+ * @returns {{text?: String, effects?: String[], damage?: Object, removeStance?: Boolean}}
+ */
+export function buildCreatureSaveOutcome(outcome) {
+    const cfg = {};
+    if (outcome?.text) cfg.text = outcome.text;
+    const effects = (outcome?.effects || []).filter(Boolean);
+    if (effects.length > 0) cfg.effects = effects;
+    const damage = buildOutcomeDamageConfig(outcome?.damage);
+    if (damage) cfg.damage = damage;
+    if (outcome?.removeStance === true) cfg.removeStance = true;
+    return cfg;
+}
+
+/**
+ * 将对抗后果配置转换为 requestContest 的 outcome.win/lose 节点。
+ * 目标侧 = 对抗者，自身侧 = 发起野兽；全部后果均未配置时返回 undefined（对方无自动化）。
+ * @param {Object} [outcome] check.contest.win / check.contest.lose 节点
+ * @returns {Object|undefined} { text, targetEffect, targetDamage, selfEffect, selfDamage, selfRecovery }
+ */
+export function buildCreatureContestOutcome(outcome) {
+    const cfg = {};
+    if (outcome?.text) cfg.text = outcome.text;
+    const targetEffects = (outcome?.effects || []).filter(Boolean);
+    if (targetEffects.length > 0) cfg.targetEffect = targetEffects;
+    const targetDamage = buildOutcomeDamageConfig(outcome?.damage);
+    if (targetDamage) cfg.targetDamage = targetDamage;
+    const selfEffects = (outcome?.selfEffects || []).filter(Boolean);
+    if (selfEffects.length > 0) cfg.selfEffect = selfEffects;
+    const selfDamage = buildOutcomeDamageConfig(outcome?.selfDamage);
+    if (selfDamage) cfg.selfDamage = selfDamage;
+    const recValue = Number(outcome?.selfRecovery?.value);
+    if (Number.isFinite(recValue) && recValue > 0) {
+        // 缺省 tili：发起者是野兽，自身只持久化体力/怒气，hp 恢复会被静默丢弃
+        cfg.selfRecovery = { value: recValue, type: outcome.selfRecovery.type || "tili" };
+    }
+    return Object.keys(cfg).length > 0 ? cfg : undefined;
+}
+
+/**
  * 脚本宏助手 (Script Macros)
  * 提供给 Item 脚本使用的高级封装函数
  */

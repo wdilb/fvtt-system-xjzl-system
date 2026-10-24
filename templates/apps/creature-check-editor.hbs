@@ -1,0 +1,108 @@
+{{!-- 野兽检定型特性配置编辑器：特性卡上只留开关与摘要，全部配置在此窗口完成。
+布局采用两列对照（豁免=目标失败|目标成功，对抗=野兽获胜|野兽落败），
+后果列内部用"作用于目标/作用于野兽"小节明确作用对象。
+改动实时自动保存（防抖写回，无保存按钮）；特性列表增删时窗口自动失效关闭。--}}
+<div class="xjzl-check-editor">
+
+    {{!-- 头部：特性名 + 模式提示（模式二选一，只有选中的方案生效） --}}
+    <div class="editor-head">
+        <span class="editor-ability-name">{{abilityName}}</span>
+        <span class="editor-mode-current">
+            {{localize "XJZL.Creature.Check.ModeCurrentPrefix"}}
+            {{#if (eq check.mode "save")}}{{localize "XJZL.Creature.Check.ModeSave"}}{{else}}{{localize "XJZL.Creature.Check.ModeContest"}}{{/if}}
+        </span>
+    </div>
+
+    {{!-- 模式开关：两张说明卡，二选一生效；未选中的一套配置保留但不发起 --}}
+    <div class="editor-mode-row">
+        <label class="mode-option{{#if (eq check.mode "save")}} active{{/if}}">
+            <input type="radio" name="mode" value="save" {{checked (eq check.mode "save")}} />
+            <span class="mode-title">{{localize "XJZL.Creature.Check.ModeSave"}}</span>
+            <span class="mode-desc">{{localize "XJZL.Creature.Check.ModeSaveDesc"}}</span>
+            {{#if (eq check.mode "save")}}
+            <span class="mode-badge active-badge">{{localize "XJZL.Creature.Check.ModeActive"}}</span>
+            {{else}}
+            <span class="mode-badge">{{localize "XJZL.Creature.Check.ModeStandby"}}</span>
+            {{/if}}
+        </label>
+        <label class="mode-option{{#if (eq check.mode "contest")}} active{{/if}}">
+            <input type="radio" name="mode" value="contest" {{checked (eq check.mode "contest")}} />
+            <span class="mode-title">{{localize "XJZL.Creature.Check.ModeContest"}}</span>
+            <span class="mode-desc">{{localize "XJZL.Creature.Check.ModeContestDesc"}}</span>
+            {{#if (eq check.mode "contest")}}
+            <span class="mode-badge active-badge">{{localize "XJZL.Creature.Check.ModeActive"}}</span>
+            {{else}}
+            <span class="mode-badge">{{localize "XJZL.Creature.Check.ModeStandby"}}</span>
+            {{/if}}
+        </label>
+    </div>
+
+    <label class="check-inline-toggle require-hit" data-tooltip="{{localize "XJZL.Creature.Check.RequireHitHint"}}">
+        <input type="checkbox" name="requireHit" {{checked check.requireHit}} />
+        <span class="diamond"></span>{{localize "XJZL.Creature.Check.RequireHit"}}
+    </label>
+
+    {{!-- 检定参数：豁免=四组字段；对抗=野兽 vs 目标对阵 --}}
+    <div class="editor-sec-head">{{localize "XJZL.Creature.Check.ParamsSection"}}</div>
+    {{#if (eq check.mode "save")}}
+    <div class="params-grid save-params">
+        <div class="param-field">
+            <label>{{localize "XJZL.Creature.Check.AttrLabel"}}</label>
+            <select name="save.attr">
+                {{selectOptions choices.checkAttrs selected=check.save.attr}}
+            </select>
+        </div>
+        <div class="param-field">
+            <label>{{localize "XJZL.Creature.Check.DC"}}</label>
+            <input type="number" name="save.dc" value="{{check.save.dc}}" min="0" />
+        </div>
+        <div class="param-field">
+            <label data-tooltip="{{localize "XJZL.Creature.Check.LevelHint"}}">{{localize "XJZL.Creature.Check.Level"}}</label>
+            <input type="number" name="save.level" value="{{check.save.level}}" />
+        </div>
+        <div class="param-field">
+            <label>{{localize "XJZL.Creature.Check.Bonus"}}</label>
+            <input type="number" name="save.bonus" value="{{check.save.bonus}}" />
+        </div>
+    </div>
+    {{else}}
+    <div class="params-grid contest-params">
+        <div class="contest-side">
+            <span class="side-name" data-tooltip="{{localize "XJZL.Creature.Check.AttAttrHint"}}">{{localize "XJZL.Creature.Check.AttAttr"}}</span>
+            <select name="contest.attAttr">
+                {{selectOptions choices.checkAttrs selected=check.contest.attAttr}}
+            </select>
+            <span class="side-bonus-label">{{localize "XJZL.Creature.Check.AttBonus"}}</span>
+            <input type="number" name="contest.attBonus" value="{{check.contest.attBonus}}" />
+        </div>
+        <span class="vs-seal">{{localize "XJZL.Creature.Check.ContestVs"}}</span>
+        <div class="contest-side">
+            <span class="side-name">{{localize "XJZL.Creature.Check.DefAttr"}}</span>
+            <select name="contest.defAttr">
+                {{selectOptions choices.checkAttrs selected=check.contest.defAttr}}
+            </select>
+            <span class="side-bonus-label">{{localize "XJZL.Creature.Check.DefBonus"}}</span>
+            <input type="number" name="contest.defBonus" value="{{check.contest.defBonus}}" />
+        </div>
+    </div>
+    {{/if}}
+
+    {{!-- 检定后果：两列对照。豁免=目标失败|目标成功；对抗=野兽获胜|野兽落败 --}}
+    <div class="editor-sec-head">{{localize "XJZL.Creature.Check.OutcomesSection"}}</div>
+    <div class="outcome-columns">
+        <div class="outcome-col">
+            <div class="col-banner danger">{{localize leftCol.bannerKey}}</div>
+            <div class="col-body">
+                {{> "systems/xjzl-system/templates/apps/partials/check-outcome.hbs"
+                    prefix=leftCol.prefix outcome=leftCol.outcome isContest=leftCol.isContest}}
+            </div>
+        </div>
+        <div class="outcome-col">
+            <div class="col-banner safe">{{localize rightCol.bannerKey}}</div>
+            <div class="col-body">
+                {{> "systems/xjzl-system/templates/apps/partials/check-outcome.hbs"
+                    prefix=rightCol.prefix outcome=rightCol.outcome isContest=rightCol.isContest}}
+            </div>
+        </div>
+    </div>
+</div>

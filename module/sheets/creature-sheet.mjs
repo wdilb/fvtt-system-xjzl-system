@@ -4,8 +4,38 @@
 import { localizeConfig } from "../utils/utils.mjs";
 import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } from "./behaviors/effect-interactions.mjs";
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
+import { CreatureCheckEditor } from "../applications/creature-check-editor.mjs";
+import {
+    getCheckAttrChoices,
+    updateCreatureAbility
+} from "../data/actor/creature.mjs";
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
+
+/**
+ * 生成检定配置的卡上摘要文本（如"豁免 · 定力 DC 12（需命中）"）。
+ * @param {Object} check 特性的 check 配置节点
+ * @param {Object} attrChoices 属性 key → 本地化标签（getCheckAttrChoices 的结果）
+ * @returns {String} 摘要文本
+ */
+function buildCheckSummary(check, attrChoices) {
+    const signed = (n) => (Number(n) > 0 ? `+${n}` : `${Number(n) || 0}`);
+    let summary;
+    if (check.mode === "contest") {
+        summary = game.i18n.format("XJZL.Creature.Check.SummaryContest", {
+            att: attrChoices[check.contest.attAttr] || check.contest.attAttr,
+            attBonus: signed(check.contest.attBonus),
+            def: attrChoices[check.contest.defAttr] || check.contest.defAttr
+        });
+    } else {
+        summary = game.i18n.format("XJZL.Creature.Check.SummarySave", {
+            attr: attrChoices[check.save.attr] || check.save.attr,
+            dc: check.save.dc
+        });
+    }
+    if (check.requireHit) summary += game.i18n.localize("XJZL.Creature.Check.SummaryRequireHit");
+    return summary;
+}
 
 export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
@@ -25,8 +55,12 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             deleteAbility: XJZLCreatureSheet.prototype._onDeleteAbility,
             // 快捷发送
             postAbility: XJZLCreatureSheet.prototype._onPostAbility,
-            // 攻击型特性
-            rollAbilityAttack: XJZLCreatureSheet.prototype._onRollAbilityAttack,
+            // 使用特性（攻击/命中/检定一体化流程）
+            useAbility: XJZLCreatureSheet.prototype._onUseAbility,
+            // 切换特性的检定开关（按钮，不走表单提交路径）
+            toggleCheck: XJZLCreatureSheet.prototype._onToggleCheck,
+            // 打开检定配置编辑器
+            editCheck: XJZLCreatureSheet.prototype._onEditCheck,
             // 特效交互（与人物卡一致）
             deleteEffect: XJZLCreatureSheet.prototype._onDeleteEffect,
             // 设为常用
@@ -56,15 +90,50 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         // 准备非被动 AE（与人物卡共享同一逻辑）
         prepareEffects(this, context);
 
-        //解析常用招式
+        //解析常用招式 + 检定摘要（特性卡上仅显示开关与摘要，配置在编辑器弹窗完成）
         const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
+        const attrChoices = getCheckAttrChoices();
         if (context.system.abilities) {
             context.system.abilities.forEach((ab, index) => {
                 ab.isPinned = pinnedList.includes(`Ability.${index}`);
+                // 可发起：配置了攻击段或检定段
+                ab.canUse = ab.isAttack || ab.check?.enabled === true;
+                if (ab.check?.enabled) {
+                    ab.checkSummary = buildCheckSummary(ab.check, attrChoices);
+                }
             });
         }
 
         return context;
+    }
+
+    /**
+     * @override
+     * abilities 数组元素在 Foundry update 中按"整体替换"处理，而表单只包含部分字段
+     * （卡上没有检定配置的输入），若不补全，每次表单提交都会把不在表单里的兄弟数据
+     * （如 check 配置）重置为默认值。以现有数据为底、表单值覆盖，保证提交永远完整。
+     */
+    _processFormData(event, form, formData) {
+        const submitData = super._processFormData(event, form, formData);
+        // 表单展开后 abilities 可能是数组或数字键对象（两种形态都出现过），统一按条目补全
+        const abilities = submitData.system?.abilities;
+        if (abilities && typeof abilities === "object") {
+            const current = this.document.system.abilities;
+            const isArray = Array.isArray(abilities);
+            const entries = isArray ? abilities.map((v, i) => [i, v]) : Object.entries(abilities);
+            const merged = {};
+            for (const [idxStr, patch] of entries) {
+                const existing = current[Number(idxStr)];
+                if (!existing || patch === null || typeof patch !== "object") {
+                    merged[idxStr] = patch;
+                    continue;
+                }
+                const full = existing.toObject?.() ?? foundry.utils.deepClone(existing);
+                merged[idxStr] = foundry.utils.mergeObject(full, patch);
+            }
+            submitData.system.abilities = isArray ? Object.values(merged) : merged;
+        }
+        return submitData;
     }
 
     /* -------------------------------------------- */
@@ -137,23 +206,32 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     }
 
     /**
-     * 发起攻击型特性：复用人物普攻管线（弹配置窗 + d20 命中检定 + applyDamage），
-     * 野兽攻击永不暴击（由 rollBasicAttack 的 isCreatureAttack 标记处理）。
+     * 使用特性：薄壳入口，一体化流程（攻击/命中/检定融合）的单一事实源在
+     * XJZLActor.useCreatureAbility，Token HUD 等其他发起入口调用同一方法。
      */
-    async _onRollAbilityAttack(event, target) {
+    async _onUseAbility(event, target) {
+        const index = Number(target.dataset.index);
+        await this.document.useCreatureAbility(index);
+    }
+
+    /**
+     * 切换特性的检定开关。开关是按钮而非表单复选框：abilities 数组元素按整体替换
+     * 合并，卡上表单不含 check 配置的其余字段，表单提交会清空它们；
+     * 因此开关通过完整元素写回（updateCreatureAbility），配置的编辑全部交给编辑器弹窗。
+     */
+    async _onToggleCheck(event, target) {
         const index = Number(target.dataset.index);
         const ability = this.document.system.abilities[index];
-        if (!ability) return;
+        if (!ability?.check) return;
+        await updateCreatureAbility(this.document, index, { check: { enabled: !ability.check.enabled } });
+    }
 
-        await this.document.rollBasicAttack({
-            isCreatureAttack: true,
-            baseDamage: ability.damage || 0,
-            damageType: ability.damageType || "waigong",
-            // 弹窗显示全量伤害类型，并默认选中特性上的类型（流血/毒素等不会被外功内功覆盖）
-            defaultDamageType: ability.damageType || "waigong",
-            damageTypes: CONFIG.XJZL.damageTypes,
-            label: ability.name || "野兽攻击"
-        });
+    /** 打开检定配置编辑器（独立窗口，改动实时自动保存）。 */
+    _onEditCheck(event, target) {
+        const index = Number(target.dataset.index);
+        const ability = this.document.system.abilities[index];
+        if (!ability?.check) return;
+        return CreatureCheckEditor.open(this.document, index, ability.check);
     }
 
     /**

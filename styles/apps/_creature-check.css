@@ -1,0 +1,977 @@
+/* =====================================================
+   野兽"检定型特性"（豁免/对抗）全部样式，集中于此一个文件：
+   1. 特性卡上的检定开关行与摘要入口（作用域：野兽卡窗口）
+   2. 检定配置编辑器弹窗（纸张风 + 白瓷控件 + 两列对照后果）
+   3. 野兽特性使用面板（DialogV2 深色，与状态选择器同风格）
+   4. 系统状态 ID 选择器弹窗（深色，与状态盘一致）
+   检定语义色：靛蓝=作用于目标，朱砂=作用于野兽 / 不利后果。
+   ===================================================== */
+
+/* -----------------------------------
+   1. 特性卡上的检定入口（野兽卡）
+   ----------------------------------- */
+.xjzl-window.actor.creature .ability-check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    min-height: 28px;
+}
+
+/* 检定开关是按钮（实时写回），启用态加 .on 类 */
+.xjzl-window.actor.creature .ability-check-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    font-family: inherit;
+    padding: 4px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: #f5f5f5;
+    color: #888;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.xjzl-window.actor.creature .ability-check-toggle.on {
+    background: var(--c-mp-blue);
+    border-color: var(--c-mp-blue);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(60, 90, 112, 0.3);
+}
+
+/* 摘要按钮：显示当前模式与关键参数，点击打开配置编辑器 */
+.xjzl-window.actor.creature .check-summary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(60, 90, 112, 0.35);
+    background: rgba(60, 90, 112, 0.08);
+    color: var(--c-mp-blue);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.xjzl-window.actor.creature .check-summary-btn:hover {
+    background: rgba(60, 90, 112, 0.18);
+    border-color: var(--c-mp-blue);
+}
+
+.xjzl-window.actor.creature .check-summary-btn i {
+    opacity: 0.7;
+    font-size: 10px;
+}
+
+/* 头部"使用特性"掷骰按钮（内力蓝主色，悬浮转朱砂） */
+.xjzl-window.actor.creature .ability-tools .ability-use-btn {
+    color: var(--c-mp-blue);
+}
+
+.xjzl-window.actor.creature .ability-tools .ability-use-btn:hover {
+    color: var(--c-cinnabar);
+}
+
+/* -----------------------------------
+   2. 检定配置编辑器弹窗
+   （纸张底 + 白瓷控件；后果区为两列对照布局）
+   ----------------------------------- */
+.xjzl-check-editor-window .window-content {
+    /* 覆盖 .xjzl-window 的三列 grid（侧栏|内容|书脊）——编辑器是单列内容，直接块级铺满 */
+    display: block;
+    background-color: var(--c-paper);
+    background-image: var(--tex-paper);
+    color: var(--c-ink-dark);
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+/* 白瓷条控件：所有输入框统一观感（白底细边、圆角、内阴影） */
+.xjzl-check-editor-window input[type="text"],
+.xjzl-check-editor-window input[type="number"],
+.xjzl-check-editor-window select,
+.xjzl-check-editor-window textarea {
+    background: #fff !important;
+    border: 1px solid rgba(0, 0, 0, 0.16) !important;
+    border-radius: 5px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+    color: var(--c-ink-dark) !important;
+    font-family: inherit;
+    height: 27px;
+    padding: 0 6px;
+}
+
+.xjzl-check-editor-window select {
+    cursor: pointer;
+    padding: 0 2px;
+}
+
+.xjzl-check-editor-window input:focus,
+.xjzl-check-editor-window select:focus,
+.xjzl-check-editor-window textarea:focus {
+    border-color: var(--c-cinnabar) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px rgba(166, 54, 54, 0.25) !important;
+}
+
+.xjzl-check-editor-window input::placeholder,
+.xjzl-check-editor-window textarea::placeholder {
+    color: rgba(0, 0, 0, 0.28) !important;
+}
+
+.xjzl-check-editor-window .xjzl-check-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    /* 顶部 48px 避让窗口框架的 40px 绝对定位透明 header（左侧拖拽毯会拦截点击） */
+    padding: 48px 20px 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+}
+
+/* 头部：特性名 + 当前生效模式提示 */
+.xjzl-check-editor-window .editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.xjzl-check-editor-window .editor-ability-name {
+    font-family: var(--font-deco);
+    font-size: 21px;
+    color: var(--c-cinnabar);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.xjzl-check-editor-window .editor-mode-current {
+    font-size: 11.5px;
+    color: var(--c-ink-light);
+    white-space: nowrap;
+}
+
+/* 模式开关：两张说明大卡，二选一生效 */
+.xjzl-check-editor-window .editor-mode-row {
+    display: flex;
+    gap: 10px;
+}
+
+.xjzl-check-editor-window .mode-option {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px 12px;
+    border: 1.5px solid var(--c-ink-faint);
+    border-radius: 8px;
+    background: var(--c-white-glass);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.xjzl-check-editor-window .mode-option input {
+    display: none;
+}
+
+.xjzl-check-editor-window .mode-option .mode-title {
+    font-size: 14.5px;
+    font-weight: bold;
+    color: var(--c-ink-light);
+    font-family: var(--font-serif);
+    letter-spacing: 2px;
+}
+
+.xjzl-check-editor-window .mode-option .mode-desc {
+    font-size: 11px;
+    color: var(--c-ink-light);
+    line-height: 1.5;
+}
+
+.xjzl-check-editor-window .mode-option:hover {
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+.xjzl-check-editor-window .mode-option.active {
+    border-color: var(--c-mp-blue);
+    background: rgba(60, 90, 112, 0.1);
+    box-shadow: 0 0 0 1px var(--c-mp-blue) inset;
+}
+
+.xjzl-check-editor-window .mode-option.active .mode-title {
+    color: var(--c-mp-blue);
+}
+
+/* "当前生效 / 待用"徽章 */
+.xjzl-check-editor-window .mode-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 1px 8px;
+    border-radius: 9px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    color: var(--c-ink-light);
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.xjzl-check-editor-window .mode-badge.active-badge {
+    background: var(--c-mp-blue);
+    border-color: var(--c-mp-blue);
+    color: #fff;
+}
+
+/* "需要命中"开关：菱形符号引导 */
+.xjzl-check-editor-window .check-inline-toggle.require-hit {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--c-ink-dark);
+    cursor: pointer;
+    user-select: none;
+    width: fit-content;
+}
+
+.xjzl-check-editor-window .check-inline-toggle.require-hit input {
+    accent-color: var(--c-cinnabar);
+    width: 14px;
+    height: 14px;
+}
+
+.xjzl-check-editor-window .check-inline-toggle.require-hit .diamond {
+    width: 6px;
+    height: 6px;
+    background: var(--c-highlight);
+    transform: rotate(45deg);
+    flex-shrink: 0;
+}
+
+/* 区头：短金线 + 标题 + 延伸细线（不用卡片框） */
+.xjzl-check-editor-window .editor-sec-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: var(--c-ink-dark);
+    margin-top: 3px;
+}
+
+.xjzl-check-editor-window .editor-sec-head::before {
+    content: "";
+    width: 16px;
+    height: 3px;
+    background: var(--c-highlight);
+    flex-shrink: 0;
+}
+
+.xjzl-check-editor-window .editor-sec-head::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.14);
+}
+
+/* 参数区：豁免=四组字段横排 */
+.xjzl-check-editor-window .params-grid.save-params {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.xjzl-check-editor-window .param-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.xjzl-check-editor-window .param-field:first-child {
+    flex: 1.4;
+}
+
+.xjzl-check-editor-window .param-field label {
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    color: var(--c-ink-light);
+    white-space: nowrap;
+}
+
+.xjzl-check-editor-window .param-field input[type="number"] {
+    width: 100%;
+    text-align: center;
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+    color: var(--c-cinnabar) !important;
+}
+
+.xjzl-check-editor-window .param-field select {
+    width: 100%;
+    min-width: 110px;
+    font-size: 12px;
+}
+
+/* 参数区：对抗=野兽 vs 目标对阵 */
+.xjzl-check-editor-window .params-grid.contest-params {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 4px 0 2px;
+}
+
+.xjzl-check-editor-window .contest-side {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.xjzl-check-editor-window .contest-side .side-name {
+    font-size: 12.5px;
+    font-weight: bold;
+    color: var(--c-ink-dark);
+    white-space: nowrap;
+}
+
+.xjzl-check-editor-window .contest-side .side-bonus-label {
+    font-size: 10.5px;
+    color: var(--c-ink-light);
+    white-space: nowrap;
+}
+
+.xjzl-check-editor-window .contest-side select {
+    max-width: 108px;
+    font-size: 12px;
+}
+
+.xjzl-check-editor-window .contest-side input[type="number"] {
+    width: 54px;
+    text-align: center;
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+    color: var(--c-cinnabar) !important;
+}
+
+/* "对"字圆章 */
+.xjzl-check-editor-window .vs-seal {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #2e2a26;
+    color: var(--c-highlight);
+    font-family: var(--font-deco);
+    font-size: 17px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px var(--c-paper), 0 0 0 3px var(--c-highlight);
+    flex-shrink: 0;
+    user-select: none;
+}
+
+/* 后果两列对照 */
+.xjzl-check-editor-window .outcome-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+}
+
+.xjzl-check-editor-window .outcome-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* 列头横幅：明确写出结果主体（目标豁免失败 / 野兽获胜时 …） */
+.xjzl-check-editor-window .col-banner {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 6px 6px 0 0;
+    color: #f7f2e4;
+    font-family: var(--font-serif);
+    font-size: 13.5px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    user-select: none;
+}
+
+.xjzl-check-editor-window .col-banner.danger {
+    background: linear-gradient(180deg, #b84545, #96302f);
+}
+
+.xjzl-check-editor-window .col-banner.safe {
+    background: linear-gradient(180deg, #4a6a84, #37536b);
+}
+
+.xjzl-check-editor-window .col-body {
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding: 8px 10px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.xjzl-check-editor-window .check-outcome-text {
+    width: 100%;
+    font-size: 12px;
+}
+
+/* 小节：作用对象（无框，色字小节头 + 虚线延伸） */
+.xjzl-check-editor-window .col-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.xjzl-check-editor-window .col-section + .col-section {
+    border-top: 1px dashed rgba(0, 0, 0, 0.16);
+    padding-top: 7px;
+}
+
+.xjzl-check-editor-window .col-section-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: bold;
+}
+
+.xjzl-check-editor-window .col-section-head::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.28;
+}
+
+.xjzl-check-editor-window .col-section-head.target {
+    color: var(--c-mp-blue);
+}
+
+.xjzl-check-editor-window .col-section-head.self {
+    color: var(--c-cinnabar);
+}
+
+/* 伤害/流失行 */
+.xjzl-check-editor-window .check-damage-config {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    font-size: 12px;
+}
+
+.xjzl-check-editor-window .check-damage-label {
+    white-space: nowrap;
+    color: var(--c-ink-light);
+    font-size: 11.5px;
+}
+
+.xjzl-check-editor-window .check-damage-config input[type="number"] {
+    width: 54px;
+    text-align: center;
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+}
+
+.xjzl-check-editor-window .check-damage-config select {
+    max-width: 96px;
+    font-size: 11.5px;
+}
+
+/* 高级开关折叠区 */
+.xjzl-check-editor-window .check-advanced {
+    width: 100%;
+}
+
+.xjzl-check-editor-window .check-advanced summary {
+    font-size: 10.5px;
+    color: var(--c-ink-light);
+    cursor: pointer;
+    user-select: none;
+    width: fit-content;
+}
+
+.xjzl-check-editor-window .check-advanced summary:hover {
+    color: var(--c-cinnabar);
+}
+
+.xjzl-check-editor-window .check-advanced-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 5px 0 0 2px;
+    font-size: 11px;
+    color: var(--c-ink-dark);
+}
+
+.xjzl-check-editor-window .check-advanced-grid label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.xjzl-check-editor-window .check-advanced-grid input {
+    accent-color: var(--c-mp-blue);
+    width: 13px;
+    height: 13px;
+}
+
+.xjzl-check-editor-window .check-advanced-grid .element-field {
+    gap: 4px;
+}
+
+.xjzl-check-editor-window .check-advanced-grid .element-field select {
+    max-width: 80px;
+    font-size: 11px;
+    height: 23px;
+}
+
+/* 状态 chips 行 */
+.xjzl-check-editor-window .check-effects-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.xjzl-check-editor-window .check-effects-label {
+    font-size: 11.5px;
+    color: var(--c-ink-light);
+    white-space: nowrap;
+}
+
+.xjzl-check-editor-window .check-effect-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 5px 2px 9px;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.xjzl-check-editor-window .col-section.target-side .check-effect-chip {
+    border: 1px solid rgba(60, 90, 112, 0.4);
+    color: var(--c-mp-blue);
+}
+
+.xjzl-check-editor-window .col-section.self-side .check-effect-chip {
+    border: 1px solid rgba(166, 54, 54, 0.4);
+    color: var(--c-cinnabar);
+}
+
+.xjzl-check-editor-window .check-effect-chip a {
+    color: #999;
+    font-size: 10px;
+}
+
+.xjzl-check-editor-window .check-effect-chip a:hover {
+    color: #e74c3c;
+}
+
+/* 添加状态：虚线小圆钮 */
+.xjzl-check-editor-window .check-effect-add {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px dashed rgba(0, 0, 0, 0.35);
+    color: var(--c-ink-light);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.xjzl-check-editor-window .check-effect-add:hover {
+    border-style: solid;
+    border-color: var(--c-cinnabar);
+    color: var(--c-cinnabar);
+}
+
+/* 恢复行（自身小节内） */
+.xjzl-check-editor-window .check-recovery-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.xjzl-check-editor-window .check-recovery-row input[type="number"] {
+    width: 54px;
+    text-align: center;
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+}
+
+.xjzl-check-editor-window .check-recovery-row select {
+    max-width: 96px;
+    font-size: 11.5px;
+}
+
+/* 豁免侧"解除架招"开关（目标小节内） */
+.xjzl-check-editor-window .col-section .check-inline-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--c-ink-dark);
+    cursor: pointer;
+    user-select: none;
+    width: fit-content;
+}
+
+.xjzl-check-editor-window .col-section .check-inline-toggle input {
+    accent-color: var(--c-mp-blue);
+    width: 13px;
+    height: 13px;
+}
+
+/* -----------------------------------
+   3. 野兽特性使用面板（DialogV2 · 深色，与状态选择器同风格）
+   ----------------------------------- */
+
+/* 弹窗窗体铺深底：世界主题会随机深染弹窗输入控件，与其混杂，不如整体统一深色 */
+.dialog:has(.xjzl-ability-panel) .window-content {
+    background: #17130e;
+    color: #e9dcbe;
+    padding: 12px 14px !important;
+}
+
+/* 标题栏染成深金风（仅背景与文字，不触碰框架定位属性） */
+.dialog:has(.xjzl-ability-panel) .window-header {
+    background: linear-gradient(90deg, rgba(99, 28, 32, 0.9), rgba(23, 19, 14, 0.95) 45%);
+    border-bottom: 1px solid rgba(222, 176, 94, 0.3);
+    color: #f0dfb0;
+}
+
+.dialog:has(.xjzl-ability-panel) .window-header .window-title {
+    color: #f0dfb0;
+}
+
+.dialog:has(.xjzl-ability-panel) .window-header .header-control {
+    color: #c9b27a;
+}
+
+.xjzl-ability-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 目标预览行 */
+.xjzl-ability-panel .target-list {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.xjzl-ability-panel .list-label {
+    font-size: 12px;
+    color: #b3a67f;
+    margin-right: 2px;
+}
+
+.xjzl-ability-panel .target-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    padding: 2px 9px 2px 3px;
+    border-radius: 12px;
+    border: 1px solid rgba(222, 176, 94, 0.35);
+    background: rgba(222, 176, 94, 0.1);
+    color: #e9c877;
+}
+
+.xjzl-ability-panel .target-chip img {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(222, 176, 94, 0.4);
+}
+
+/* 参数分区：深色玻璃 + 金色标题线 */
+.xjzl-ability-panel .panel-section {
+    border: 1px solid rgba(222, 176, 94, 0.22);
+    border-radius: 6px;
+    padding: 7px 10px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: rgba(255, 243, 220, 0.04);
+}
+
+.xjzl-ability-panel .panel-section-title {
+    font-size: 11.5px;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: #deb05e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.xjzl-ability-panel .panel-section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(222, 176, 94, 0.3);
+}
+
+.xjzl-ability-panel .panel-fields {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* 字段：浅色小标签 + 深色输入控件（显式设色，不随世界主题漂移） */
+.xjzl-ability-panel .edit-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.xjzl-ability-panel .edit-field label {
+    font-size: 11px;
+    color: #b3a67f;
+    white-space: nowrap;
+}
+
+.xjzl-ability-panel input[type="text"],
+.xjzl-ability-panel input[type="number"],
+.xjzl-ability-panel select {
+    background: #0e0b08 !important;
+    color: #f0e6d2 !important;
+    border: 1px solid rgba(222, 176, 94, 0.28) !important;
+    border-radius: 5px;
+    height: 28px;
+    padding: 0 7px;
+    font-family: var(--font-serif);
+}
+
+.xjzl-ability-panel input[type="number"] {
+    width: 66px;
+    text-align: center;
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+}
+
+.xjzl-ability-panel select {
+    min-width: 100px;
+    cursor: pointer;
+}
+
+.xjzl-ability-panel input:focus,
+.xjzl-ability-panel select:focus {
+    border-color: #deb05e !important;
+    outline: none !important;
+    box-shadow: 0 0 0 1px rgba(222, 176, 94, 0.35) !important;
+}
+
+.xjzl-ability-panel input[type="checkbox"] {
+    accent-color: #deb05e;
+    width: 16px;
+    height: 16px;
+    margin-bottom: 5px;
+}
+
+/* 确认按钮染成金底深字，与面板统一 */
+.dialog:has(.xjzl-ability-panel) .form-footer button,
+.dialog:has(.xjzl-ability-panel) button[data-button="ok"] {
+    background: linear-gradient(180deg, #e5c078, #c39a4e);
+    color: #241a08;
+    border: none;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+
+/* -----------------------------------
+   4. 系统状态 ID 选择器弹窗（深色，同状态盘风格）
+   ----------------------------------- */
+
+/* 内容区显式铺深底：窗口框架是 theme-dark，内容区不铺会露白底导致浅色文字不可读。
+   覆盖 .xjzl-window 的三列 grid（侧栏|内容|书脊）——选择器是单列内容，直接块级铺满；
+   顶部 48px 避让窗口框架 40px 绝对定位标题拖拽层（左侧拖拽毯会拦截点击，同检定编辑器） */
+.xjzl-status-id-picker .window-content {
+    display: block;
+    background: #0d100e;
+    color: #ddd;
+    padding: 48px 8px 8px !important;
+    overflow: hidden;
+}
+
+.xjzl-status-id-picker .xjzl-status-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+}
+
+.xjzl-status-id-picker .picker-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.xjzl-status-id-picker .picker-toolbar i {
+    color: #aaa;
+}
+
+.xjzl-status-id-picker .picker-toolbar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #ddd;
+}
+
+/* 分类 tab 行 */
+.xjzl-status-id-picker .category-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.xjzl-status-id-picker .category-tab {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+    color: #bbb;
+    cursor: pointer;
+}
+
+.xjzl-status-id-picker .category-tab .count {
+    opacity: 0.65;
+    font-size: 10px;
+}
+
+.xjzl-status-id-picker .category-tab:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.xjzl-status-id-picker .category-tab.active {
+    background: var(--c-mp-blue);
+    border-color: var(--c-mp-blue);
+    color: #fff;
+}
+
+/* 状态列表 */
+.xjzl-status-id-picker .picker-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-right: 2px;
+}
+
+.xjzl-status-id-picker .picker-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.xjzl-status-id-picker .picker-row:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.xjzl-status-id-picker .picker-row input[type="checkbox"] {
+    accent-color: var(--c-mp-blue);
+}
+
+.xjzl-status-id-picker .picker-row .row-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.xjzl-status-id-picker .picker-row .row-name {
+    flex: 1;
+    font-size: 13px;
+    color: #ddd;
+}
+
+.xjzl-status-id-picker .picker-row .row-id {
+    font-size: 10px;
+    font-family: "Consolas", monospace;
+    color: #777;
+}
+
+.xjzl-status-id-picker .picker-empty {
+    text-align: center;
+    color: #888;
+    font-style: italic;
+    font-size: 12px;
+    padding: 20px 0;
+}
+
+/* 底部确认按钮 */
+.xjzl-status-id-picker .picker-footer {
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 8px;
+}
+
+.xjzl-status-id-picker .picker-confirm {
+    padding: 5px 18px;
+    border-radius: 6px;
+    border: none;
+    background: var(--c-mp-blue);
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.xjzl-status-id-picker .picker-confirm:hover {
+    filter: brightness(1.15);
+}
