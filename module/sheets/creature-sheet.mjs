@@ -15,7 +15,7 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     static DEFAULT_OPTIONS = {
         tag: "form",
         classes: ["xjzl-window", "actor", "creature", "theme-dark"],
-        position: { width: 600, height: 600 }, // 不需要太大
+        position: { width: 760, height: 820 },
         window: { resizable: true },
         form: {
             submitOnChange: true,
@@ -31,9 +31,9 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             postAbility: XJZLCreatureSheet.prototype._onPostAbility,
             // 使用特性（攻击/命中/检定一体化流程）
             useAbility: XJZLCreatureSheet.prototype._onUseAbility,
-            // 状态与检定全部在独立编辑器中配置
+            // 状态、检定与说明共用同一个编辑器，沿用既有保存逻辑
             editAbilityState: XJZLCreatureSheet.prototype._onEditAbilityState,
-            // 能力卡的轻量折叠面板（攻击 / 状态）
+            // 统一特性配置面板；内部沿用 attack 面板键以保留窗口展开状态
             toggleAbilityPanel: XJZLCreatureSheet.prototype._onToggleAbilityPanel,
             // 特效交互（与人物卡一致）
             deleteEffect: XJZLCreatureSheet.prototype._onDeleteEffect,
@@ -43,20 +43,25 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     };
 
     static PARTS = {
-        main: { template: "systems/xjzl-system/templates/actor/creature/sheet.hbs", scrollable: [".xjzl-creature-sheet", ".ability-list"] }
+        main: { template: "systems/xjzl-system/templates/actor/creature/sheet.hbs", scrollable: [".creature-content"] }
     };
 
-    /** 准备野兽卡上下文；baseCombat 只含存档值，system 提供最终战斗数值。 */
+    /** 准备野兽卡展示数据；基础值取自存档，能力展示副本与富文本不写回 Actor。 */
     async _prepareContext(options) {
         const context = await super._prepareContext(options);
         const actor = this.document;
 
+        context.sheetId = this.id;
         context.system = actor.system;
         // 编辑只读取存档中的 value，防止任何 AE 对运行时字段的修改被表单写回。
         context.baseCombat = actor.system.toObject().combat;
         context.creatureTypes = localizeConfig(CONFIG.XJZL.creatureTypes); // 用于下拉菜单
         context.choices = {
-            sizes: { tiny: "袖珍", small: "小型", medium: "中型", large: "大型", huge: "巨型" },
+            sizes: localizeConfig({
+                tiny: "XJZL.Creature.Sizes.Tiny", small: "XJZL.Creature.Sizes.Small",
+                medium: "XJZL.Creature.Sizes.Medium", large: "XJZL.Creature.Sizes.Large",
+                huge: "XJZL.Creature.Sizes.Huge"
+            }),
             damageTypes: localizeConfig(CONFIG.XJZL.damageTypes) // 攻击型特性伤害类型下拉
         };
         // 准备体力百分比
@@ -66,23 +71,31 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         // 准备非被动 AE（与人物卡共享同一逻辑）
         prepareEffects(this, context);
 
-        // 解析常用招式与卡片摘要；状态与检定详情统一在独立编辑器配置。
+        // 阅读信息独立于编辑入口，避免打开配置才能获知规则；派生标记只放在展示副本中。
         const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
-        if (context.system.abilities) {
-            context.system.abilities.forEach((ab, index) => {
-                ab.isPinned = pinnedList.includes(`Ability.${index}`);
-                // 可发起：配置了攻击段或检定段
-                ab.canUse = ab.isAttack || ab.check?.enabled === true || (ab.directEffects?.length > 0);
-                // 状态页包含直接状态与检定；说明文本仍归在状态页，避免卡片初始高度过长。
-                ab.stateConfigured = (ab.directEffects?.length > 0)
-                    || ab.check?.enabled === true
-                    || Boolean(ab.description || ab.automationNote);
-                if (ab.isAttack) {
-                    const damageType = context.choices.damageTypes[ab.damageType] || ab.damageType || "";
-                    ab.attackSummary = `${ab.damage ?? 0} · ${damageType}`;
-                }
-            });
-        }
+        const enrichOptions = { secrets: actor.isOwner, relativeTo: actor };
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
+            actor.system.description || "", enrichOptions
+        );
+        context.abilities = await Promise.all(Array.from(actor.system.abilities || [], async (ability, index) => {
+            const ab = ability.toObject?.() ?? foundry.utils.deepClone(ability);
+            const damageType = context.choices.damageTypes[ab.damageType] || ab.damageType || "";
+            return {
+                ...ab,
+                index,
+                isPinned: pinnedList.includes(`Ability.${index}`),
+                canUse: ab.isAttack || ab.check?.enabled === true || (ab.directEffects?.length > 0),
+                // 说明文字不代表已配置自动状态，摘要只反映实际状态与检定字段。
+                stateConfigured: (ab.directEffects?.length > 0) || ab.check?.enabled === true,
+                attackSummary: ab.isAttack ? `${ab.damage ?? 0} · ${damageType}` : "",
+                directEffectNames: (ab.directEffects || []).map(id =>
+                    game.i18n.localize(CONFIG.statusEffects[id]?.name || id)
+                ).join("、"),
+                enrichedDescription: await foundry.applications.ux.TextEditor.enrichHTML(
+                    ab.description || "", enrichOptions
+                )
+            };
+        }));
 
         return context;
     }
@@ -120,11 +133,19 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     /*  交互 Actions                                */
     /* -------------------------------------------- */
 
+    /** 恢复当前窗口的展开状态，并为动态生成的资料编辑按钮补齐可访问名称。 */
     _onRender(context, options) {
         super._onRender(context, options);
         const html = this.element;
 
         this._restoreAbilityPanels(html);
+
+        const biographyEdit = html.querySelector(".creature-biography prose-mirror > button.toggle");
+        if (biographyEdit) {
+            const label = game.i18n.localize("XJZL.Creature.EditBiography");
+            biographyEdit.setAttribute("aria-label", label);
+            biographyEdit.dataset.tooltip = label;
+        }
 
         // 特效交互：左键加层，右键减层（委托共享逻辑）
         const effectsContainer = html.querySelector(".active-effects-row");
@@ -148,7 +169,7 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     }
 
     /**
-     * 切换能力卡的攻击/状态配置页，不改变能力数据；具体字段仍由表单提交保存。
+     * 切换能力卡的配置面板，不改变能力数据；attack/state 面板键兼容原有调用。
      * @param {Event} event 点击事件
      * @param {HTMLElement} target 带 data-index/data-panel 的入口按钮
      * @returns {void}
@@ -256,8 +277,8 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         await this.document.useCreatureAbility(index);
     }
 
-    /** 打开野兽特性的状态/检定编辑器，所有非攻击配置在该窗口内保存。 */
-    _onEditAbilityState(event, target) {
+    /** 按特性下标打开统一编辑器；沿用原草稿与自动保存流程，不修改能力数据。 */
+    async _onEditAbilityState(event, target) {
         const index = Number(target.dataset.index);
         const ability = this.document.system.abilities[index];
         if (!ability) return;

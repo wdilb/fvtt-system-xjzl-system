@@ -12,8 +12,8 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
  * 野兽特性的状态/检定配置编辑器。
- * 特性卡上只保留攻击入口与状态入口；直接状态、叠层/持续时间、检定及说明
- * 全部在本窗口完成，并通过同一份草稿实时保存。
+ * 特性卡通过“状态、检定与说明”这一个入口打开本窗口，
+ * 直接状态、叠层/持续时间、检定及说明通过同一份草稿实时保存。
  * 改动实时自动保存（与野兽卡的 submitOnChange 体验一致，无保存按钮）：
  * 任何输入变化经防抖后通过 updateCreatureAbility 整元素写回（abilities 数组元素
  * 在 update 中按整体替换合并，因此状态字段和 check 一起提交，保留同级攻击配置）。

@@ -1,821 +1,1245 @@
-/* ==========================================================================
-   XJZL Creature Sheet Styles (Strictly Scoped)
-   作用域严格限定为: .xjzl-window.actor.creature
-   ========================================================================== */
-
-/* 1. 窗口容器重置 */
+/* 江湖兽谱：墨漆身份区与浅纸正文形成明暗层次，朱印承载操作，文字保持实色与足够字号。 */
 .xjzl-window.actor.creature .window-content {
     display: flex;
     flex-direction: column;
-    background-color: var(--c-paper);
-    /* 引用全局纸张色 */
-    background-image: var(--tex-paper);
-    color: var(--c-ink-dark);
-    padding: 0 !important;
+    padding: 0;
     overflow: hidden;
+    background: #f4ebd9;
+    color: #24251f;
 }
 
-/* 2. 强制覆盖 Foundry 默认表单样式 (输入框去背景) */
-.xjzl-window.actor.creature input[type="text"],
-.xjzl-window.actor.creature input[type="number"],
-.xjzl-window.actor.creature select,
-.xjzl-window.actor.creature textarea {
-    background-color: transparent !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    color: var(--c-ink-dark) !important;
-    font-family: inherit;
-    border-radius: 0;
-}
-
-/* 修复 Placeholder 颜色 */
-.xjzl-window.actor.creature input::placeholder,
-.xjzl-window.actor.creature textarea::placeholder {
-    color: rgba(0, 0, 0, 0.3) !important;
-}
-
-/* 聚焦状态微调 */
-.xjzl-window.actor.creature input:focus,
-.xjzl-window.actor.creature select:focus,
-.xjzl-window.actor.creature textarea:focus {
-    background: rgba(0, 0, 0, 0.05) !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
-
-/* -----------------------------------
-   内部布局容器
-   ----------------------------------- */
 .xjzl-window.actor.creature .xjzl-creature-sheet {
-    padding: 20px;
-    height: 100%;
-    overflow-y: auto;
-    /* 强制隐藏横向滚动条 */
-    overflow-x: hidden;
+    --creature-ink: #24251f;
+    --creature-muted: #514b3e;
+    --creature-jade: #36554d;
+    --creature-jade-wash: #e3e7d9;
+    --creature-card: #fffaf0;
+    --creature-line: #bcb095;
+    --creature-note: #ebe0c6;
+    --creature-gold: #d0b17a;
+    --creature-red: #a32f30;
+    --creature-cover: #252822;
+    --creature-cover-muted: #e1d4b4;
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    position: relative;
-    /* 滚动条美化 */
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    color: var(--creature-ink);
+    background: #f4ebd9;
+    background-image: var(--tex-paper);
+    font-family: var(--font-serif);
+    font-size: 12px;
+    color-scheme: light;
+    container-type: inline-size;
 }
 
-/* 背景大字装饰 */
-.xjzl-window.actor.creature .bg-deco {
-    position: absolute;
-    top: -20px;
-    right: -20px;
-    font-family: var(--font-title);
-    font-size: 200px;
-    color: var(--c-ink-dark);
-    opacity: 0.05;
-    pointer-events: none;
-    z-index: 0;
+.xjzl-window.actor.creature .xjzl-creature-sheet :where(input[type="text"], input[type="number"], select, textarea) {
+    min-width: 0;
+    height: 30px;
+    margin: 0;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--creature-ink);
+    font: inherit;
 }
 
-/* -----------------------------------
-   1. 头部区域 (Header)
-   ----------------------------------- */
+.xjzl-window.actor.creature .xjzl-creature-sheet :is(input, select, textarea)::placeholder {
+    color: var(--creature-muted);
+    opacity: .75;
+}
+
+.xjzl-window.actor.creature .xjzl-creature-sheet :is(input, select, textarea):hover {
+    border-color: var(--creature-line);
+    background: rgba(255, 255, 255, .65);
+}
+
+.xjzl-window.actor.creature .xjzl-creature-sheet :is(input, select, textarea):focus {
+    border-color: var(--creature-jade);
+    background: #fffefa;
+    box-shadow: 0 0 0 2px rgba(71, 98, 90, .12);
+    outline: none;
+}
+
+.xjzl-window.actor.creature .xjzl-creature-sheet select option {
+    background: var(--creature-card);
+    color: var(--creature-ink);
+}
+
+.xjzl-window.actor.creature .creature-overview {
+    flex: 0 0 auto;
+    padding: 0 0 12px;
+    border-bottom: 3px solid #ba995f;
+    background: var(--creature-cover);
+    background-image: radial-gradient(ellipse at 90% 0, rgba(202, 172, 118, .14), transparent 62%), var(--tex-paper);
+    color: #fff4de;
+}
+
 .xjzl-window.actor.creature .creature-header {
-    display: flex;
-    gap: 20px;
-    align-items: center;
     position: relative;
-    z-index: 1;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 132px;
+    align-items: center;
+    gap: 26px;
+    padding: 20px 28px 16px;
 }
 
-/* 头像 */
-.xjzl-window.actor.creature .portrait-wrapper {
-    width: 80px;
-    height: 80px;
+/* 兽字暗纹只作为身份区的装饰，保持在文字与头像之后且不拦截点击。 */
+.xjzl-window.actor.creature .creature-header::before {
+    content: attr(data-emblem);
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    right: 158px;
+    color: rgba(221, 196, 147, .08);
+    font: 153px/1 var(--font-title);
+    pointer-events: none;
+}
+
+.xjzl-window.actor.creature .creature-header::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: 15px;
+    right: 21px;
+    width: 147px;
+    height: 147px;
+    border: 1px solid rgba(213, 181, 122, .5);
     border-radius: 50%;
-    border: 3px solid #555;
-    overflow: hidden;
+    pointer-events: none;
+}
+
+.xjzl-window.actor.creature .portrait-wrapper {
     position: relative;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    grid-column: 2;
+    grid-row: 1;
+    display: block;
+    width: 132px;
+    height: 132px;
+    min-height: 0;
+    margin: 0;
+    padding: 4px;
+    border: 1px solid #d5b57a;
+    border-radius: 50%;
+    background: #e8d9b9;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .3);
     cursor: pointer;
-    background: #ccc;
-    flex-shrink: 0;
+}
+
+.xjzl-window.actor.creature .portrait-wrapper:hover {
+    border-color: #fff1c9;
+    box-shadow: 0 0 0 3px rgba(213, 181, 122, .2), 0 6px 16px rgba(0, 0, 0, .3);
 }
 
 .xjzl-window.actor.creature .portrait-wrapper img {
     width: 100%;
     height: 100%;
+    border: 0;
+    border-radius: 50%;
     object-fit: cover;
-    transition: 0.3s;
 }
 
-.xjzl-window.actor.creature .portrait-wrapper:hover img {
-    transform: scale(1.1);
-}
-
-.xjzl-window.actor.creature .header-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-/* 名字输入框 */
-.xjzl-window.actor.creature .creature-name {
-    font-family: var(--font-title);
-    font-size: 32px !important;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1) !important;
-    padding: 0 !important;
-    height: 40px !important;
-    width: 100%;
-    line-height: 1.2;
-}
-
-.xjzl-window.actor.creature .creature-name:focus {
-    border-bottom-color: var(--c-cinnabar) !important;
-}
-
-.xjzl-window.actor.creature .tags-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* 类型印章 */
-.xjzl-window.actor.creature .tag-seal {
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
-    background: var(--c-cinnabar);
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-    position: relative;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.xjzl-window.actor.creature .tag-seal select {
+.xjzl-window.actor.creature .portrait-edit {
     position: absolute;
-    inset: 0;
-    color: #fff !important;
-    font-family: var(--font-deco);
-    font-weight: bold;
-    text-align: center;
-    text-align-last: center;
-    appearance: none;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 0 2px;
-}
-
-.xjzl-window.actor.creature .tag-seal select option {
-    color: #000;
-    background: #fff;
-}
-
-/* 信息胶囊 (Info Pills) */
-.xjzl-window.actor.creature .info-pill {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 12px;
-    padding: 2px 8px;
-    font-size: 12px;
-    color: #666;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.xjzl-window.actor.creature .info-pill i {
+    right: 2px;
+    bottom: 6px;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 2px solid #e8d9b9;
+    border-radius: 50%;
+    background: var(--creature-red);
+    color: #fff8e9;
     font-size: 10px;
-    opacity: 0.7;
 }
 
-.xjzl-window.actor.creature .info-pill input,
-.xjzl-window.actor.creature .info-pill select {
-    width: 50px;
-    text-align: center;
-    font-family: var(--font-serif);
-    font-weight: bold;
-    font-size: 12px !important;
-    height: 18px !important;
-    padding: 0 !important;
+.xjzl-window.actor.creature .creature-identity {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
 }
 
-/* -----------------------------------
-   2. 资源条 (Vitals)
-   ----------------------------------- */
-.xjzl-window.actor.creature .vitals-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.4);
-    border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.xjzl-window.actor.creature .vital-bar {
+.xjzl-window.actor.creature .creature-kicker {
     display: flex;
     align-items: center;
     gap: 10px;
-}
-
-.xjzl-window.actor.creature .vital-bar .label {
-    width: 40px;
+    margin-bottom: 5px;
+    color: #f0d5a0;
     font-size: 11px;
-    font-weight: bold;
-    color: #888;
-    text-align: right;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 4px;
+    font-weight: 700;
+    letter-spacing: .24em;
 }
 
-.xjzl-window.actor.creature .vital-bar .bar-track {
-    flex: 1;
-    height: 16px;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    position: relative;
-    overflow: hidden;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+.xjzl-window.actor.creature .creature-seal {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 27px;
+    border: 1px solid #d59269;
+    border-radius: 2px 1px 3px 1px;
+    background: #aa3f32;
+    color: #fff2d4;
+    font-family: var(--font-deco);
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: 0;
+    transform: rotate(-4deg);
 }
 
-.xjzl-window.actor.creature .vital-bar .bar-fill {
-    height: 100%;
-    transition: width 0.3s ease;
-}
-
-.xjzl-window.actor.creature .vital-bar.hp .bar-fill {
-    background: #c0392b;
-}
-
-.xjzl-window.actor.creature .vital-bar.rage .bar-fill {
-    background: #f1c40f;
-}
-
-.xjzl-window.actor.creature .vital-bar .bar-text {
-    position: absolute;
-    top: 0;
-    left: 0;
+.xjzl-window.actor.creature .xjzl-creature-sheet .creature-name {
     width: 100%;
-    height: 100%;
+    height: 48px;
+    padding: 0;
+    font-family: var(--font-title);
+    font-size: 38px;
+    line-height: 1.15;
+    letter-spacing: .08em;
+}
+
+.xjzl-window.actor.creature .creature-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(90px, 1.25fr);
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.xjzl-window.actor.creature .creature-meta-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 3px;
+    color: var(--creature-cover-muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.xjzl-window.actor.creature .creature-meta-field > span {
+    padding-left: 3px;
+}
+
+.xjzl-window.actor.creature .creature-meta-field :is(input, select) {
+    width: 100%;
+    height: 29px;
+    padding: 2px 4px;
+    border-color: rgba(213, 181, 122, .35);
+    border-radius: 2px;
+    background: rgba(255, 255, 255, .035);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* 暗色身份区的输入框仍沿用原表单字段；单独定义悬浮与聚焦色，避免主题默认值降低对比。 */
+.xjzl-window.actor.creature .creature-overview :is(input[type="text"], input[type="number"], select) {
+    color: #fff4de;
+    color-scheme: dark;
+}
+
+.xjzl-window.actor.creature .creature-overview :is(input, select):hover,
+.xjzl-window.actor.creature .creature-overview :is(input, select):focus {
+    border-color: #d5b57a;
+    background: #3d4136;
+    color: #fff8e9;
+}
+
+.xjzl-window.actor.creature .creature-overview :is(input, select):focus {
+    box-shadow: 0 0 0 2px rgba(213, 181, 122, .23);
+}
+
+.xjzl-window.actor.creature .creature-vitals {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+    gap: 28px;
+    margin: 0 28px 14px;
+}
+
+.xjzl-window.actor.creature .creature-vital {
+    min-width: 0;
+}
+
+.xjzl-window.actor.creature .vital-heading {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.xjzl-window.actor.creature .vital-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #fff4de;
     font-size: 11px;
-    font-weight: bold;
-    color: #fff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    gap: 2px;
+    font-weight: 700;
 }
 
-.xjzl-window.actor.creature .vital-bar .bar-text input {
-    width: 30px;
+.xjzl-window.actor.creature .tili .vital-label i {
+    color: #ed9d85;
+}
+
+.xjzl-window.actor.creature .rage .vital-label i {
+    color: #edcd88;
+}
+
+.xjzl-window.actor.creature .vital-values {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--creature-cover-muted);
+    font: 11px Consolas, monospace;
+    white-space: nowrap;
+}
+
+.xjzl-window.actor.creature .vital-values input[type="number"] {
+    width: 46px;
+    height: 27px;
+    padding: 0 2px;
     text-align: center;
-    color: #fff !important;
-    padding: 0;
-    font-weight: bold;
+    font: bold 17px Consolas, monospace;
 }
 
-.xjzl-window.actor.creature .vital-bar .bar-text span {
-    opacity: 0.8;
+.xjzl-window.actor.creature .vital-values input[name$=".max"] {
+    font-size: 13.5px;
+    color: var(--creature-cover-muted);
 }
 
-/* -----------------------------------
-   3. 战斗属性 (Combat Stats)
-   ----------------------------------- */
+.xjzl-window.actor.creature .vital-track {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: #55594b;
+}
+
+.xjzl-window.actor.creature .vital-fill {
+    height: 100%;
+    max-width: 100%;
+    border-radius: inherit;
+    background: #ca5d49;
+}
+
+.xjzl-window.actor.creature .rage .vital-fill {
+    background: #d5b57a;
+}
+
 .xjzl-window.actor.creature .combat-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0 28px;
+    padding: 11px 0;
+    border-top: 1px solid #7a7058;
+    border-bottom: 1px solid #7a7058;
+    background: rgba(0, 0, 0, .12);
 }
 
 .xjzl-window.actor.creature .stat-cell {
-    background: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    border-radius: 4px;
-    padding: 5px;
+    min-width: 0;
+    padding: 0 8px;
     text-align: center;
-    position: relative;
-    overflow: hidden;
 }
 
-.xjzl-window.actor.creature .stat-cell.protection {
-    border-color: #2980b9;
-    background: #f0f7fb;
+.xjzl-window.actor.creature .stat-cell + .stat-cell {
+    border-left: 1px solid #665f4d;
 }
 
-.xjzl-window.actor.creature .stat-cell .stat-label {
-    font-size: 10px;
-    color: #888;
-    text-transform: uppercase;
-    position: relative;
-    z-index: 1;
-}
-
-.xjzl-window.actor.creature .stat-cell .stat-val {
-    font-family: "Consolas", monospace;
-    font-size: 20px !important;
-    font-weight: bold;
-    width: 100%;
-    text-align: center;
-    padding: 0 !important;
-    height: 24px !important;
-    color: var(--c-ink-dark) !important;
-    position: relative;
-    z-index: 1;
-}
-
-.xjzl-window.actor.creature .stat-cell .stat-total {
-    font: bold 20px "Consolas", monospace;
-    color: var(--c-ink-dark);
-}
-
-.xjzl-window.actor.creature .stat-cell .stat-base {
+.xjzl-window.actor.creature .stat-label {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    font-size: 10px;
-    color: #888;
-}
-
-.xjzl-window.actor.creature .stat-cell .stat-base .stat-val {
-    width: 42px;
-    font-size: 12px !important;
-    height: 20px !important;
-}
-
-.xjzl-window.actor.creature .stat-cell .icon-bg {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 40px;
-    color: rgba(0, 0, 0, 0.05);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.xjzl-window.actor.creature .stat-cell.protection .icon-bg {
-    color: rgba(41, 128, 185, 0.15);
-}
-
-/* -----------------------------------
-   2.5 临时状态栏 (Active Effects)
-   ----------------------------------- */
-.xjzl-window.actor.creature .active-effects-row {
-    min-height: 30px;
-    flex-shrink: 0;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
     gap: 6px;
-    padding: 7px 9px;
-    background: rgba(255, 255, 255, 0.4);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    border-radius: 8px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
-    position: relative;
-    z-index: 2;
+    color: var(--creature-cover-muted);
+    font-size: 11px;
+    font-weight: 700;
 }
 
-.xjzl-window.actor.creature .effect-immunity-summary {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 5px;
-    padding: 2px 6px 5px;
-    margin-top: 4px;
-    color: rgba(56, 40, 31, 0.68);
+.xjzl-window.actor.creature .stat-label i {
     font-size: 11px;
 }
 
-.xjzl-window.actor.creature .effect-immunity-chip {
-    padding: 2px 6px;
-    border: 1px solid rgba(46, 125, 50, 0.35);
-    border-radius: 10px;
-    color: #2e7d32;
-    background: rgba(232, 245, 233, 0.72);
+.xjzl-window.actor.creature .stat-total {
+    margin: 4px 0;
+    color: #fff8e9;
+    font: bold 23px/1.1 Consolas, monospace;
+}
+
+.xjzl-window.actor.creature .protection .stat-total {
+    color: #f0d5a0;
+}
+
+.xjzl-window.actor.creature .stat-base {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    color: var(--creature-cover-muted);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.xjzl-window.actor.creature .stat-base input[type="number"] {
+    width: 39px;
+    height: 22px;
+    padding: 0 2px;
+    border: 1px solid #7a7058;
+    border-radius: 2px;
+    text-align: center;
+    font: bold 11px Consolas, monospace;
+}
+
+.xjzl-window.actor.creature .creature-effects {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 5px 10px;
+    margin: 9px 28px 0;
+    font-size: 11px;
+}
+
+.xjzl-window.actor.creature .effects-label {
+    padding-top: 4px;
+    color: var(--creature-cover-muted);
+    font-weight: 700;
+}
+
+.xjzl-window.actor.creature .active-effects-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 24px;
+    gap: 5px;
+    max-height: 82px;
+    overflow-y: auto;
 }
 
 .xjzl-window.actor.creature .effect-chip {
-    background: rgba(255, 255, 255, 0.78);
-    color: var(--c-ink-dark);
-    padding: 2px 8px 2px 3px;
-    border-radius: 16px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    transition: 0.18s ease;
-    white-space: nowrap;
+    gap: 5px;
+    max-width: 100%;
+    padding: 3px 4px 3px 5px;
+    border: 1px solid #c6af7f;
+    border-radius: 3px;
+    background: #efe4cb;
+    color: var(--creature-ink);
     cursor: pointer;
-}
-
-.xjzl-window.actor.creature .effect-chip:hover {
-    transform: translateY(-1px);
-    border-color: var(--c-cinnabar);
-    background: #fff;
-    box-shadow: 0 2px 6px rgba(166, 54, 54, 0.14);
-}
-
-.xjzl-window.actor.creature .effect-chip.suppressed {
-    opacity: 0.45;
-    filter: grayscale(0.8);
-}
-
-.xjzl-window.actor.creature .effect-chip.suppressed .effect-label {
-    text-decoration: line-through;
 }
 
 .xjzl-window.actor.creature .effect-icon {
     width: 18px;
     height: 18px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid rgba(0, 0, 0, 0.15);
+    border: 0;
+    border-radius: 3px;
 }
 
 .xjzl-window.actor.creature .effect-label {
-    font-weight: bold;
-    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
 }
 
 .xjzl-window.actor.creature .effect-rounds {
-    background: var(--c-cinnabar);
-    color: #fff;
-    border-radius: 8px;
-    padding: 0 5px;
-    font-size: 10px;
-    font-weight: bold;
-    font-family: "Consolas", monospace;
-    line-height: 14px;
-}
-
-.xjzl-window.actor.creature .effect-delete {
-    color: rgba(0, 0, 0, 0.25);
-    cursor: pointer;
-    margin-left: 1px;
-    font-size: 10px;
-    transition: 0.15s ease;
-}
-
-.xjzl-window.actor.creature .effect-delete:hover {
     color: var(--c-cinnabar);
+    font: bold 10px Consolas, monospace;
+}
+
+.xjzl-window.actor.creature .effect-duration {
+    color: var(--creature-muted);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.xjzl-window.actor.creature .effect-chip.suppressed .effect-label {
+    opacity: .6;
+    text-decoration: line-through;
+}
+
+.xjzl-window.actor.creature .effect-immunity-summary {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    color: #f0d5a0;
+}
+
+.xjzl-window.actor.creature .effect-immunity-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.xjzl-window.actor.creature .effect-immunity-chip {
+    padding: 2px 6px;
+    border: 1px solid #7a7058;
+    border-radius: 2px;
+    background: #3c4336;
+    color: #fff0c9;
 }
 
 .xjzl-window.actor.creature .no-effects-hint {
-    font-size: 12px;
-    color: var(--c-ink-light);
-    opacity: 0.5;
-    font-family: var(--font-deco);
-    letter-spacing: 0.12em;
+    color: var(--creature-cover-muted);
+    font-size: 11px;
 }
 
-
-/* ==========================================================================
-   4. 描述与特性 (Bottom Split)
-   ========================================================================== */
-.xjzl-window.actor.creature .bottom-split {
-    flex: 1;
-    display: flex;
-    gap: 15px;
-    min-height: 200px;
+.xjzl-window.actor.creature .creature-content {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 24px 24px 28px;
+    scrollbar-width: thin;
+    scrollbar-color: #8d7956 #e6dac1;
+    scrollbar-gutter: stable;
 }
 
-.xjzl-window.actor.creature .desc-col {
-    flex: 0.4;
-    display: flex;
-    flex-direction: column;
+.xjzl-window.actor.creature .creature-biography {
+    margin-bottom: 18px;
+    border: 1px solid #b2a080;
+    border-left: 4px solid #7b3b30;
+    border-radius: 2px;
+    background: #e9ddc3;
 }
 
-.xjzl-window.actor.creature .abilities-col {
-    flex: 0.6;
-    display: flex;
-    flex-direction: column;
-}
-
-.xjzl-window.actor.creature .section-title {
-    font-family: var(--font-title);
-    font-size: 18px;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
-    margin-bottom: 8px;
-    color: var(--c-ink-dark);
-}
-
-.xjzl-window.actor.creature .action-header {
+.xjzl-window.actor.creature .creature-biography > summary {
     display: flex;
     justify-content: space-between;
     align-items: center;
-}
-
-.xjzl-window.actor.creature .action-header a {
-    color: var(--c-cinnabar);
+    gap: 10px;
+    padding: 10px 12px;
+    color: #352d22;
+    font-family: var(--font-deco);
+    font-size: 17px;
+    list-style: none;
     cursor: pointer;
-    transition: 0.2s;
 }
 
-.xjzl-window.actor.creature .action-header a:hover {
-    transform: scale(1.1);
+.xjzl-window.actor.creature .creature-biography > summary::-webkit-details-marker {
+    display: none;
 }
 
-/* 描述文本域 */
-.xjzl-window.actor.creature .desc-input {
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.3) !important;
-    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+.xjzl-window.actor.creature .creature-biography > summary > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.xjzl-window.actor.creature .biography-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 27px;
+    border: 1px solid #7b3b30;
+    background: #7b3b30;
+    color: #fff1d5;
+    font-family: var(--font-deco);
+    font-size: 15px;
+}
+
+.xjzl-window.actor.creature .creature-biography[open] > summary {
+    border-bottom: 1px dashed var(--creature-line);
+}
+
+.xjzl-window.actor.creature .biography-chevron {
+    font-size: 10px;
+    transition: transform .15s ease;
+}
+
+.xjzl-window.actor.creature .creature-biography[open] .biography-chevron {
+    transform: rotate(180deg);
+}
+
+.xjzl-window.actor.creature .creature-biography-content {
+    --color-text-primary: var(--creature-ink);
+    --color-text-secondary: var(--creature-muted);
+    padding: 12px 14px 14px;
+    color: var(--creature-ink);
+    font-size: 13.5px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+}
+
+.xjzl-window.actor.creature .creature-biography-content prose-mirror {
+    min-height: 90px;
+    color: var(--creature-ink);
+}
+
+.xjzl-window.actor.creature .creature-biography-content prose-mirror.active {
+    min-height: 220px;
+    height: 280px;
+    border: 1px solid var(--creature-line);
     border-radius: 4px;
-    padding: 8px !important;
-    font-size: 12px;
-    line-height: 1.5;
-    resize: none;
-    color: var(--c-ink-dark) !important;
+    background: var(--creature-card);
+    --menu-background: var(--creature-jade-wash);
+    --button-text-color: var(--creature-ink);
+    --color-form-label-hover: var(--creature-jade);
 }
 
-.xjzl-window.actor.creature .desc-input:focus {
-    background: #fff !important;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+.xjzl-window.actor.creature .creature-biography-content .editor-content {
+    color: var(--creature-ink);
 }
 
-/* -----------------------------------
-   右侧：特性卡片列表美化
-   ----------------------------------- */
-.xjzl-window.actor.creature .ability-list {
+.xjzl-window.actor.creature .creature-biography-content prose-mirror:not([open]) > .editor-content {
+    position: static;
+    overflow: visible;
+    padding-right: 0;
+}
+
+.xjzl-window.actor.creature .creature-biography-content prose-mirror .menu-container {
+    flex-basis: auto;
+}
+
+.xjzl-window.actor.creature .creature-biography-content prose-mirror menu {
+    position: static;
+    flex-wrap: wrap;
+}
+
+/* 原生编辑按钮默认依赖悬浮，资料区始终提供可聚焦的编辑入口。 */
+.xjzl-window.actor.creature .creature-biography-content prose-mirror:not([open]) > button.toggle:enabled {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    min-height: 0;
+    margin-top: 6px;
+    padding: 4px;
+    border: 1px solid var(--creature-line);
+    border-radius: 3px;
+    background: var(--creature-card);
+    color: var(--creature-jade);
+    box-shadow: none;
+}
+
+.xjzl-window.actor.creature .abilities-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.xjzl-window.actor.creature .abilities-heading > div {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
     flex: 1;
-    overflow-y: auto;
+}
+
+.xjzl-window.actor.creature .abilities-heading h2 {
+    margin: 0;
+    border: 0;
+    color: #25231c;
+    font-family: var(--font-deco);
+    font-size: 23px;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.xjzl-window.actor.creature .ability-count {
+    color: var(--creature-muted);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.xjzl-window.actor.creature .ability-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    /* 增加卡片间距，提升呼吸感 */
-    padding-right: 6px;
 }
 
 .xjzl-window.actor.creature .ability-card {
-    background: rgba(255, 255, 255, 0.7);
-    /* 半透明纸面白底 */
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    border-left: 4px solid #ccc;
-    /* 加宽左侧边条，更醒目 */
-    padding: 10px 12px;
-    /* 增加内边距 */
-    border-radius: 6px;
-    /* 卡片圆角 */
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-    /* 微弱的底部阴影 */
-    transition: all 0.25s ease;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.xjzl-window.actor.creature .ability-card:hover {
-    background: #fff;
-    border-left-color: var(--c-cinnabar);
-    box-shadow: 0 4px 12px rgba(166, 54, 54, 0.08);
-    /* 悬浮时带一点点朱砂色的阴影 */
-    transform: translateY(-1px);
-    /* 悬浮时轻微上浮 */
-}
-
-/* 卡片标题行 */
-.xjzl-window.actor.creature .ability-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
-    /* 增加标题下方的虚线分割 */
-    padding-bottom: 4px;
-}
-
-.xjzl-window.actor.creature .ability-name {
-    flex: 1 1 auto;
+    position: relative;
     min-width: 0;
-    font-weight: bold;
-    font-size: 14px !important;
-    padding: 0 !important;
-    width: auto;
-    color: var(--c-ink-dark) !important;
-    background: transparent !important;
+    padding: 17px 18px 10px 54px;
+    border: 1px solid #b7a581;
+    border-radius: 3px;
+    background: var(--creature-card);
+    box-shadow: 0 3px 9px rgba(57, 42, 17, .09);
 }
 
-.xjzl-window.actor.creature .ability-name:focus {
-    color: var(--c-cinnabar) !important;
+.xjzl-window.actor.creature .ability-card:last-child {
+    border-bottom: 1px solid #b7a581;
+}
+
+.xjzl-window.actor.creature .ability-card + .ability-card {
+    margin-top: 14px;
+}
+
+.xjzl-window.actor.creature .ability-mark {
+    position: absolute;
+    top: 20px;
+    left: 14px;
+    padding: 7px 4px;
+    border: 1px solid #66745d;
+    border-radius: 2px 0 2px 0;
+    background: #394538;
+    color: #fff2d6;
+    font: 13px/1 var(--font-deco);
+    writing-mode: vertical-rl;
+    letter-spacing: .16em;
+    pointer-events: none;
+}
+
+.xjzl-window.actor.creature .ability-mark.attack-mark {
+    border-color: #bd7560;
+    background: var(--creature-red);
+    color: #fff3d9;
+}
+
+.xjzl-window.actor.creature .ability-card.is-pinned {
+    border-color: #9e783c;
+    box-shadow: inset 0 2px #b18b4c, 0 3px 9px rgba(57, 42, 17, .09);
+}
+
+.xjzl-window.actor.creature .ability-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.xjzl-window.actor.creature .ability-title {
+    min-width: 0;
+}
+
+.xjzl-window.actor.creature .xjzl-creature-sheet .ability-name {
+    width: 100%;
+    height: 31px;
+    padding: 0;
+    font-family: var(--font-deco);
+    font-size: 22px;
+    font-weight: 400;
+}
+
+.xjzl-window.actor.creature .ability-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 10px;
+    margin-top: 3px;
+}
+
+.xjzl-window.actor.creature .ability-tag {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    color: var(--creature-jade);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.xjzl-window.actor.creature .ability-tag i {
+    font-size: 11px;
+}
+
+.xjzl-window.actor.creature .attack-tag {
+    color: #9b2c2d;
+}
+
+.xjzl-window.actor.creature .rule-tag {
+    color: var(--creature-muted);
 }
 
 .xjzl-window.actor.creature .ability-tools {
-    flex: 0 0 auto;
     display: flex;
-    gap: 10px;
-    opacity: 0.3;
-    transition: 0.2s;
-}
-
-.xjzl-window.actor.creature .ability-card:hover .ability-tools {
-    opacity: 1;
-}
-
-.xjzl-window.actor.creature .ability-tools a {
-    cursor: pointer;
-    font-size: 13px;
-}
-
-.xjzl-window.actor.creature .ability-tools a:hover {
-    color: var(--c-cinnabar);
-}
-
-.xjzl-window.actor.creature .ability-tools a.delete:hover {
-    color: #e74c3c;
-}
-
-/* -----------------------------------
-   能力卡：两个主入口 + 按需展开的详细配置
-   ----------------------------------- */
-.xjzl-window.actor.creature .ability-mode-tabs {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin-top: 2px;
-}
-
-.xjzl-window.actor.creature .ability-mode-tab {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 6px;
-    min-width: 0;
-    padding: 7px 9px;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.56);
-    color: var(--c-ink-light);
-    font-family: inherit;
+}
+
+.xjzl-window.actor.creature .creature-button,
+.xjzl-window.actor.creature .creature-icon-button,
+.xjzl-window.actor.creature .creature-text-button,
+.xjzl-window.actor.creature .effect-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    gap: 6px;
+    width: auto;
+    min-height: 32px;
+    height: auto;
+    margin: 0;
+    padding: 5px 10px;
+    border: 1px solid var(--creature-line);
+    border-radius: 2px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--creature-ink);
+    font: 12px/1.4 var(--font-serif);
+    text-decoration: none;
     cursor: pointer;
-    text-align: left;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    transition: background .12s ease, border-color .12s ease;
 }
 
-.xjzl-window.actor.creature .ability-mode-tab:hover,
-.xjzl-window.actor.creature .ability-mode-tab.is-open {
-    border-color: var(--c-mp-blue);
-    background: rgba(60, 90, 112, 0.09);
-    color: var(--c-mp-blue);
+.xjzl-window.actor.creature .creature-button:hover,
+.xjzl-window.actor.creature .creature-text-button:hover,
+.xjzl-window.actor.creature .creature-icon-button:hover {
+    border-color: var(--creature-jade);
+    background: var(--creature-jade-wash);
+    color: var(--creature-jade);
 }
 
-.xjzl-window.actor.creature .ability-attack-tab {
-    color: var(--c-cinnabar);
-}
-
-.xjzl-window.actor.creature .ability-attack-tab:hover,
-.xjzl-window.actor.creature .ability-attack-tab.is-open {
-    border-color: var(--c-cinnabar);
-    background: rgba(166, 54, 54, 0.08);
-    color: var(--c-cinnabar);
-}
-
-.xjzl-window.actor.creature .ability-state-tab {
-    color: var(--c-mp-blue);
-}
-
-.xjzl-window.actor.creature .ability-tab-external {
-    font-size: 10px;
-    opacity: 0.65;
-}
-
-.xjzl-window.actor.creature .ability-tab-title {
-    min-width: 0;
-    overflow: hidden;
+.xjzl-window.actor.creature .ability-tools .creature-button.ability-use-btn {
+    min-width: 80px;
+    min-height: 34px;
+    padding: 5px 11px;
+    border-color: #7e2425;
+    border-radius: 2px;
+    background: var(--creature-red);
+    color: #fff7e4;
+    box-shadow: inset 0 0 0 1px rgba(255, 213, 162, .35), 0 2px 3px rgba(96, 33, 22, .14);
     font-size: 12px;
-    font-weight: bold;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-weight: 700;
 }
 
-.xjzl-window.actor.creature .ability-tab-state {
-    overflow: hidden;
-    color: var(--c-ink-light);
-    font-size: 10px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.xjzl-window.actor.creature .ability-tools .creature-button.ability-use-btn:hover {
+    border-color: #7b2524;
+    background: #bb4235;
+    color: #fff7e4;
 }
 
-.xjzl-window.actor.creature .ability-mode-tab.is-open .ability-tab-state {
-    color: var(--c-mp-blue);
+.xjzl-window.actor.creature .creature-icon-button {
+    width: 32px;
+    min-height: 32px;
+    padding: 5px;
+    border-color: transparent;
+    color: var(--creature-muted);
+    font-size: 12px;
+}
+
+.xjzl-window.actor.creature .ability-pin-btn.pinned {
+    color: var(--creature-red);
+}
+
+.xjzl-window.actor.creature .creature-text-button {
+    min-height: 30px;
+    padding: 4px 7px;
+    border-color: transparent;
+    color: #4a4030;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.xjzl-window.actor.creature .creature-text-button:hover,
+.xjzl-window.actor.creature .creature-text-button.is-open {
+    border-color: transparent;
+    background: transparent;
+    color: var(--creature-jade);
+}
+
+.xjzl-window.actor.creature .creature-text-button.is-open .ability-tab-chevron {
+    transform: rotate(180deg);
+}
+
+.xjzl-window.actor.creature .ability-edit-button {
+    border-color: #c0ae89;
+    background: #f0e5ce;
+}
+
+.xjzl-window.actor.creature .ability-edit-button:is(:hover, .is-open) {
+    border-color: #927346;
+    background: #e3d1aa;
+    color: #60362b;
+}
+
+.xjzl-window.actor.creature .add-ability {
+    min-height: 32px;
+    border-color: #88704c;
+    background: #e4d7bc;
+    color: #332b20;
+    font-size: 11.5px;
+    font-weight: 700;
 }
 
 .xjzl-window.actor.creature .ability-tab-chevron {
-    font-size: 10px;
-    opacity: 0.6;
-    transition: transform 0.15s ease;
+    font-size: 9px;
 }
 
-.xjzl-window.actor.creature .ability-mode-tab.is-open .ability-tab-chevron {
-    transform: rotate(180deg);
+.xjzl-window.actor.creature .creature-icon-button.delete:hover,
+.xjzl-window.actor.creature .effect-delete:hover {
+    border-color: transparent;
+    background: var(--c-cinnabar-dim);
+    color: var(--c-cinnabar);
+}
+
+.xjzl-window.actor.creature .effect-delete {
+    min-height: 18px;
+    width: 18px;
+    padding: 1px;
+    border: 0;
+    color: var(--creature-muted);
+    font-size: 10px;
+}
+
+.xjzl-window.actor.creature .xjzl-creature-sheet :is(button, summary):focus-visible {
+    outline: 2px solid var(--creature-jade);
+    outline-offset: 2px;
+}
+
+.xjzl-window.actor.creature .ability-description {
+    overflow-wrap: anywhere;
+    color: #24251f;
+    font-size: 13.5px;
+    line-height: 1.8;
+}
+
+.xjzl-window.actor.creature .ability-description > :first-child {
+    margin-top: 0;
+}
+
+.xjzl-window.actor.creature .ability-description > :last-child {
+    margin-bottom: 0;
+}
+
+.xjzl-window.actor.creature .ability-description p {
+    margin: 5px 0;
+}
+
+.xjzl-window.actor.creature .ability-description :is(ul, ol) {
+    padding-left: 20px;
+}
+
+.xjzl-window.actor.creature .ability-description img {
+    max-width: 100%;
+    height: auto;
+}
+
+.xjzl-window.actor.creature .ability-no-description {
+    margin: 5px 0;
+    color: var(--creature-muted);
+    font-size: 12px;
+}
+
+.xjzl-window.actor.creature .ability-automation {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 12px;
+    margin-top: 13px;
+    padding: 10px 12px;
+    border-left: 3px solid #94733d;
+    border-radius: 0 2px 2px 0;
+    background: var(--creature-note);
+    color: #393528;
+    font-size: 11.5px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+}
+
+.xjzl-window.actor.creature .automation-label {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    color: #664c27;
+    font-weight: 700;
+}
+
+.xjzl-window.actor.creature .ability-automation p {
+    margin: 0;
+    white-space: pre-line;
+}
+
+.xjzl-window.actor.creature .ability-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #d8c8a7;
+}
+
+.xjzl-window.actor.creature .ability-config-actions,
+.xjzl-window.actor.creature .ability-secondary-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 13px;
+}
+
+.xjzl-window.actor.creature .ability-secondary-actions {
+    margin-left: auto;
+    gap: 3px;
 }
 
 .xjzl-window.actor.creature .ability-config-panel {
     display: none;
-    flex-direction: column;
-    gap: 9px;
-    padding: 10px 11px;
-    border: 1px solid rgba(60, 90, 112, 0.22);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.42);
+    margin: 9px 0 3px;
+    padding: 14px;
+    border: 1px solid #b39b70;
+    border-radius: 2px;
+    background: #eee2c8;
 }
 
 .xjzl-window.actor.creature .ability-config-panel.is-open {
-    display: flex;
+    display: block;
 }
 
 .xjzl-window.actor.creature .ability-panel-heading {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
-    padding-bottom: 5px;
-    border-bottom: 1px dashed rgba(0, 0, 0, 0.12);
-    color: var(--c-ink-dark);
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 10px;
+    padding: 0;
+    border: 0;
+    color: var(--creature-ink);
+    font-family: var(--font-serif);
     font-size: 12px;
-    font-weight: bold;
+    font-weight: 700;
 }
 
-.xjzl-window.actor.creature .ability-panel-heading small {
-    color: var(--c-ink-light);
+.xjzl-window.actor.creature .ability-edit-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+}
+
+.xjzl-window.actor.creature .ability-damage-settings {
+    min-width: 0;
+}
+
+/* 一个按钮对应一个完整编辑器，辅助文字交代其内容而不伪装成多个独立页面。 */
+.xjzl-window.actor.creature .ability-editor-link {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 12px;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    min-height: 58px;
+    margin: 0;
+    padding: 12px 0 0;
+    border: 0;
+    border-top: 1px solid #bda77e;
+    border-radius: 0;
+    background: transparent;
+    color: #70372b;
+    box-shadow: none;
+    font: 12px/1.5 var(--font-serif);
+    text-align: left;
+    white-space: normal;
+    cursor: pointer;
+}
+
+.xjzl-window.actor.creature .ability-editor-link:hover {
+    background: #e3d1aa;
+    color: #922c2b;
+}
+
+.xjzl-window.actor.creature .ability-editor-link > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.xjzl-window.actor.creature .ability-editor-link :is(strong, small) {
+    display: block;
+}
+
+.xjzl-window.actor.creature .ability-editor-link small {
+    margin-top: 4px;
+    color: var(--creature-muted);
+    font-size: 11px;
+}
+
+.xjzl-window.actor.creature .ability-editor-link > i:last-child {
     font-size: 10px;
-    font-weight: normal;
+}
+
+.xjzl-window.actor.creature .ability-panel-hint {
+    margin: 6px 0 9px;
+    color: var(--creature-muted);
+    font-size: 11px;
+    line-height: 1.7;
 }
 
 .xjzl-window.actor.creature .ability-config-switch {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    color: var(--c-cinnabar);
-    font-size: 11.5px;
-    font-weight: bold;
+    gap: 7px;
+    font-size: 12px;
     cursor: pointer;
 }
 
 .xjzl-window.actor.creature .ability-config-switch input {
-    width: 15px;
-    height: 15px;
-    accent-color: var(--c-cinnabar);
+    --checkbox-checked-color: var(--creature-jade);
+    --checkbox-checkmark-color: var(--creature-card);
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--creature-jade);
 }
 
 .xjzl-window.actor.creature .ability-attack-fields {
     display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    gap: 8px;
+    grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr);
+    gap: 12px;
+    margin-top: 10px;
 }
 
 .xjzl-window.actor.creature .ability-config-field {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    flex-direction: column;
+    gap: 5px;
     min-width: 0;
-    padding: 5px 7px;
-    border: 1px solid rgba(0, 0, 0, 0.09);
+    color: #4b4131;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.xjzl-window.actor.creature .ability-config-field :is(input, select) {
+    width: 100%;
+    background: var(--creature-card);
+    border-color: var(--creature-line);
+}
+
+.xjzl-window.actor.creature .creature-empty {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    padding: 32px 12px;
+    border: 1px dashed var(--creature-line);
     border-radius: 5px;
-    background: rgba(255, 255, 255, 0.62);
-    color: var(--c-ink-light);
-    font-size: 10.5px;
-    white-space: nowrap;
+    color: var(--creature-muted);
 }
 
-.xjzl-window.actor.creature .ability-config-field span {
-    flex: 0 0 auto;
+.xjzl-window.actor.creature .creature-empty > i {
+    color: var(--creature-jade);
+    font-size: 23px;
 }
 
-.xjzl-window.actor.creature .ability-config-field input,
-.xjzl-window.actor.creature .ability-config-field select {
-    min-width: 0;
-    flex: 1 1 auto;
-    height: 25px;
-    background: #fff !important;
+.xjzl-window.actor.creature .creature-empty p {
+    margin: 0;
 }
 
-.xjzl-window.actor.creature .ability-config-field input[type="number"] {
-    width: 54px;
-    flex: 0 0 54px;
-    text-align: center;
-    color: var(--c-cinnabar) !important;
-    font-family: "Consolas", monospace;
-    font-weight: bold;
+@container (max-width: 540px) {
+    .xjzl-window.actor.creature .creature-overview {
+        padding-bottom: 8px;
+    }
+    .xjzl-window.actor.creature .creature-header {
+        grid-template-columns: minmax(0, 1fr) 84px;
+        gap: 14px;
+        padding: 16px 16px 12px;
+    }
+    .xjzl-window.actor.creature .creature-header::before {
+        top: 20px;
+        right: 100px;
+        font-size: 90px;
+    }
+    .xjzl-window.actor.creature .creature-header::after {
+        top: 24px;
+        right: 10px;
+        width: 97px;
+        height: 97px;
+    }
+    .xjzl-window.actor.creature .portrait-wrapper {
+        width: 84px;
+        height: 84px;
+        align-self: start;
+        margin-top: 14px;
+        padding: 3px;
+    }
+    .xjzl-window.actor.creature .portrait-edit {
+        right: -1px;
+        bottom: 1px;
+        width: 22px;
+        height: 22px;
+    }
+    .xjzl-window.actor.creature .xjzl-creature-sheet .creature-name {
+        height: 42px;
+        font-size: 32px;
+    }
+    .xjzl-window.actor.creature .creature-meta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px 10px;
+        margin-top: 5px;
+    }
+    .xjzl-window.actor.creature .creature-content {
+        padding: 12px 12px 18px 16px;
+    }
+    .xjzl-window.actor.creature .creature-vitals {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin: 0 16px 12px;
+    }
+    .xjzl-window.actor.creature .combat-grid {
+        margin: 0 16px;
+    }
+    .xjzl-window.actor.creature .creature-effects {
+        margin-right: 16px;
+        margin-left: 16px;
+    }
+    .xjzl-window.actor.creature .ability-card {
+        padding: 13px 11px 7px 36px;
+    }
+    .xjzl-window.actor.creature .ability-mark {
+        top: 20px;
+        left: 9px;
+        font-size: 11px;
+    }
+    .xjzl-window.actor.creature .ability-automation {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 3px;
+    }
 }
 
-.xjzl-window.actor.creature .ability-panel-empty {
-    color: var(--c-ink-light);
-    font-size: 10.5px;
-    font-style: italic;
+@container (max-width: 380px) {
+    .xjzl-window.actor.creature .stat-label {
+        gap: 3px;
+        font-size: 10px;
+    }
+    .xjzl-window.actor.creature .stat-cell {
+        padding: 0 3px;
+    }
+    .xjzl-window.actor.creature .stat-base {
+        gap: 0;
+        font-size: 10px;
+    }
+    .xjzl-window.actor.creature .creature-header {
+        grid-template-columns: minmax(0, 1fr) 68px;
+        gap: 9px;
+    }
+    .xjzl-window.actor.creature .portrait-wrapper {
+        width: 68px;
+        height: 68px;
+    }
+    .xjzl-window.actor.creature .creature-header::before {
+        top: 25px;
+        right: 83px;
+        font-size: 81px;
+    }
+    .xjzl-window.actor.creature .creature-header::after {
+        top: 25px;
+        right: 11px;
+        width: 77px;
+        height: 77px;
+    }
+    .xjzl-window.actor.creature .ability-header {
+        gap: 5px;
+    }
+    .xjzl-window.actor.creature .ability-tools .creature-button.ability-use-btn {
+        min-width: 58px;
+        padding: 4px 7px;
+    }
+    .xjzl-window.actor.creature .ability-tools {
+        gap: 1px;
+    }
+    .xjzl-window.actor.creature .ability-config-actions {
+        gap: 3px 8px;
+    }
+    .xjzl-window.actor.creature .vital-values input[type="number"] {
+        width: 33px;
+        font-size: 16px;
+    }
 }
 
-/* 空列表提示语 */
-.xjzl-window.actor.creature .empty-hint {
-    text-align: center;
-    color: #bbb;
-    font-style: italic;
-    font-size: 12px;
-    margin-top: 20px;
+@media (prefers-reduced-motion: reduce) {
+    .xjzl-window.actor.creature .xjzl-creature-sheet * {
+        transition: none;
+    }
 }

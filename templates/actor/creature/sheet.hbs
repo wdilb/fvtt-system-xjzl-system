@@ -1,285 +1,267 @@
-{{!-- templates/actor/creature/sheet.hbs --}}
+{{!-- 野兽卡将阅读信息与配置入口分层；表单字段和 data-action 保留既有提交与结算入口。 --}}
 <div class="xjzl-creature-sheet">
-
-    {{!-- 背景纹理 --}}
-    <div class="bg-deco">{{localize "XJZL.Creature.BgDeco"}}</div>
-
-    {{!-- 1. 头部：立绘与基础信息 --}}
-    <header class="creature-header">
-
-        <div class="portrait-wrapper" data-action="editImage" data-tooltip="{{localize 'XJZL.UI.EditImage'}}">
-            <img src="{{document.img}}" />
-            <div class="portrait-frame"></div>
-        </div>
-
-        {{!-- 核心信息 --}}
-        <div class="header-content">
-            {{!-- 名字 (书法大字) --}}
-            <input type="text" name="name" value="{{document.name}}" class="creature-name"
-                placeholder="{{localize 'XJZL.Creature.NamePlaceholder'}}" />
-
-            {{!-- 标签行 (Type / Size / Diff / Price) --}}
-            <div class="tags-row">
-                {{!-- 类型印章 --}}
-                <div class="tag-seal type-{{system.info.type}}">
-                    <select name="system.info.type">
-                        {{selectOptions creatureTypes selected=system.info.type}}
-                    </select>
-                </div>
-
-                {{!-- 体型 --}}
-                <div class="info-pill">
-                    <i class="fas fa-expand"></i>
-                    <select name="system.info.size" style="width:auto; min-width:60px;">
-                        {{selectOptions choices.sizes selected=system.info.size localize=true}}
-                    </select>
-                </div>
-
-                {{!-- 难度 --}}
-                <div class="info-pill" data-tooltip="{{localize 'XJZL.Creature.Difficulty'}}">
-                    <i class="fas fa-crosshairs"></i>
-                    <input type="number" name="system.info.difficulty" value="{{system.info.difficulty}}"
-                        placeholder="10" />
-                </div>
-
-                {{!-- 价格 --}}
-                <div class="info-pill" data-tooltip="{{localize 'XJZL.Equipment.Price'}}">
-                    <i class="fas fa-coins"></i>
-                    <input type="text" name="system.info.price" value="{{system.info.price}}"
-                        placeholder="{{localize 'XJZL.Equipment.Price'}}" />
+    <section class="creature-overview">
+        <header class="creature-header" data-emblem="{{localize 'XJZL.Creature.BgDeco'}}">
+            <button type="button" class="portrait-wrapper" data-action="editImage"
+                aria-label="{{localize 'XJZL.UI.EditImage'}}" data-tooltip="{{localize 'XJZL.UI.EditImage'}}">
+                <img src="{{document.img}}" alt="{{document.name}}" />
+                <span class="portrait-edit"><i class="fas fa-pen" aria-hidden="true"></i></span>
+            </button>
+            <div class="creature-identity">
+                <div class="creature-kicker"><span class="creature-seal" aria-hidden="true">{{localize "XJZL.Creature.BgDeco"}}</span>{{localize "XJZL.Creature.SheetTitle"}}</div>
+                <input type="text" name="name" value="{{document.name}}" class="creature-name"
+                    aria-label="{{localize 'XJZL.Info.Name'}}" placeholder="{{localize 'XJZL.Creature.NamePlaceholder'}}" />
+                <div class="creature-meta-grid">
+                    <label class="creature-meta-field">
+                        <span>{{localize "XJZL.Creature.Type"}}</span>
+                        <select name="system.info.type">{{selectOptions creatureTypes selected=system.info.type}}</select>
+                    </label>
+                    <label class="creature-meta-field">
+                        <span>{{localize "XJZL.Creature.Size"}}</span>
+                        <select name="system.info.size">{{selectOptions choices.sizes selected=system.info.size}}</select>
+                    </label>
+                    <label class="creature-meta-field">
+                        <span>{{localize "XJZL.Creature.Difficulty"}}</span>
+                        <input type="number" name="system.info.difficulty" value="{{system.info.difficulty}}" placeholder="10" />
+                    </label>
+                    <label class="creature-meta-field creature-price-field">
+                        <span>{{localize "XJZL.Equipment.Price"}}</span>
+                        <input type="text" name="system.info.price" value="{{system.info.price}}"
+                            placeholder="{{localize 'XJZL.Equipment.Price'}}" />
+                    </label>
                 </div>
             </div>
-        </div>
-    </header>
+        </header>
 
-    {{!-- 2. 核心资源条 (体力 & 怒气) --}}
-    <section class="vitals-section">
-
-        {{!-- 体力条 --}}
-        <div class="vital-bar hp">
-            <div class="label"><i class="fas fa-heartbeat"></i> {{localize "XJZL.Creature.Tili"}}</div>
-            <div class="bar-track">
-                <div class="bar-fill" style="width: {{tiliPercent}}%"></div>
-                <div class="bar-text">
-                    <input type="number" name="system.resources.tili.value" value="{{system.resources.tili.value}}">
-                    <span>/</span>
-                    <input type="number" name="system.resources.tili.max" value="{{system.resources.tili.max}}">
-                </div>
-            </div>
-        </div>
-
-        {{!-- 怒气条 --}}
-        <div class="vital-bar rage">
-            <div class="label"><i class="fas fa-fire"></i> {{localize "XJZL.Resources.Rage"}}</div>
-            <div class="bar-track">
-                {{!-- 注意：确保你注册了 calculatePercentage 这个 helper，或者在 JS _prepareContext 中计算好传进来 --}}
-                <div class="bar-fill" style="width: {{calculatePercentage system.resources.rage.value 10}}%"></div>
-                <div class="bar-text">
-                    <input type="number" name="system.resources.rage.value" value="{{system.resources.rage.value}}">
-                    <span style="opacity:0.6">/ 10</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    {{!-- 2.5 临时状态栏 (非被动 AE，与人物卡一致) --}}
-    <div class="active-effects-row">
-        {{#if temporaryEffects.length}}
-        {{#each temporaryEffects as |effect|}}
-
-        <div class="effect-chip {{#if effect.isActorEffect}}draggable{{/if}} interactive-effect {{#if effect.isSuppressed}}suppressed{{/if}}"
-            data-effect-id="{{effect.id}}" data-tooltip="
-                <div style='text-align:left;'>
-                    <b>{{effect.name}}</b>
-                    {{#if (gt effect.stacks 1)}} <span style='color:#f1c40f'>(x{{effect.stacks}})</span>{{/if}}
-
-                    {{#if effect.durationLabel}}
-                        <span style='color:#aaa; font-weight:normal; margin-left:5px;'>
-                            <i class='far fa-clock'></i> {{effect.durationLabel}}
-                        </span>
-                    {{/if}}
-
-                    <hr style='margin:4px 0; border-color:#555;'>
-                    {{#if effect.description}}{{effect.description}}<br><br>{{/if}}
-
-                    {{#if effect.isStackable}}
-<span style='color:#2ecc71'><i class='fas fa-mouse-pointer'></i> {{localize "XJZL.UI.LeftClickAddStack"}}</span><br>
-<span style='color:#e74c3c'><i class='fas fa-mouse-pointer'></i> {{localize "XJZL.UI.RightClickRemoveStack"}}</span>
-                    {{else}}
-<span style='color:#2ecc71'><i class='far fa-clock'></i> {{localize "XJZL.UI.LeftClickSetDuration"}}</span>
-                    {{/if}}
-                </div>
-             ">
-
-            <img src="{{effect.img}}" class="effect-icon">
-            <span class="effect-label">{{effect.name}}</span>
-
-            {{#if (gt effect.stacks 1)}}
-            <span class="effect-rounds">x{{effect.stacks}}</span>
-            {{/if}}
-
-            <a class="effect-delete" data-action="deleteEffect" data-id="{{effect.id}}">
-                <i class="fas fa-times"></i>
-            </a>
-        </div>
-        {{/each}}
-        {{else}}
-        <div class="no-effects-hint">{{localize "XJZL.Combat.NoEffects"}}</div>
-        {{/if}}
-    </div>
-
-    {{#if effectImmunities.length}}
-    <div class="effect-immunity-summary">
-        <span class="effect-immunity-label"><i class="fas fa-shield-alt"></i> {{localize "XJZL.UI.EffectImmunity"}}</span>
-        {{#each effectImmunities as |immunity|}}
-        <span class="effect-immunity-chip" data-tooltip="{{immunity.sourcesLabel}}">{{immunity.name}}</span>
-        {{/each}}
-    </div>
-    {{/if}}
-
-    {{!-- 3. 战斗属性网格 --}}
-    <section class="combat-grid">
-        {{!-- 速度 --}}
-        <div class="stat-cell">
-            <div class="stat-label">{{localize "XJZL.Combat.Speed"}}</div>
-            <div class="stat-total">{{system.combat.speedTotal}}</div>
-            <label class="stat-base">{{localize "XJZL.Stats.Base"}}
-                <input type="number" class="stat-val" name="system.combat.speed.value" value="{{baseCombat.speed.value}}" />
-            </label>
-        </div>
-
-        {{!-- 命中 --}}
-        <div class="stat-cell">
-            <div class="stat-label">{{localize "XJZL.Creature.Hit"}}</div>
-            <div class="stat-total">{{system.combat.hitWaigongTotal}}</div>
-            <label class="stat-base">{{localize "XJZL.Stats.Base"}}
-                <input type="number" class="stat-val" name="system.combat.hit.value" value="{{baseCombat.hit.value}}" />
-            </label>
-        </div>
-
-        {{!-- 闪避 --}}
-        <div class="stat-cell">
-            <div class="stat-label">{{localize "XJZL.Combat.Dodge"}}</div>
-            <div class="stat-total">{{system.combat.dodgeTotal}}</div>
-            <label class="stat-base">{{localize "XJZL.Stats.Base"}}
-                <input type="number" class="stat-val" name="system.combat.dodge.value" value="{{baseCombat.dodge.value}}" />
-            </label>
-        </div>
-
-        {{!-- 防护 --}}
-        <div class="stat-cell protection">
-            <div class="stat-label">{{localize "XJZL.Creature.Protection"}}</div>
-            <div class="stat-total">{{system.combat.protectionTotal}}</div>
-            <label class="stat-base">{{localize "XJZL.Stats.Base"}}
-                <input type="number" class="stat-val" name="system.combat.protection.value" value="{{baseCombat.protection.value}}" />
-            </label>
-            <i class="fas fa-shield-alt icon-bg"></i>
-        </div>
-    </section>
-
-    {{!-- 4. 描述与特性 --}}
-    <div class="bottom-split">
-
-        {{!-- 左侧：描述 --}}
-        <div class="desc-col">
-            <div class="section-title">{{localize "XJZL.Info.Description"}}</div>
-            <textarea name="system.description" class="desc-input"
-                placeholder="{{localize 'XJZL.Creature.DescriptionPlaceholder'}}">{{system.description}}</textarea>
-        </div>
-
-        {{!-- 右侧：特性列表 --}}
-        <div class="abilities-col">
-            <div class="section-title action-header">
-                <span>{{localize "XJZL.Creature.Abilities"}}</span>
-                <a data-action="addAbility" data-tooltip="{{localize 'XJZL.Creature.AddAbility'}}"><i
-                        class="fas fa-plus-circle"></i></a>
-            </div>
-
-            <div class="ability-list">
-                {{#each system.abilities as |ability i|}}
-                <div class="ability-card" data-ability-index="{{i}}">
-                    {{!-- 头部：名称 + 操作工具（可发起的特性显示收藏与掷骰） --}}
-                    <div class="ability-header">
-                        <input type="text" class="ability-name" name="system.abilities.{{i}}.name"
-                            value="{{ability.name}}"
-                            placeholder="{{localize 'XJZL.Creature.AbilityNamePlaceholder'}}" />
-                        <div class="ability-tools">
-                            {{#if ability.canUse}}
-                            <a data-action="togglePinnedAbility" data-index="{{i}}"
-                                class="ability-pin-btn {{#if ability.isPinned}}pinned{{/if}}"
-                                data-tooltip="{{localize 'XJZL.UI.Cultivation.PinMove'}}"
-                                style="color: {{#if ability.isPinned}}#f1c40f{{else}}#ccc{{/if}};">
-                                <i class="fas fa-star"></i>
-                            </a>
-                            <a data-action="useAbility" data-index="{{i}}" class="ability-use-btn"
-                                data-tooltip="{{localize 'XJZL.Creature.UseAbility'}}"><i
-                                    class="fas fa-dice-d20"></i></a>
-                            {{/if}}
-                            <a data-action="postAbility" data-index="{{i}}"
-                                data-tooltip="{{localize 'XJZL.Creature.PostAbility'}}"><i
-                                    class="fas fa-comment-alt"></i></a>
-                            <a data-action="deleteAbility" data-index="{{i}}" class="delete"><i
-                                    class="fas fa-trash"></i></a>
-                        </div>
+        {{!-- 数值位于资源条之外，避免低资源时文字失去对比；字段仍直接沿用原表单路径。 --}}
+        <section class="creature-vitals" aria-label="{{localize 'XJZL.Creature.Resources'}}">
+            <div class="creature-vital tili">
+                <div class="vital-heading">
+                    <span class="vital-label"><i class="fas fa-heartbeat" aria-hidden="true"></i>{{localize "XJZL.Creature.Tili"}}</span>
+                    <div class="vital-values">
+                        <input type="number" name="system.resources.tili.value" value="{{system.resources.tili.value}}"
+                            aria-label="{{localize 'XJZL.Creature.CurrentTili'}}" />
+                        <span>/</span>
+                        <input type="number" name="system.resources.tili.max" value="{{system.resources.tili.max}}"
+                            aria-label="{{localize 'XJZL.Creature.MaxTili'}}" />
                     </div>
-
-                    {{!-- 能力卡只显示两个主入口；详细字段按需展开，避免常见的攻击配置被说明文本挤到下方。 --}}
-                    <div class="ability-mode-tabs" role="tablist">
-                        <button type="button" class="ability-mode-tab ability-attack-tab" data-action="toggleAbilityPanel"
-                            data-index="{{i}}" data-panel="attack" aria-controls="ability-attack-{{i}}"
-                            aria-expanded="false">
-                            <i class="fas fa-gavel"></i>
-                            <span class="ability-tab-title">{{localize "XJZL.Creature.AbilityIsAttack"}}</span>
-                            <span class="ability-tab-state">
-                                {{#if ability.isAttack}}{{ability.attackSummary}}{{else}}{{localize "XJZL.Creature.AbilityNotConfigured"}}{{/if}}
-                            </span>
-                            <i class="fas fa-chevron-down ability-tab-chevron"></i>
-                        </button>
-                        <button type="button" class="ability-mode-tab ability-state-tab" data-action="editAbilityState"
-                            data-index="{{i}}" data-tooltip="{{localize 'XJZL.Creature.AbilityStateOpenHint'}}">
-                            <i class="fas fa-sparkles"></i>
-                            <span class="ability-tab-title">{{localize "XJZL.Creature.AbilityState"}}</span>
-                            <span class="ability-tab-state">
-                                {{#if ability.stateConfigured}}{{localize "XJZL.Creature.AbilityConfigured"}}{{else}}{{localize "XJZL.Creature.AbilityNotConfigured"}}{{/if}}
-                            </span>
-                            <i class="fas fa-arrow-up-right-from-square ability-tab-external"></i>
-                        </button>
-                    </div>
-
-                    <div id="ability-attack-{{i}}" class="ability-config-panel" data-ability-panel="attack"
-                        aria-hidden="true">
-                        <div class="ability-panel-heading">
-                            <span>{{localize "XJZL.Creature.AbilityAttackSettings"}}</span>
-                            <small>{{localize "XJZL.Creature.AbilityAttackSettingsHint"}}</small>
-                        </div>
-                        <label class="ability-config-switch">
-                            <input type="checkbox" name="system.abilities.{{i}}.isAttack" {{checked ability.isAttack}} />
-                            <span>{{localize "XJZL.Creature.AbilityEnableAttack"}}</span>
-                        </label>
-                        {{#if ability.isAttack}}
-                        <div class="ability-attack-fields">
-                            <label class="ability-config-field">
-                                <span>{{localize "XJZL.Equipment.Damage"}}</span>
-                                <input type="number" class="ability-damage" name="system.abilities.{{i}}.damage"
-                                    value="{{ability.damage}}" placeholder="0" />
-                            </label>
-                            <label class="ability-config-field">
-                                <span>{{localize "XJZL.Wuxue.Moves.DamageType"}}</span>
-                                <select name="system.abilities.{{i}}.damageType">
-                                    {{selectOptions @root.choices.damageTypes selected=ability.damageType localize=true}}
-                                </select>
-                            </label>
-                        </div>
-                        {{else}}
-                        <div class="ability-panel-empty">{{localize "XJZL.Creature.AbilityAttackDisabledHint"}}</div>
-                        {{/if}}
-                    </div>
-
                 </div>
-                {{else}}
-                <div class="empty-hint">{{localize "XJZL.Creature.NoAbilities"}}</div>
+                <div class="vital-track" aria-hidden="true"><div class="vital-fill" style="width: {{tiliPercent}}%"></div></div>
+            </div>
+            <div class="creature-vital rage">
+                <div class="vital-heading">
+                    <span class="vital-label"><i class="fas fa-fire" aria-hidden="true"></i>{{localize "XJZL.Resources.Rage"}}</span>
+                    <div class="vital-values">
+                        <input type="number" name="system.resources.rage.value" value="{{system.resources.rage.value}}"
+                            aria-label="{{localize 'XJZL.Creature.CurrentRage'}}" />
+                        <span>/ 10</span>
+                    </div>
+                </div>
+                <div class="vital-track" aria-hidden="true"><div class="vital-fill" style="width: {{calculatePercentage system.resources.rage.value 10}}%"></div></div>
+            </div>
+        </section>
+
+        <section class="combat-grid" aria-label="{{localize 'XJZL.Creature.CombatStats'}}">
+            <div class="stat-cell">
+                <div class="stat-label"><i class="fas fa-shoe-prints" aria-hidden="true"></i>{{localize "XJZL.Combat.Speed"}}</div>
+                <div class="stat-total">{{system.combat.speedTotal}}</div>
+                <label class="stat-base">{{localize "XJZL.Stats.Base"}}
+                    <input type="number" name="system.combat.speed.value" value="{{baseCombat.speed.value}}"
+                        aria-label="{{localize 'XJZL.Combat.Speed'}} {{localize 'XJZL.Stats.Base'}}" />
+                </label>
+            </div>
+            <div class="stat-cell">
+                <div class="stat-label"><i class="fas fa-crosshairs" aria-hidden="true"></i>{{localize "XJZL.Creature.Hit"}}</div>
+                <div class="stat-total">{{system.combat.hitWaigongTotal}}</div>
+                <label class="stat-base">{{localize "XJZL.Stats.Base"}}
+                    <input type="number" name="system.combat.hit.value" value="{{baseCombat.hit.value}}"
+                        aria-label="{{localize 'XJZL.Creature.Hit'}} {{localize 'XJZL.Stats.Base'}}" />
+                </label>
+            </div>
+            <div class="stat-cell">
+                <div class="stat-label"><i class="fas fa-wind" aria-hidden="true"></i>{{localize "XJZL.Combat.Dodge"}}</div>
+                <div class="stat-total">{{system.combat.dodgeTotal}}</div>
+                <label class="stat-base">{{localize "XJZL.Stats.Base"}}
+                    <input type="number" name="system.combat.dodge.value" value="{{baseCombat.dodge.value}}"
+                        aria-label="{{localize 'XJZL.Combat.Dodge'}} {{localize 'XJZL.Stats.Base'}}" />
+                </label>
+            </div>
+            <div class="stat-cell protection">
+                <div class="stat-label"><i class="fas fa-shield-alt" aria-hidden="true"></i>{{localize "XJZL.Creature.Protection"}}</div>
+                <div class="stat-total">{{system.combat.protectionTotal}}</div>
+                <label class="stat-base">{{localize "XJZL.Stats.Base"}}
+                    <input type="number" name="system.combat.protection.value" value="{{baseCombat.protection.value}}"
+                        aria-label="{{localize 'XJZL.Creature.Protection'}} {{localize 'XJZL.Stats.Base'}}" />
+                </label>
+            </div>
+        </section>
+
+        {{!-- 保留共享特效交互依赖的类名、拖拽标记和数据属性。 --}}
+        <section class="creature-effects" aria-label="{{localize 'XJZL.UI.Status'}}">
+            <span class="effects-label">{{localize "XJZL.UI.Status"}}</span>
+            <div class="active-effects-row">
+                {{#each temporaryEffects as |effect|}}
+                <div class="effect-chip {{#if effect.isActorEffect}}draggable{{/if}} interactive-effect {{#if effect.isSuppressed}}suppressed{{/if}}"
+                    data-effect-id="{{effect.id}}" data-tooltip="
+                        <div style='text-align:left;'>
+                            <b>{{effect.name}}</b>
+                            {{#if (gt effect.stacks 1)}} <span>(x{{effect.stacks}})</span>{{/if}}
+                            {{#if effect.durationLabel}} <span><i class='far fa-clock'></i> {{effect.durationLabel}}</span>{{/if}}
+                            <hr>
+                            {{#if effect.description}}{{effect.description}}<br><br>{{/if}}
+                            {{#if effect.isStackable}}
+                            {{localize 'XJZL.UI.LeftClickAddStack'}}<br>{{localize 'XJZL.UI.RightClickRemoveStack'}}
+                            {{else}}{{localize 'XJZL.UI.LeftClickSetDuration'}}{{/if}}
+                        </div>">
+                    <img src="{{effect.img}}" class="effect-icon" alt="" />
+                    <span class="effect-label">{{effect.name}}</span>
+                    {{#if (gt effect.stacks 1)}}<span class="effect-rounds">×{{effect.stacks}}</span>{{/if}}
+                    {{#if effect.durationLabel}}<span class="effect-duration">{{effect.durationLabel}}</span>{{/if}}
+                    <button type="button" class="effect-delete" data-action="deleteEffect" data-id="{{effect.id}}"
+                        aria-label="{{localize 'XJZL.UI.Delete'}} {{effect.name}}" data-tooltip="{{localize 'XJZL.UI.Delete'}}">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                {{else}}<span class="no-effects-hint">{{localize "XJZL.Combat.NoEffects"}}</span>{{/each}}
+            </div>
+            {{#if effectImmunities.length}}
+            <div class="effect-immunity-summary">
+                <span class="effect-immunity-label"><i class="fas fa-shield-alt" aria-hidden="true"></i>{{localize "XJZL.UI.EffectImmunity"}}</span>
+                {{#each effectImmunities as |immunity|}}
+                <span class="effect-immunity-chip" data-tooltip="{{immunity.sourcesLabel}}">{{immunity.name}}</span>
                 {{/each}}
             </div>
-        </div>
+            {{/if}}
+        </section>
+    </section>
+
+    <div class="creature-content">
+        {{!-- data-sync 交由 Foundry 保留展开状态；富文本编辑仍提交原来的 description 字段。 --}}
+        <details class="creature-biography" data-sync="creature-biography">
+            <summary>
+                <span><span class="biography-mark" aria-hidden="true">{{localize "XJZL.Creature.BiographyMark"}}</span>{{localize "XJZL.Creature.Biography"}}</span>
+                <i class="fas fa-chevron-down biography-chevron" aria-hidden="true"></i>
+            </summary>
+            <div class="creature-biography-content">
+                <prose-mirror name="system.description" data-document-u-u-i-d="{{document.uuid}}" value="{{system.description}}"
+                    toggled="false" button="true">{{{enrichedDescription}}}</prose-mirror>
+            </div>
+        </details>
+
+        <section class="creature-abilities" aria-label="{{localize 'XJZL.Creature.Abilities'}}">
+            <header class="abilities-heading">
+                <div><h2>{{localize "XJZL.Creature.Abilities"}}</h2><span class="ability-count">{{localize "XJZL.Creature.AbilityCount" count=abilities.length}}</span></div>
+                <button type="button" class="creature-button add-ability" data-action="addAbility">
+                    <i class="fas fa-plus" aria-hidden="true"></i>{{localize "XJZL.Creature.AddAbility"}}
+                </button>
+            </header>
+            <div class="ability-list">
+                {{#each abilities as |ability|}}
+                <article class="ability-card {{#if ability.canUse}}is-usable{{/if}} {{#if ability.isPinned}}is-pinned{{/if}}"
+                    data-ability-index="{{ability.index}}" aria-label="{{ability.name}}">
+                    <span class="ability-mark {{#if ability.isAttack}}attack-mark{{/if}}" aria-hidden="true">
+                        {{#if ability.isAttack}}{{localize "XJZL.Creature.AbilityMarks.Attack"}}
+                        {{else if ability.check.enabled}}{{localize "XJZL.Creature.AbilityMarks.Check"}}
+                        {{else if ability.directEffectNames}}{{localize "XJZL.Creature.AbilityMarks.State"}}
+                        {{else}}{{localize "XJZL.Creature.AbilityMarks.Rule"}}{{/if}}
+                    </span>
+                    <header class="ability-header">
+                        <div class="ability-title">
+                            <input type="text" class="ability-name" name="system.abilities.{{ability.index}}.name" value="{{ability.name}}"
+                                aria-label="{{localize 'XJZL.Creature.AbilityNamePlaceholder'}}" placeholder="{{localize 'XJZL.Creature.AbilityNamePlaceholder'}}" />
+                            <div class="ability-tags">
+                                {{#if ability.isAttack}}<span class="ability-tag attack-tag"><i class="fas fa-gavel" aria-hidden="true"></i>{{ability.attackSummary}}</span>{{/if}}
+                                {{#if ability.check.enabled}}
+                                <span class="ability-tag"><i class="fas fa-dice" aria-hidden="true"></i>
+                                    {{#if (eq ability.check.mode "save")}}{{localize "XJZL.Creature.Check.ModeSave"}}{{else}}{{localize "XJZL.Creature.Check.ModeContest"}}{{/if}}
+                                </span>
+                                {{/if}}
+                                {{#if ability.directEffectNames}}<span class="ability-tag"><i class="fas fa-sparkles" aria-hidden="true"></i>{{ability.directEffectNames}}</span>{{/if}}
+                                {{#unless ability.canUse}}<span class="ability-tag rule-tag">{{localize "XJZL.Creature.RuleAbility"}}</span>{{/unless}}
+                            </div>
+                        </div>
+                        <div class="ability-tools">
+                            {{#if ability.canUse}}
+                            <button type="button" data-action="togglePinnedAbility" data-index="{{ability.index}}"
+                                class="creature-icon-button ability-pin-btn {{#if ability.isPinned}}pinned{{/if}}" aria-pressed="{{ability.isPinned}}"
+                                aria-label="{{localize 'XJZL.UI.Cultivation.PinMove'}}" data-tooltip="{{localize 'XJZL.UI.Cultivation.PinMove'}}">
+                                <i class="{{#if ability.isPinned}}fas{{else}}far{{/if}} fa-star" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" data-action="useAbility" data-index="{{ability.index}}" class="creature-button ability-use-btn"
+                                data-tooltip="{{localize 'XJZL.Creature.UseAbility'}}">
+                                <i class="fas fa-dice-d20" aria-hidden="true"></i>{{localize "XJZL.UI.Use"}}
+                            </button>
+                            {{/if}}
+                        </div>
+                    </header>
+
+                    {{#if ability.enrichedDescription}}
+                    <div class="ability-description">{{{ability.enrichedDescription}}}</div>
+                    {{else}}<p class="ability-no-description">{{localize "XJZL.Creature.NoDescription"}}</p>{{/if}}
+                    {{#if ability.automationNote}}
+                    <div class="ability-automation">
+                        <span class="automation-label"><i class="fas fa-scroll" aria-hidden="true"></i>{{localize "XJZL.Creature.ExecutionNote"}}</span>
+                        <p>{{ability.automationNote}}</p>
+                    </div>
+                    {{/if}}
+
+                    <footer class="ability-footer">
+                        <div class="ability-config-actions">
+                            <button type="button" class="creature-text-button ability-edit-button" data-action="toggleAbilityPanel"
+                                data-index="{{ability.index}}" data-panel="attack" aria-expanded="false"
+                                aria-controls="{{@root.sheetId}}-attack-{{ability.index}}">
+                                <i class="fas fa-pen-to-square" aria-hidden="true"></i>{{localize "XJZL.Creature.EditAbility"}}
+                                <i class="fas fa-chevron-down ability-tab-chevron" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="ability-secondary-actions">
+                            <button type="button" class="creature-icon-button" data-action="postAbility" data-index="{{ability.index}}"
+                                aria-label="{{localize 'XJZL.Creature.PostAbility'}}" data-tooltip="{{localize 'XJZL.Creature.PostAbility'}}">
+                                <i class="far fa-comment-dots" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" class="creature-icon-button delete" data-action="deleteAbility" data-index="{{ability.index}}"
+                                aria-label="{{localize 'XJZL.UI.Delete'}} {{ability.name}}" data-tooltip="{{localize 'XJZL.UI.Delete'}}">
+                                <i class="far fa-trash-can" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </footer>
+
+                    <div id="{{@root.sheetId}}-attack-{{ability.index}}" class="ability-config-panel" data-ability-panel="attack" aria-hidden="true">
+                        <div class="ability-edit-grid">
+                            <section class="ability-damage-settings">
+                                <h3 class="ability-panel-heading"><i class="fas fa-gavel" aria-hidden="true"></i>{{localize "XJZL.Creature.DamageSettings"}}</h3>
+                                <label class="ability-config-switch">
+                                    <input type="checkbox" name="system.abilities.{{ability.index}}.isAttack" {{checked ability.isAttack}} />
+                                    <span>{{localize "XJZL.Creature.AbilityEnableAttack"}}</span>
+                                </label>
+                                {{#if ability.isAttack}}
+                                <div class="ability-attack-fields">
+                                    <label class="ability-config-field"><span>{{localize "XJZL.Equipment.Damage"}}</span>
+                                        <input type="number" name="system.abilities.{{ability.index}}.damage" value="{{ability.damage}}" placeholder="0" />
+                                    </label>
+                                    <label class="ability-config-field"><span>{{localize "XJZL.Wuxue.Moves.DamageType"}}</span>
+                                        <select name="system.abilities.{{ability.index}}.damageType">{{selectOptions @root.choices.damageTypes selected=ability.damageType}}</select>
+                                    </label>
+                                </div>
+                                <p class="ability-panel-hint">{{localize "XJZL.Creature.AbilityAttackSettingsHint"}}</p>
+                                {{else}}<p class="ability-panel-hint">{{localize "XJZL.Creature.AbilityAttackDisabledHint"}}</p>{{/if}}
+                            </section>
+                            <button type="button" class="ability-editor-link" data-action="editAbilityState" data-index="{{ability.index}}">
+                                <i class="fas fa-sliders" aria-hidden="true"></i>
+                                <span><strong>{{localize "XJZL.Creature.UnifiedEditor"}}</strong><small>{{localize "XJZL.Creature.UnifiedEditorHint"}}</small></span>
+                                <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                </article>
+                {{else}}
+                <div class="creature-empty">
+                    <i class="fas fa-paw" aria-hidden="true"></i>
+                    <p>{{localize "XJZL.Creature.NoAbilities"}}</p>
+                    <button type="button" class="creature-button" data-action="addAbility">{{localize "XJZL.Creature.AddAbility"}}</button>
+                </div>
+                {{/each}}
+            </div>
+        </section>
     </div>
 </div>
