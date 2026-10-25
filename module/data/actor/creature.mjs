@@ -79,7 +79,7 @@ export function getCheckAttrChoices() {
 
 export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
 
-    /** 定义野兽存档结构；战斗属性只持久化 value，省略项由字段默认值补齐。 */
+    /** 定义野兽存档结构；战斗属性只持久化 value，省略项由字段默认值补齐，来源默认视为官方。 */
     static defineSchema() {
         const fields = foundry.data.fields;
 
@@ -150,6 +150,11 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
         });
 
         return {
+            isOfficial: new fields.BooleanField({
+                initial: true,
+                label: "XJZL.Item.IsOfficial"
+            }),
+
             // === 1. 核心生存 ===
             resources: new fields.SchemaField({
                 // 体力 (对应 HP)

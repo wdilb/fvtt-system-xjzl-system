@@ -16,6 +16,21 @@ const MAX_RENDER = 500;
 const MAX_DRAW_AMOUNT = 100;
 
 /**
+ * 野兽品级 → 品质序（与武学/内功的 tier 1-3 同构）。
+ * 排序、抽取权重、卡片稀有度表现共用此映射，把野兽纳入既有"品阶"体系。
+ */
+const CREATURE_GRADE_RANK = { fan: 1, meng: 2, zhen: 3 };
+
+/** 野兽体型 → 本地化键（creature-sheet 同源；CONFIG 未提供，仅供筛选器与卡片徽标使用）。 */
+const CREATURE_SIZES = {
+    tiny: "XJZL.Creature.Sizes.Tiny",
+    small: "XJZL.Creature.Sizes.Small",
+    medium: "XJZL.Creature.Sizes.Medium",
+    large: "XJZL.Creature.Sizes.Large",
+    huge: "XJZL.Creature.Sizes.Huge"
+};
+
+/**
  * 归一化抽取数量：收敛到 [1, MAX_DRAW_AMOUNT] 的整数。
  * Infinity 必须在此拦下——它能穿透 Math.max/Math.floor 原样进入抽取循环造成死循环。
  * @param {number} value 原始数量（宏/弹窗/调用方传入，可能为 NaN、Infinity 或超大数）
@@ -145,6 +160,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         { id: "neigong", label: "TYPES.Item.neigong", icon: "fas fa-yin-yang" },
         { id: "art_book", label: "TYPES.Item.art_book", icon: "fas fa-book" },
         { id: "trait", label: "TYPES.Item.trait", icon: "fas fa-seedling" },
+        { id: "creature", label: "TYPES.Actor.creature", icon: "fas fa-paw" }
     ];
 
     static INDEX_FIELDS = [
@@ -152,6 +168,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         "system.type", "system.subtype", "system.tier",
         "system.sect", "system.subSect", "system.element", "system.category",
         "system.moves", "system.artType", "system.damageType", "system.weaponType",
+        "system.info.type", "system.info.size", "system.abilities",
         "system.isOfficial"
     ];
 
@@ -210,6 +227,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             art_book: [{ key: "artType", label: "XJZL.CompendiumBrowser.Filter.ArtType", type: "checkbox", options: C.arts }],
             trait: [
                 { key: "type", label: "XJZL.CompendiumBrowser.Filter.TraitType", type: "checkbox", options: C.traitTypes }
+            ],
+            creature: [
+                { key: "type", label: "XJZL.Creature.Type", type: "checkbox", options: C.creatureTypes },
+                { key: "size", label: "XJZL.Creature.Size", type: "checkbox", options: CREATURE_SIZES }
             ]
         };
 
@@ -252,7 +273,9 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const tempCache = {};
         XJZLCompendiumBrowser.TABS.forEach(t => tempCache[t.id] = []);
 
-        const targetPacks = game.packs.filter(p => p.metadata.type === "Item" && p.metadata.system === "xjzl-system");
+        // 野兽图鉴是 Actor 合集包；按条目 type 落入对应 Tab，未登记的类型自然跳过
+        const targetPacks = game.packs.filter(p =>
+            ["Item", "Actor"].includes(p.metadata.type) && p.metadata.system === "xjzl-system");
 
         const loadPackIndex = async (pack) => {
             try {
@@ -265,7 +288,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                         // 让"搜索名称"可以同时命中门派、属性、伤害类型等词，且只在加载时算一次。
                         const searchParts = [entry.name, pack.metadata.label];
                         const sys = entry.system ?? {};
-                        for (const key of ["type", "subtype", "sect", "subSect", "element", "category", "artType", "damageType", "weaponType"]) {
+                        for (const key of ["type", "subtype", "size", "sect", "subSect", "element", "category", "artType", "damageType", "weaponType"]) {
                             if (sys[key]) searchParts.push(sys[key]);
                         }
                         if (Array.isArray(sys.moves)) {
@@ -273,6 +296,19 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                                 if (move?.name) searchParts.push(move.name);
                                 for (const key of ["element", "damageType", "weaponType"]) {
                                     if (move[key]) searchParts.push(move[key]);
+                                }
+                            }
+                        }
+                        if (entry.type === "creature") {
+                            // 野兽的品级/体型挂在 system.info 下；平铺到根字段，
+                            // 让过滤引擎与筛选计数按物品同一路径读取，避免到处写嵌套特判
+                            sys.type = sys.info?.type;
+                            sys.size = sys.info?.size;
+                            searchParts.push(sys.type, sys.size);
+                            // 特性名进入搜索串：按特性名（如"喷毒"）也能找到野兽
+                            if (Array.isArray(sys.abilities)) {
+                                for (const ability of sys.abilities) {
+                                    if (ability?.name) searchParts.push(ability.name);
                                 }
                             }
                         }
@@ -730,13 +766,14 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /*  排序与卡片数据                              */
     /* -------------------------------------------- */
 
-    /** 统一稀有度值：武学/内功按品阶 tier(1-3)，其余按品质 quality(0-4)，统一为"品质"排序概念。 */
+    /** 统一稀有度值：武学/内功按品阶 tier(1-3)，野兽按品级 fan/meng/zhen(→1-3)，其余按品质 quality(0-4)，统一为"品质"排序概念。 */
     _rarityValue(item) {
         const sys = item.system ?? {};
         if (item.type === "wuxue" || item.type === "neigong") {
             const tier = Number(sys.tier);
             return Number.isFinite(tier) ? tier : 1;
         }
+        if (item.type === "creature") return CREATURE_GRADE_RANK[sys.type] ?? 1;
         const quality = Number(sys.quality);
         return Number.isFinite(quality) ? quality : 0;
     }
@@ -813,6 +850,13 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         } else if (item.type === "trait") {
             const typeLabel = this._localizeKey(C.traitTypes, sys.type);
             if (typeLabel) { sub.push(typeLabel); badges.push({ label: typeLabel, cls: "b-trait" }); }
+        } else if (item.type === "creature") {
+            // 野兽：品级与体型（品级色阶由 tierAttr 承载，左边框颜色表达）
+            const gradeLabel = this._localizeKey(C.creatureTypes, sys.type);
+            const sizeLabel = this._localizeKey(CREATURE_SIZES, sys.size);
+            sub.push(gradeLabel, sizeLabel);
+            if (gradeLabel) badges.push({ label: gradeLabel, cls: "b-beast" });
+            if (sizeLabel) badges.push({ label: sizeLabel, cls: "b-size" });
         }
         // misc / qizhen 无类型信息，保持单行 + 来源包名
 
@@ -825,7 +869,12 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             ...item,
             badges,
             sub: sub.filter(Boolean).join(" · "),
-            tooltip: tooltip.filter(Boolean).join(" · ")
+            tooltip: tooltip.filter(Boolean).join(" · "),
+            // 拖拽负载按文档类别区分：野兽来自 Actor 合集包，拖入画布才能按 Actor 生成 Token
+            dragType: item.type === "creature" ? "Actor" : "Item",
+            // 卡片稀有度属性：物品用品质，武学/内功用品阶，野兽用品级（映射 1-3 复用品阶色阶）
+            qualityAttr: sys.quality,
+            tierAttr: item.type === "creature" ? CREATURE_GRADE_RANK[sys.type] : sys.tier
         };
     }
 
@@ -914,8 +963,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const getWeight = (item) => {
             if (!useWeight) return 1;
             const sys = item.system;
-            const isTier = item.type === "wuxue" || item.type === "neigong";
-            const weight = isTier ? tierWeights[sys.tier ?? 1] : qualityWeights[sys.quality ?? 0];
+            const isTier = item.type === "wuxue" || item.type === "neigong" || item.type === "creature";
+            // 野兽品级 fan/meng/zhen 先映射为 1-3，与武学/内功共用 tier 权重表
+            const grade = item.type === "creature" ? CREATURE_GRADE_RANK[sys.type] ?? 1 : sys.tier ?? 1;
+            const weight = isTier ? tierWeights[grade] : qualityWeights[sys.quality ?? 0];
             // 仅对"权重表未覆盖该品级"兜底为 10；不能用 || 10，否则显式配置的 0（排除该品级）会被改写成 10
             return Number.isFinite(weight) ? weight : 10;
         };
@@ -992,7 +1043,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
      * @param {Object<string, string[]|Set>} [options.filters] 筛选条件；宏传字符串数组，内部统一转 Set
      * @param {string} [options.query=""] 搜索词，与筛选一起收窄候选池
      * @param {number} [options.amount=1] 抽取数量，收敛到 [1, 100] 的整数，非法值按 1 处理
-     * @param {Object<number, number>} [options.weights] 品级权重（武学/内功为 tier 1-3，其余为 quality 0-4）；缺省用系统默认权重
+     * @param {Object<number, number>} [options.weights] 品级权重（武学/内功为 tier 1-3，野兽为品级 fan/meng/zhen 映射的 1-3，其余为 quality 0-4）；缺省用系统默认权重
      * @param {string} [options.alias]   战利品卡发送者名，缺省为"江湖奇遇"
      * @param {string} [options.title]   战利品卡标题，缺省为"随机战利品"
      * @returns {Promise<Array>} 抽中的索引条目；候选池为空或全部品级权重为 0 时返回空数组
@@ -1053,13 +1104,24 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
-     * 按分类返回品级权重行：武学/内功用 tier（1-3 = 人/地/天），其余用 quality（0-4 = 凡/铜/银/金/玉）。
+     * 按分类返回品级权重行：武学/内功用 tier（1-3 = 人/地/天），野兽用品级（1-3 = 凡/猛/珍），
+     * 其余用 quality（0-4 = 凡/铜/银/金/玉）。
      * 配置弹窗与宏导出共用此映射，保证弹窗里的权重行与导出宏内的品级注释始终同源。
      * @param {string} tab 分类 id
      * @returns {Array<{name: string, label: string, value: number, color: string}>} 权重行；name 为 "w_<级别>"，供弹窗 input 使用
      */
     _getWeightRows(tab) {
         const localize = key => game.i18n.localize(`XJZL.CompendiumBrowser.Random.${key}`);
+        if (tab === "creature") {
+            // 野兽品级行复用 w_1/2/3 命名，使导出宏的 weights 与 getWeight 的品级映射直接对齐
+            const grades = ["Fan", "Meng", "Zhen"];
+            return [1, 2, 3].map((rank, index) => ({
+                name: `w_${rank}`,
+                label: game.i18n.localize(`XJZL.Creature.Types.${grades[index]}`),
+                value: [100, 20, 5][index],
+                color: ["#666", "#8d6e63", "#d4af37"][index]
+            }));
+        }
         return ["wuxue", "neigong"].includes(tab)
             ? [
                 { name: "w_1", label: localize("Tier1"), value: 100, color: "#666" },
@@ -1103,7 +1165,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             filters: Object.fromEntries(Object.entries(state.filters).map(([key, set]) => [key, [...set]]))
         };
 
-        const isTier = ["wuxue", "neigong"].includes(activeTab);
+        // 野兽与武学/内功同为三档品级（w_1..w_3 表单结构）
+        const isTier = ["wuxue", "neigong", "creature"].includes(activeTab);
 
         const localize = key => game.i18n.localize(`XJZL.CompendiumBrowser.Random.${key}`);
 
@@ -1271,6 +1334,26 @@ ${weightLines}
                 }
             };
             return tiers[tier];
+        }
+
+        if (item.type === "creature") {
+            // 野兽品级复用品阶色阶（tier-1/2/3），标签取品级名首字
+            const rank = CREATURE_GRADE_RANK[sys.type] ?? 1;
+            const grades = {
+                1: {
+                    colorClass: "tier-1", drawClass: "tier-1", label: game.i18n.localize("XJZL.Creature.Types.Fan").substring(0, 1),
+                    nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Beast1", power: 1
+                },
+                2: {
+                    colorClass: "tier-2", drawClass: "tier-2", label: game.i18n.localize("XJZL.Creature.Types.Meng").substring(0, 1),
+                    nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Beast2", power: 4
+                },
+                3: {
+                    colorClass: "tier-3", drawClass: "tier-3", label: game.i18n.localize("XJZL.Creature.Types.Zhen").substring(0, 1),
+                    nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Beast3", power: 6
+                }
+            };
+            return grades[rank];
         }
 
         if (item.type === "trait") {
@@ -2021,7 +2104,8 @@ ${weightLines}
                 uuid: item.uuid,
                 name: item.name,
                 img: item.img,
-                typeLabel: game.i18n.localize(`TYPES.Item.${item.type}`),
+                // 野兽是 Actor 文档，类型标签走 TYPES.Actor 命名空间
+                typeLabel: game.i18n.localize(`TYPES.${item.type === "creature" ? "Actor" : "Item"}.${item.type}`),
                 rarityLabel: game.i18n.localize(rarity.nameKey),
                 drawClass: rarity.drawClass,
                 marks: Array.from({ length: Math.max(1, Math.min(5, rarity.power + 1)) }),
@@ -2309,6 +2393,9 @@ ${weightLines}
 
                 return {
                     uuid: i.uuid, name: i.name, img: i.img, type: i.type,
+                    // 野兽是 Actor 文档：类型标签与拖拽负载都按 Actor 走，拖出即生成 Token
+                    typeLabel: game.i18n.localize(`TYPES.${i.type === "creature" ? "Actor" : "Item"}.${i.type}`),
+                    dragType: i.type === "creature" ? "Actor" : "Item",
                     colorClass: rarity.colorClass,
                     label: rarity.label
                 };
