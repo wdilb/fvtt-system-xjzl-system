@@ -1205,33 +1205,39 @@ XJZL.statusEffects = [
         label: "围狩追加流失",
         trigger: "damaged",
         active: true,
-        script: `// 流失伤害本身不递归触发围狩；其余触发时机沿用 damaged。
-if (args.type === "liushi") return;
+        script: `// 只拦截本状态正在追加的那笔伤害，不排除其他来源的气血流失。
+const loss = Number(args.hpLost || 0) + Number(args.hutiLost || 0) + Number(args.mpLost || 0);
+if (loss <= 0 || actor._xjzlBeastHuntResolving) return;
 
-const result = await actor.applyDamage({
-  amount: 5,
-  type: "liushi",
-  attacker: args.attacker || null,
-  targetTokenUuid: actor.token?.document?.uuid || null,
-  move: args.move || null,
-  item: args.item || null,
-  isHit: true
-});
+actor._xjzlBeastHuntResolving = true;
+try {
+  const result = await actor.applyDamage({
+    amount: 5,
+    type: "liushi",
+    attacker: args.attacker || null,
+    targetTokenUuid: actor.token?.document?.uuid || null,
+    move: args.move || null,
+    item: args.item || null,
+    isHit: true
+  });
 
-const actualLoss = Number(result?.hpLost || 0) + Number(result?.hutiLost || 0)
-  + Number(result?.mpLost || 0) + Number(result?.tiliLost || 0);
-const parts = [];
-if (Number(result?.hutiLost || 0) > 0) parts.push("护体 -" + result.hutiLost);
-if (Number(result?.hpLost || 0) > 0) parts.push("气血 -" + result.hpLost);
-if (Number(result?.mpLost || 0) > 0) parts.push("内力 -" + result.mpLost);
-if (Number(result?.tiliLost || 0) > 0) parts.push("体力 -" + result.tiliLost);
-const detail = parts.length > 0 ? parts.join("、") : "实际损失 0";
-await ChatMessage.create({
-  author: game.user.id,
-  speaker: ChatMessage.getSpeaker({ actor }),
-  content: '<div class="xjzl-chat-card" style="padding:4px 8px;border-left:3px solid #8b0000;background:rgba(139,0,0,0.05);"><b style="color:#8b0000;">围狩触发</b><div>追加 5 点气血流失（实际结算：' + detail + '，共 ' + actualLoss + ' 点）。</div></div>',
-  style: CONST.CHAT_MESSAGE_STYLES.OTHER
-});`
+  const actualLoss = Number(result?.hpLost || 0) + Number(result?.hutiLost || 0)
+    + Number(result?.mpLost || 0) + Number(result?.tiliLost || 0);
+  const parts = [];
+  if (Number(result?.hutiLost || 0) > 0) parts.push("护体 -" + result.hutiLost);
+  if (Number(result?.hpLost || 0) > 0) parts.push("气血 -" + result.hpLost);
+  if (Number(result?.mpLost || 0) > 0) parts.push("内力 -" + result.mpLost);
+  if (Number(result?.tiliLost || 0) > 0) parts.push("体力 -" + result.tiliLost);
+  const detail = parts.length > 0 ? parts.join("、") : "实际损失 0";
+  await ChatMessage.create({
+    author: game.user.id,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: '<div class="xjzl-chat-card" style="padding:4px 8px;border-left:3px solid #8b0000;background:rgba(139,0,0,0.05);"><b style="color:#8b0000;">围狩触发</b><div>追加 5 点气血流失（实际结算：' + detail + '，共 ' + actualLoss + ' 点）。</div></div>',
+    style: CONST.CHAT_MESSAGE_STYLES.OTHER
+  });
+} finally {
+  delete actor._xjzlBeastHuntResolving;
+}`
       }]
     } },
     system: { changes: [] }
@@ -1268,33 +1274,6 @@ await ChatMessage.create({
     system: { changes: [] }
   },
   {
-    id: "beast_hunt_bonus",
-    name: "XJZL.Status.BeastHuntBonus",
-    description: "XJZL.Status.BeastHuntBonusDesc",
-    img: "systems/xjzl-system/assets/icons/ae/围猎加值.png",
-    showIcon: 2,
-    flags: { "xjzl-system": { slug: "beast_hunt_bonus", stackable: false } },
-    system: { changes: [] }
-  },
-  {
-    id: "beast_ambush_bonus",
-    name: "XJZL.Status.BeastAmbushBonus",
-    description: "XJZL.Status.BeastAmbushBonusDesc",
-    img: "systems/xjzl-system/assets/icons/ae/伏击加值.png",
-    showIcon: 2,
-    flags: { "xjzl-system": { slug: "beast_ambush_bonus", stackable: false } },
-    system: { changes: [] }
-  },
-  {
-    id: "beast_bear_bonus",
-    name: "XJZL.Status.BeastBearBonus",
-    description: "XJZL.Status.BeastBearBonusDesc",
-    img: "systems/xjzl-system/assets/icons/ae/熊罴加值.png",
-    showIcon: 2,
-    flags: { "xjzl-system": { slug: "beast_bear_bonus", stackable: false } },
-    system: { changes: [] }
-  },
-  {
     id: "beast_search",
     name: "XJZL.Status.BeastSearch",
     description: "XJZL.Status.BeastSearchDesc",
@@ -1302,8 +1281,8 @@ await ChatMessage.create({
     showIcon: 2,
     flags: { "xjzl-system": { slug: "beast_search", stackable: false } },
     system: { changes: [
-      { key: "system.skills.tancha.checkMod", type: "add", value: "1" },
-      { key: "system.skills.zhuizong.checkMod", type: "add", value: "1" }
+      { key: "system.skills.tancha.mod", type: "add", value: "1" },
+      { key: "system.skills.zhuizong.mod", type: "add", value: "1" }
     ] }
   },
   {
@@ -1313,7 +1292,7 @@ await ChatMessage.create({
     img: "systems/xjzl-system/assets/icons/ae/识途.png",
     showIcon: 2,
     flags: { "xjzl-system": { slug: "beast_wayfinding", stackable: false } },
-    system: { changes: [{ key: "system.skills.zhuizong.checkMod", type: "add", value: "1" }] }
+    system: { changes: [{ key: "system.skills.zhuizong.mod", type: "add", value: "1" }] }
   },
   {
     id: "beast_cunning",
@@ -1322,7 +1301,7 @@ await ChatMessage.create({
     img: "systems/xjzl-system/assets/icons/ae/狡黠.png",
     showIcon: 2,
     flags: { "xjzl-system": { slug: "beast_cunning", stackable: false } },
-    system: { changes: [{ key: "system.skills.qianxing.checkMod", type: "add", value: "2" }] }
+    system: { changes: [{ key: "system.skills.qianxing.mod", type: "add", value: "2" }] }
   },
   {
     id: "beast_benefactor",
@@ -1332,8 +1311,8 @@ await ChatMessage.create({
     showIcon: 2,
     flags: { "xjzl-system": { slug: "beast_benefactor", stackable: false } },
     system: { changes: [
-      { key: "system.skills.shuofu.checkMod", type: "add", value: "1" },
-      { key: "system.skills.jiaoyi.checkMod", type: "add", value: "1" }
+      { key: "system.skills.shuofu.mod", type: "add", value: "1" },
+      { key: "system.skills.jiaoyi.mod", type: "add", value: "1" }
     ] }
   },
   {
@@ -1344,8 +1323,8 @@ await ChatMessage.create({
     showIcon: 2,
     flags: { "xjzl-system": { slug: "beast_fortune", stackable: false } },
     system: { changes: [
-      { key: "system.skills.shuofu.checkMod", type: "add", value: "2" },
-      { key: "system.skills.jiaoyi.checkMod", type: "add", value: "2" }
+      { key: "system.skills.shuofu.mod", type: "add", value: "2" },
+      { key: "system.skills.jiaoyi.mod", type: "add", value: "2" }
     ] }
   },
   {

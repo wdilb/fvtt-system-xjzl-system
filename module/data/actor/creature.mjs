@@ -2,13 +2,15 @@
  * 野兽/怪物 (Creature) 数据模型
  * ==========================================
  * 设计目标：
- * 1. 极简配置：只存储体力、防护、基础战斗数值。
+ * 1. 只持久化体力与战斗属性基础值；mod/total 在每次数据准备时重建。
  * 2. 接口兼容 (Duck Typing)：
  *    在内存中动态生成 stats, skills, martial 等结构，
  *    欺骗脚本引擎和战斗系统，使其认为这是一个"数值为0的侠客"。
  * ==========================================
  */
 import { localizeConfig } from "../../utils/utils.mjs";
+
+const COMBAT_KEYS = ["speed", "dodge", "hit", "protection"];
 
 /**
  * 检定后果可用的伤害/流失类型。
@@ -77,8 +79,14 @@ export function getCheckAttrChoices() {
 
 export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
 
+    /** 定义野兽存档结构；战斗属性只持久化 value，省略项由字段默认值补齐。 */
     static defineSchema() {
         const fields = foundry.data.fields;
+
+        // 与人物属性相同：只保存 value，AE 修正与最终值不进入存档或编辑表单。
+        const combatStat = (initial, label, min) => new fields.SchemaField({
+            value: new fields.NumberField({ initial, integer: true, ...(min === undefined ? {} : { min }) })
+        }, { label });
 
         // --- 检定型特性（豁免/对抗）子结构 ---
         // 字段契约与 XJZLMacros.requestSave / requestContest 的参数一一对应；
@@ -156,12 +164,12 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
                 })
             }),
 
-            // === 2. 战斗属性 (直接填值) ===
+            // === 2. 战斗属性基础值 ===
             combat: new fields.SchemaField({
-                speed: new fields.NumberField({ initial: 5, integer: true, label: "XJZL.Combat.Speed" }),
-                dodge: new fields.NumberField({ initial: 10, integer: true, label: "XJZL.Combat.Dodge" }),
-                hit: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.HitWaigong" }),
-                protection: new fields.NumberField({ initial: 0, min: 0, integer: true, label: "XJZL.Combat.Protection" }) // 防护阈值
+                speed: combatStat(5, "XJZL.Combat.Speed"),
+                dodge: combatStat(10, "XJZL.Combat.Dodge"),
+                hit: combatStat(0, "XJZL.Combat.HitWaigong"),
+                protection: combatStat(0, "XJZL.Combat.Protection", 0)
             }),
 
             // === 3. 描述信息 ===
@@ -246,12 +254,15 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
     }
 
     /**
-     * @override 旧版 selfRecovery.type 默认 "hp"：野兽不持久化 hp（由 tili 派生），
-     * 恢复会被静默丢弃；choices 收紧为体力/怒气后，存量非法键若不迁移，
-     * 特性整元素写回（编辑器自动保存、卡片表单提交）会被字段校验拒绝。
-     * 加载时统一迁到 tili，幂等且不动合法值。
+     * 加载时幂等转换旧的纯数字战斗属性，并纠正不受支持的自身恢复资源。
+     * 仅包装原有基础值，不推测或回减历史上可能已被写入的状态加成。
+     * @param {object} source 野兽 system 源数据；允许局部更新、缺失 abilities。
+     * @returns {object} 就地转换后的源数据。
      */
     static migrateData(source) {
+        for (const key of COMBAT_KEYS) {
+            if (Number.isFinite(source?.combat?.[key])) source.combat[key] = { value: source.combat[key] };
+        }
         const abilities = source?.abilities;
         // 表单展开后可能是数组或数字键对象，两种形态都按条目遍历；null/缺失直接跳过
         if (!abilities || typeof abilities !== "object") return source;
@@ -265,9 +276,16 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
         return source;
     }
 
+    /** 每轮清零战斗修正；AE 只修改本轮内存，禁用或移除后自然撤销。 */
+    prepareBaseData() {
+        for (const key of COMBAT_KEYS) {
+            this.combat[key].mod = 0;
+            this.combat[key].total = this.combat[key].value;
+        }
+    }
+
     /**
-     * 数据准备：关键的兼容性映射 (Safety Padding)
-     * 这里我们凭空捏造出侠客的所有属性，防止脚本报错，没有任何实际作用
+     * 准备最终战斗数值，并填充人物战斗管线读取所需的零值兼容结构。
      */
     prepareDerivedData() {
         // ----------------------------------------------------
@@ -275,13 +293,7 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
         // ----------------------------------------------------
         const combat = this.combat;
 
-        // 系统读取的是 xxxTotal，我们把基础值赋给它
-        combat.dodgeTotal = combat.dodge;
-        combat.speedTotal = combat.speed;
-
-        // 野兽只有一种命中，映射给内外功
-        combat.hitWaigongTotal = combat.hit;
-        combat.hitNeigongTotal = combat.hit;
+        this.recalculate();
 
         // 其他可能被读取的战斗属性，全部置 0
         combat.blockTotal = 0;
@@ -362,12 +374,25 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
     }
 
     /**
-     * [接口兼容] 重新计算
-     * 即使野兽不需要重算，也必须保留这个空方法，防止 Actor 调用报错
+     * 从 value + mod 重算战斗最终值；可重复调用，不把修正累计到基础值。
+     * 保留 speedTotal 等战斗管线入口，旧象王命中 flag 仍可作用于存量 AE。
      */
     recalculate() {
-        // 野兽逻辑简单，脚本修改数值后不需要复杂的二次计算，留空即可
-        // 或者如果未来野兽也有复杂逻辑，可以在这里再次调用 prepareDerivedData
-        // this.prepareDerivedData(); 
+        const combat = this.combat;
+        for (const key of COMBAT_KEYS) {
+            const stat = combat[key];
+            stat.total = Math.floor(stat.value + stat.mod);
+        }
+        const statuses = this.parent?.xjzlStatuses || {};
+        if (statuses.unstable) combat.speed.total = Math.floor(combat.speed.total / 2);
+        if (statuses.forceSpeedZero) combat.speed.total = 0;
+        if (statuses.forceDodgeZero) combat.dodge.total = 0;
+        combat.protection.total = Math.max(0, combat.protection.total);
+        combat.hit.total += Number(statuses.beastHitBonus) || 0;
+        combat.speedTotal = combat.speed.total;
+        combat.dodgeTotal = combat.dodge.total;
+        combat.protectionTotal = combat.protection.total;
+        combat.hitWaigongTotal = combat.hit.total;
+        combat.hitNeigongTotal = combat.hit.total;
     }
 }

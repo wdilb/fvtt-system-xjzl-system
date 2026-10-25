@@ -1056,18 +1056,8 @@ export class XJZLActor extends Actor {
       this.xjzlStatuses[key] = parseInt(this.getFlag("xjzl-system", key)) || 0;
     }
 
-    // 野兽只保留自己的战斗数值：状态对速度、闪避和命中的修改在这里收口，
-    // 避免把人物武学/装备的派生加成带入野兽攻击。
-    if (this.type === "creature") {
-      const combat = this.system.combat;
-      const speed = combat.speed || 0;
-      combat.speedTotal = this.xjzlStatuses.forceSpeedZero
-        ? 0
-        : (this.xjzlStatuses.unstable ? Math.floor(speed / 2) : speed);
-      combat.dodgeTotal = this.xjzlStatuses.forceDodgeZero ? 0 : (combat.dodge || 0);
-      combat.hitWaigongTotal = (combat.hit || 0) + (this.xjzlStatuses.beastHitBonus || 0);
-      combat.hitNeigongTotal = combat.hitWaigongTotal;
-    }
+    // 让野兽 passive 读取本轮最新状态；与末尾重算一样，不向基础值累计修正。
+    if (this.type === "creature") this.system.recalculate();
 
     // ----------------------------------------------------
     // PHASE 2: 脚本干预 (Script Execution)
@@ -2163,7 +2153,7 @@ export class XJZLActor extends Actor {
       // 2. 获取配置
       const mode = game.settings.get("xjzl-system", "creatureDamageMode");
       const scalingBase = game.settings.get("xjzl-system", "creatureDamageScaling");
-      const protection = this.system.combat.protection || 0;
+      const protection = this.system.combat.protectionTotal || 0;
 
       let tiliLost = 0;
       let actualTiliLost = 0;
@@ -4010,7 +4000,7 @@ export class XJZLActor extends Actor {
    * 3. 配置了攻击段时走 rollBasicAttack 管线（d20 命中 + 攻击卡，配置由面板注入）；
    *    纯检定 + 需要命中时走轻量命中判定（无攻击弹窗与攻击卡）；
    * 4. 检定发起对象：requireHit=仅命中的目标，否则全部瞄准目标；
-   * 5. 按面板参数逐目标发起请求卡，结算复用 XJZLMacros.requestSave/requestContest 管线。
+   * 5. 纯检定先发送原文与人工步骤，再逐目标发起请求卡，复用请求卡结算管线。
    * @param {Number} index 特性在 system.abilities 中的下标
    * @returns {Promise<void>}
    */
@@ -4138,6 +4128,9 @@ export class XJZLActor extends Actor {
     if (recipients.length === 0) {
       return ui.notifications.info(game.i18n.localize("XJZL.Creature.Check.NoHitRecipients"));
     }
+
+    // 纯检定没有攻击卡承载说明，单独发一张公共说明卡，供目标玩家查看手动条件。
+    if (!ability.isAttack) await postAbilityDescription();
 
     // 4. 按面板参数逐目标发起请求卡；后果配置经 schema 同构转换，非法数值由宏侧结算校验报告
     for (const token of recipients) {
@@ -4312,6 +4305,7 @@ export class XJZLActor extends Actor {
 
     const content = `
     <div class="xjzl-dialog-content xjzl-ability-panel">
+        ${ability.automationNote ? `<p class="notes"><strong>${game.i18n.localize("XJZL.Creature.AbilityNotes")}：</strong>${foundry.utils.escapeHTML(ability.automationNote)}</p>` : ""}
         <div class="target-list">
             <span class="list-label">${game.i18n.localize("XJZL.Creature.Check.ConfirmTargets")}(${targets.length})</span>
             ${targetChips}

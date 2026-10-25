@@ -6,6 +6,34 @@ import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { assertNoSyncScriptWrite } from "../utils/sync-script-guard.mjs";
 export class XJZLActiveEffect extends ActiveEffect {
 
+  /**
+   * 共享 AE 的旧数字路径在野兽上只改变 mod，人物目标仍使用原路径。
+   * 先按 value + mod 交给核心计算，保留乘算、覆盖和优先级语义；不修改 AE 模板。
+   * @param {Document} targetDoc AE 的实际接受者（包括非关联 Token 的合成 Actor）。
+   * @param {object} change 核心已按优先级排序的单条变更。
+   * @param {object} [options] 保留核心 replacementData/modifyTarget 选项。
+   * @returns {object} 核心变更结果及对应的内存 mod。
+   */
+  static applyChange(targetDoc, change, options = {}) {
+    const match = targetDoc.type === "creature"
+      && /^system\.combat\.(speed|dodge|hit|protection)$/.exec(change.key);
+    if (!match) return super.applyChange(targetDoc, change, options);
+
+    const stat = targetDoc.system.combat[match[1]];
+    const previousTotal = stat.total;
+    const totalKey = `${change.key}.total`;
+    stat.total = stat.value + stat.mod;
+    try {
+      const result = super.applyChange(targetDoc, { ...change, key: totalKey }, options);
+      if (!Number.isFinite(result[totalKey])) return result;
+      const mod = result[totalKey] - stat.value;
+      if (options.modifyTarget !== false) stat.mod = mod;
+      return { ...result, [`${change.key}.mod`]: mod };
+    } finally {
+      if (options.modifyTarget === false) stat.total = previousTotal;
+    }
+  }
+
   /* ------------------------------------------------------------------
    * 同步脚本写入防护入口：以下覆写只在 passive/calc 执行期间生效，
    * 常规流程直接透传父类行为。入口必须同步（非 async），保证阻断时
