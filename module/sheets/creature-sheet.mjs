@@ -46,11 +46,14 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         main: { template: "systems/xjzl-system/templates/actor/creature/sheet.hbs", scrollable: [".xjzl-creature-sheet", ".ability-list"] }
     };
 
+    /** 准备野兽卡上下文；baseCombat 只含存档值，system 提供最终战斗数值。 */
     async _prepareContext(options) {
         const context = await super._prepareContext(options);
         const actor = this.document;
 
         context.system = actor.system;
+        // 编辑只读取存档中的 value，防止任何 AE 对运行时字段的修改被表单写回。
+        context.baseCombat = actor.system.toObject().combat;
         context.creatureTypes = localizeConfig(CONFIG.XJZL.creatureTypes); // 用于下拉菜单
         context.choices = {
             sizes: { tiny: "袖珍", small: "小型", medium: "中型", large: "大型", huge: "巨型" },

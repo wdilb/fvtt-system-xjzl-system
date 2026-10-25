@@ -24,7 +24,7 @@ export const STATUS_CATEGORIES = [
     { id: "resource", label: "XJZL.UI.EffectPicker.Category.Resource", icon: "fas fa-lock", ids: ["bunu", "jinliao", "qizhi", "poyi", "fatigue", "hunger"] },
     { id: "buff", label: "XJZL.UI.EffectPicker.Category.Buff", icon: "fas fa-arrow-trend-up", ids: ["yangxue", "juqi", "chengfeng", "gangjin", "mianjin", "panshi", "hushen", "xujin", "yanli", "qingling", "jinli", "wuqishi", "jinqi_stack", "wutong", "lianji", "yanzhan"] },
     { id: "debuff", label: "XJZL.UI.EffectPicker.Category.Debuff", icon: "fas fa-arrow-trend-down", ids: ["qixu", "tuoli", "cuoluan", "youyu", "yudun", "shizhun", "benzhuo", "fali", "chanshou", "yishang", "pojia", "unstable", "chizhi", "rage", "zibi"] },
-    { id: "beast", label: "XJZL.UI.EffectPicker.Category.Beast", icon: "fas fa-paw", ids: ["beast_panic", "beast_dazzled", "beast_roar", "beast_hunt", "beast_grapple", "beast_elephant_king", "beast_crane_dance", "beast_hunt_bonus", "beast_ambush_bonus", "beast_bear_bonus", "beast_search", "beast_wayfinding", "beast_cunning", "beast_benefactor", "beast_fortune", "beast_horse_spirit"] },
+    { id: "beast", label: "XJZL.UI.EffectPicker.Category.Beast", icon: "fas fa-paw", ids: ["beast_panic", "beast_dazzled", "beast_roar", "beast_hunt", "beast_grapple", "beast_elephant_king", "beast_crane_dance", "beast_search", "beast_wayfinding", "beast_cunning", "beast_benefactor", "beast_fortune", "beast_horse_spirit"] },
     { id: "scene", label: "XJZL.UI.EffectPicker.Category.Scene", icon: "fas fa-location-dot", ids: [] },
     { id: "all", label: "XJZL.UI.EffectPicker.Category.All", icon: "fas fa-border-all", ids: [] }
 ];
