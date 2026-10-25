@@ -161,7 +161,7 @@ passive / calc（持续被动与面板计算）
 
 治疗和 Buff 招式同样执行 `attack`、`check`、`hit`、`hit_once`，但不进入标准伤害防御链。`creature` 使用独立的体力伤害分支；`container` 不参与脚本、伤害或治疗生命周期。
 
-普攻（含趁虚而入、野兽攻击）复用招式的 `attack`、`check`、`hit`、`hit_once` 流程，`args.move` 是 `type` 为 `basic` 的虚拟招式，`move.id` 依次为 `basic-attack`、`opportunity-attack`、`creature-attack`。规则中"出招"类效果不应被普攻触发、但应被趁虚而入触发；是否同时排除治疗/Buff 卡按具体规则判断，标准写法：
+人物普攻和趁虚而入复用招式的 `attack`、`check`、`hit`、`hit_once` 流程，`args.move` 是 `type` 为 `basic` 的虚拟招式，`move.id` 分别为 `basic-attack`、`opportunity-attack`。规则中"出招"类效果不应被普攻触发、但应被趁虚而入触发；是否同时排除治疗/Buff 卡按具体规则判断，标准写法：
 
 ```javascript
 // 是否排除治疗/Buff 卡按规则选用（hit/attack 上下文以动作类型区分）
@@ -169,6 +169,8 @@ if (['heal', 'buff'].includes(args.actionType)) return;
 // 出招类效果：排除普攻（趁虚而入不算普攻）
 if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;
 ```
+
+野兽攻击使用 `creature-attack` 虚拟招式，但跳过攻击侧 `calc`、`attack`、`check`、`preDamage`、`hit`、`hit_once` 脚本，只计算特性基础伤害与本次手动修正；状态和检定由特性配置结算。目标侧仍按其 Actor 类型执行伤害流程。
 
 | 需求 | 优先使用 |
 |---|---|
@@ -270,7 +272,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 |---|---|---|---|
 | `move` / `item` / `attacker` | `Object` / `Item` / `Actor` | 只读 | 当前招式、所属武学和出招者。 |
 | `actionType` | `string` | 只读 | 动作类型，例如 `attack`、`heal` 或 `buff`。 |
-| `allowDamageModifiers` | `boolean` | 只读 | 本招式在 `preAttack` 声明的值；普攻固定为 `true`。详见[攻击侧数值修正](#攻击侧数值修正)。 |
+| `allowDamageModifiers` | `boolean` | 只读 | 本招式在 `preAttack` 声明的值；人物普攻固定为 `true`。详见[攻击侧数值修正](#攻击侧数值修正)。 |
 | `damageType` / `type` | `string` | 只读 | 原始伤害类型；两者同义。 |
 | `element` | `string` | 只读 | 招式属性。 |
 | `costConsumed` | `Object` | 只读 | 已实际消耗的 `mp`、`hp`、`rage`、`morale` 及 `desperateBonus`。 |
@@ -747,6 +749,10 @@ await game.xjzl.api.effects.addEffect(args.target, {
 ```
 
 系统预置数据与脚本使用上述结构。读取已有 AE 时使用 `effect.system.changes`、`effect.duration.value`、`effect.duration.units` 和 `effect.duration.expiry`。
+
+野兽的 `system.combat.speed`、`dodge`、`hit`、`protection` 使用 `{ value, mod, total }`：只有基础值 `value` 持久化，AE 修改 `mod`，读取最终值使用 `total` 或现有的 `speedTotal`、`dodgeTotal`、`hitWaigongTotal`、`hitNeigongTotal`、`protectionTotal`。共享 AE 的数字路径（如 `system.combat.speed`）会在野兽上转换成内存修正，人物仍沿用原路径；直接改写 `.value` 不用于状态加成。
+
+`total` 会在 `recalculate()` 中重算，AE 对 `.total` 的直接写入会被覆盖。
 
 从来源 Item 复制 AE 时先转为普通对象并清除 `_id`：
 
