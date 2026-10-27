@@ -1,10 +1,194 @@
 /**
  * 扩展原生的 ActiveEffect 类
- * 核心职责：实现“基于装备状态的自动抑制”
+ * 核心职责：装备抑制、战斗内外分离计时，以及参战者移除后的到期兜底。
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { assertNoSyncScriptWrite } from "../utils/sync-script-guard.mjs";
+import { getEffectDurationMode, getEffectTurnCount } from "../utils/effect-duration.mjs";
 export class XJZLActiveEffect extends ActiveEffect {
+
+  /**
+   * 解析本效果的战斗计时基准；已删除的起始参战者仍保留原战斗锚点。
+   * @param {object} [start=this.start] 已解析的 start 或包含 Combat ID 的源数据。
+   * @returns {object|null} 进行中的战斗、起始参战者及位置；无适用战斗返回 null。
+   */
+  #getCombatClock(start = this.start) {
+    const combatId = typeof start?.combat === "string" ? start.combat : start?.combat?.id ?? this._source.start?.combat;
+    const combat = game.combats.get(combatId) ?? game.combat;
+    if (!combat?.started || !combat.turns.length) return null;
+    const sameCombat = combat.id === combatId;
+    const combatant = sameCombat && start?.combatant
+      ? combat.combatants.get(start.combatant)
+      : combat.getCombatantsByActor(this.actor)[0];
+    const removed = sameCombat && !!start?.combatant && !combatant;
+    if (!combatant && !removed) return null;
+    return {
+      combat,
+      combatant,
+      removed,
+      round: sameCombat ? (start.round ?? combatant?.roundJoined ?? combat.round) : combatant.roundJoined,
+      turn: sameCombat ? (start.turn ?? 0) : combatant.turnNumber
+    };
+  }
+
+  /**
+   * 按角色次数或固定大轮计算 rounds，turns 保留行动轮次语义；不读取世界时间。
+   * @param {string} units rounds 或 turns。
+   * @param {object} clock getCombatClock 返回的计时基准。
+   * @param {number} round 当前轮次。
+   * @param {number} turn 零基回合位置；轮末使用最后一个有效行动位置。
+   * @param {object} [context] 核心事件计数快照；省略时读取客户端最新计数。
+   * @returns {number} 已过回合或行动轮次数。
+   */
+  #getCombatElapsed(units, clock, round, turn, context) {
+    if (units === "rounds") {
+      if (getEffectDurationMode() === "combatant" && !clock.removed
+        && ["turnStart", "turnEnd"].includes(this._source.duration.expiry)) {
+        const baseline = this._source.flags?.["xjzl-system"]?.effectTurnStart;
+        if (baseline?.combatId === clock.combat.id && baseline.combatantId === clock.combatant.id) {
+          return Math.max(0, getEffectTurnCount(clock.combat, baseline.combatantId, context) - baseline.count);
+        }
+        // 旧效果在首次实际回合前尚无计数快照，只能按当前轮次和角色位置建立一次基准。
+        const index = clock.combat.turns.indexOf(clock.combatant);
+        return Math.max(0, round - clock.round - (index > turn ? 1 : 0));
+      }
+      return round - clock.round;
+    }
+    const length = clock.combat.turns.length;
+    const priorRounds = Math.max(0, length - clock.turn - 1 + length * (round - clock.round - 1));
+    const thisRound = round === clock.round ? Math.max(0, turn - clock.turn) : turn + 1;
+    return priorRounds + thisRound;
+  }
+
+  /**
+   * 战斗内按独立的角色计数或战斗位置派生；战斗外才折算为秒交给核心。
+   * @param {object} duration 已归一化为有限 value 的时长对象。
+   * @param {object} [context] 核心回合事件的 round/turn 快照。
+   * @returns {object} 含 remaining/secondsRemaining/label 的派生时长。
+   */
+  _prepareCombatBasedDuration(duration, context) {
+    const clock = this.#getCombatClock();
+    // turns 的战斗外换算独立于全局 turnTime，避免每名参战者行动都额外推进世界时间。
+    const conversion = duration.units === "rounds" ? (CONFIG.time.roundTime || 2) : 1;
+    const seconds = duration.value * conversion;
+    if (!clock) {
+      if (game._documentsReady) return this._prepareTimeBasedDuration({ ...duration, units: "seconds", value: seconds }, context);
+      return Object.assign(duration, { seconds, remaining: Infinity, secondsRemaining: Infinity,
+        label: game.i18n.localize("COMMON.None") });
+    }
+
+    const round = context?.round ?? clock.combat.round;
+    const turn = context?.turn ?? clock.combat.turn;
+    const remaining = duration.value - this.#getCombatElapsed(duration.units, clock, round, turn, context);
+    const unit = duration.units === "rounds" ? "ROUNDS" : "TURNS";
+    const plural = game.i18n.pluralRules.select(Math.abs(remaining));
+    const label = game.i18n.format(`EFFECT.DURATION.${unit}${remaining < 0 ? "_AGO" : ""}.${plural}`,
+      { [duration.units]: Math.abs(remaining) });
+    return Object.assign(duration, { seconds, remaining, secondsRemaining: remaining * conversion, label });
+  }
+
+  /**
+   * 角色模式按原 ID 到期；先攻模式或原 ID 已移除时，以施加时先攻数值到期。
+   * @param {string} event 核心 Registry 的事件名。
+   * @param {object} [context] 所属 Combat、事件角色/位置与计数快照；不使用实时行动者替代。
+   * @returns {boolean} 是否已到达配置的到期事件，剩余量判断仍由核心负责。
+   */
+  isExpiryEvent(event, context) {
+    const units = this._source.duration.units;
+    if (units !== "rounds" && units !== "turns") return super.isExpiryEvent(event, context);
+    const clock = this.#getCombatClock();
+    if (!clock) return super.isExpiryEvent(event, context);
+    if (context?.combat && context.combat !== clock.combat) return false;
+    if (event === "updateWorldTime") return false;
+    const initiativeMode = (units === "rounds" && getEffectDurationMode() === "initiative") || clock.removed;
+    const expiry = this.duration.expiry;
+    if (!initiativeMode) {
+      if (expiry !== "turnStart" && expiry !== "turnEnd") return super.isExpiryEvent(event, context);
+      if (event !== expiry || context?.skipped) return false;
+      const eventId = context?.combatantId
+        ?? (Number.isInteger(context?.turn) ? clock.combat.turns[context.turn]?.id
+          : event === "turnEnd" ? clock.combat.previous.combatantId : clock.combat.combatant?.id);
+      if (eventId !== clock.combatant.id) return false;
+      // turnEnd 的缓存可能已按终点刷新过，仍须用结束事件本身的计数确认到期。
+      return !Number.isFinite(this.duration.value) || this.#getCombatElapsed(units, clock,
+        context?.round ?? clock.combat.round, context?.turn ?? clock.combat.turn, context) >= this.duration.value;
+    }
+
+    if (expiry !== "turnStart" && expiry !== "turnEnd") {
+      if (["combatStart", "combatEnd", "roundStart", "roundEnd"].includes(expiry)) return event === expiry;
+      return super.isExpiryEvent(event, context);
+    }
+    // 先攻模式只比较数值，不按同先攻 ID 拆分时点；到期大轮的轮末兜底保证不会永续。
+    if (event !== expiry && event !== "roundEnd") return false;
+    const combat = clock.combat;
+    const initiative = this.start.initiative ?? -Infinity;
+    const round = context?.round ?? combat.round;
+    // 轮末没有 turn，实时 Combat 可能已进入下一轮，不能拼接下一轮的行动位置。
+    const turn = event === "roundEnd" ? combat.turns.length - 1 : (context?.turn ?? combat.turn);
+    const current = context?.combatantId ? combat.combatants.get(context.combatantId) : combat.turns[turn];
+    if (event !== "roundEnd" && (!current || (current.initiative ?? -Infinity) > initiative)) return false;
+    const elapsed = this.#getCombatElapsed(units, clock, round, turn, context);
+    return !Number.isFinite(this.duration.value) || elapsed >= this.duration.value;
+  }
+
+  /**
+   * 只刷新属于本战斗的 AE 派生时长和已打开角色卡，不执行过期删除。
+   * @param {Combat} combat 计数已变化的战斗。
+   * @param {object} [context] GM 核心事件使用阶段快照；客户端显示省略以读取最新计数。
+   */
+  static refreshCombatDurations(combat, context) {
+    const actors = new Set();
+    for (const effect of ActiveEffect.registry) {
+      if (!(effect instanceof XJZLActiveEffect)) continue;
+      if (!["rounds", "turns"].includes(effect._source.duration.units)) continue;
+      if (effect.#getCombatClock()?.combat !== combat) continue;
+      const units = effect.duration.units;
+      const remaining = effect.duration.remaining;
+      const updated = effect.updateDuration(context);
+      if (units !== updated.units || remaining !== updated.remaining) actors.add(effect.actor);
+    }
+    for (const actor of actors) actor?.render(false);
+  }
+
+  /**
+   * 为无计数快照的旧运行效果建立一次基准；新的效果由创建/刷新入口直接记录。
+   * @param {Combat} combat 本次流转所属战斗。
+   * @param {object} context 已同步记账、本次开始事件的 round/turn 快照。
+   * @returns {Promise<void>} 使用核心批量更新，写入失败向调用方抛出。
+   */
+  static async initializeTurnCounters(combat, context) {
+    const byParent = new Map();
+    for (const effect of ActiveEffect.registry) {
+      if (!(effect instanceof XJZLActiveEffect) || effect._source.duration.units !== "rounds") continue;
+      if (!["turnStart", "turnEnd"].includes(effect._source.duration.expiry)) continue;
+      const clock = effect.#getCombatClock();
+      if (!clock || clock.combat !== combat || clock.removed) continue;
+      const saved = effect._source.flags?.["xjzl-system"]?.effectTurnStart;
+      if (saved?.combatId === combat.id && saved.combatantId === clock.combatant.id) continue;
+      const index = combat.turns.indexOf(clock.combatant);
+      // 新事件已同步入账；旧效果的历史估算仍须区分本次开始前后的来源位置。
+      const elapsed = Math.max(0, context.round - clock.round - (index >= context.turn ? 1 : 0));
+      const baseline = {
+        combatId: combat.id, combatantId: clock.combatant.id,
+        count: getEffectTurnCount(combat, clock.combatant.id, context) - elapsed - (index === context.turn ? 1 : 0)
+      };
+      if (!byParent.has(effect.parent)) byParent.set(effect.parent, []);
+      byParent.get(effect.parent).push({ _id: effect.id, "flags.xjzl-system.effectTurnStart": baseline });
+    }
+    if (byParent.size) {
+      await foundry.documents.modifyBatch([...byParent].map(([parent, updates]) => ({
+        action: "update", documentName: "ActiveEffect", parent, updates
+      })));
+    }
+  }
+
+  /** 返回给定 start 的当前角色回合计数快照；战斗外及已移除的来源不生成快照。 */
+  #captureTurnCounter(start = this.start) {
+    const clock = this.#getCombatClock(start);
+    if (!clock || clock.removed) return null;
+    return { combatId: clock.combat.id, combatantId: clock.combatant.id,
+      count: getEffectTurnCount(clock.combat, clock.combatant.id) };
+  }
 
   /**
    * 共享 AE 的旧数字路径在野兽上只改变 mod，人物目标仍使用原路径。
@@ -285,6 +469,14 @@ export class XJZLActiveEffect extends ActiveEffect {
     const flags = data.flags?.["xjzl-system"] || {};
     const updates = {};
 
+    if (this._source?.start && this._source.duration.units === "rounds") {
+      const baseline = this.#captureTurnCounter();
+      const saved = flags.effectTurnStart;
+      if (baseline && (saved?.combatId !== baseline.combatId || saved.combatantId !== baseline.combatantId)) {
+        updates["flags.xjzl-system.effectTurnStart"] = baseline;
+      }
+    }
+
     // 强制本地化 Description
     // 无论来源是 Core toggleStatusEffect 还是其他
     if (data.description) {
@@ -342,6 +534,14 @@ export class XJZLActiveEffect extends ActiveEffect {
    */
   async _preUpdate(changed, options, user) {
     await super._preUpdate(changed, options, user);
+
+    if (changed.start && this._source?.start) {
+      const start = { ...this._source.start, ...changed.start };
+      const baseline = this.#captureTurnCounter(start);
+      changed.flags ??= {};
+      changed.flags["xjzl-system"] ??= {};
+      changed.flags["xjzl-system"].effectTurnStart = baseline;
+    }
 
     // 1. 检查是否有针对我们系统的 flags 更新
     const xjzlFlags = changed.flags?.["xjzl-system"];

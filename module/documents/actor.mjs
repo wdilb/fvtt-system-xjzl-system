@@ -215,6 +215,18 @@ function getCompiledScript(constructor, paramNames, script) {
 export class XJZLActor extends Actor {
 
   /**
+   * Registry 已完成时长计算，回调只刷新角色卡，避免再次遍历和计算 AE。
+   * @param {ActiveEffect[]} effects 核心通知的时长变化效果。
+   * @param {string} event 触发刷新所用的核心事件。
+   * @param {object} [context] 核心事件快照；保持透传给基类。
+   */
+  async onUpdateEffectDurations(effects, event, context) {
+    await super.onUpdateEffectDurations(effects, event, context);
+    if (this.type === "container") return;
+    this.render(false);
+  }
+
+  /**
    * 统一资源事务入口：提交成功后按实际差值触发 resourceChanged。
    * 入口保持同步：passive/calc 同步脚本调用时在任何 await 之前抛错阻断。
    * @param {Object} updates - Actor.update 使用的绝对值对象；资源路径也支持显式 { delta: number }

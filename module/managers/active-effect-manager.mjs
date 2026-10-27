@@ -808,7 +808,7 @@ export class ActiveEffectManager {
 
     /**
      * 计算特效剩余时长的中文简写标签（角色/生物卡与状态选取器共用）。
-     * V14 依核心派生数据（remaining/secondsRemaining）计算，替代旧 rounds/startRound/startTime 手工推算。
+     * 依 AE 派生数据（remaining/secondsRemaining）显示，不另行混合世界时间与战斗位置。
      * @param {ActiveEffect} effect 已完成数据准备的特效文档
      * @returns {string|null} 如 "3 回合"、"45s"；无限/无时长返回 null
      */
@@ -824,8 +824,8 @@ export class ActiveEffectManager {
             return `${s}s`;
         }
 
-        // rounds/turns：战斗内核心派生的 remaining 就是剩余回合/轮数；
-        // 战斗外核心按 turnTime/roundTime 把回合/轮时长折算为秒计时，据此回推
+        // rounds/turns：战斗内派生的 remaining 就是剩余回合/轮数；
+        // 战斗外文档单独折算为秒计时，据此回推。
         let remaining;
         if (game.combat?.round) {
             remaining = d.remaining;
@@ -880,9 +880,9 @@ export class ActiveEffectManager {
         if (typeof d.value !== "number" || !Number.isFinite(d.value)) return Infinity;
 
         if (d.units === "seconds") return d.value;
-        // rounds 按 roundTime（2 秒/轮）、turns 按 turnTime（1 秒/轮次，与 init 配置一致）折算
+        // 仅比较/战斗外换算：turns 固定 1 秒，不参与全局战斗时钟推进。
         if (d.units === "rounds") return d.value * (CONFIG.time?.roundTime || 2);
-        if (d.units === "turns") return d.value * (CONFIG.time?.turnTime || 1);
+        if (d.units === "turns") return d.value;
 
         // 分钟/小时等日历单位：用核心日历换算成秒
         try {

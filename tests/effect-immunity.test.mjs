@@ -29,6 +29,7 @@ function setProperty(object, path, value) {
 
 class MockActor {
   prepareDerivedData() {}
+  async onUpdateEffectDurations() {}
 }
 class MockItem {}
 class MockEffect {
@@ -335,5 +336,17 @@ try {
   XJZLActiveEffect.getSystemStatusSlug = originalGetStatusSlug;
 }
 pass("Item 模板跳过免疫解析，Actor 原生创建仍拦截且保留父类取消");
+
+const durationActor = makeActor();
+let durationRenders = 0;
+durationActor.render = () => { durationRenders++; };
+await durationActor.onUpdateEffectDurations([{
+  updateDuration() { throw new Error("时长回调不应再次计算 AE"); }
+}], "turnStart", {});
+assert.equal(durationRenders, 1);
+durationActor.type = "container";
+await durationActor.onUpdateEffectDurations([], "turnStart", {});
+assert.equal(durationRenders, 1);
+pass("时长通知仅刷新角色卡，不重复计算 AE；物资节点不参与战斗时长显示");
 
 console.log(`\n全部 ${passed} 组断言通过。`);

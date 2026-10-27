@@ -8,6 +8,8 @@
 import { XJZLActor } from "./module/documents/actor.mjs";
 import { XJZLItem } from "./module/documents/item.mjs";
 import { XJZLActiveEffect } from "./module/documents/active-effect.mjs";
+import { XJZLCombat } from "./module/documents/combat.mjs";
+import { registerEffectDurationSetting } from "./module/utils/effect-duration.mjs";
 
 // 导入 DataModels (数据结构)
 import { XJZLCharacterData } from "./module/data/actor/character.mjs";
@@ -109,6 +111,7 @@ Hooks.once("init", async function () {
   CONFIG.Combat.fallbackTurnMarker = "systems/xjzl-system/assets/picture/pause-bg.png";
 
   registerAEMigrationSetting();
+  registerEffectDurationSetting();
 
   // 是否启用侠界自定义距离
   game.settings.register("xjzl-system", "customDistanceRule", {
@@ -305,9 +308,8 @@ Hooks.once("init", async function () {
 
   // 修改世界时间配置
   CONFIG.time.roundTime = 2; // 1 轮 = 2 秒（侠界时长规则）
-  // 1 轮次 = 1 秒：核心在战斗外靠该值把 turns 时长折算为秒；缺省 0 会导致
-  // turns 效果的 secondsRemaining 为 Infinity（弹窗误存为无限、标签显示异常）
-  CONFIG.time.turnTime = 1;
+  // 一轮只推进 roundTime；AE 的战斗外 turns 换算在文档中单独处理。
+  CONFIG.time.turnTime = 0;
 
   // 1. 配置 Combat 先攻设置
   CONFIG.Combat.initiative = {
@@ -320,8 +322,9 @@ Hooks.once("init", async function () {
   // 2. 注册自定义 Document 类 (逻辑层)
   CONFIG.Actor.documentClass = XJZLActor;
   CONFIG.Item.documentClass = XJZLItem;
-  // ActiveEffect 子类承接装备抑制及系统效果规则。
+  // ActiveEffect 子类承接装备抑制、战斗内外独立计时及系统效果规则。
   CONFIG.ActiveEffect.documentClass = XJZLActiveEffect;
+  CONFIG.Combat.documentClass = XJZLCombat;
   // 使用核心过期事件物理删除特效，避免与系统回合逻辑重复清理。
   CONFIG.ActiveEffect.expiryAction = "delete";
 
@@ -1274,6 +1277,8 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
 
       // 5-6. 当前角色的系统与战局回合开始。
       if (currId) {
+        // 等待核心计数和过期删除，再运行本回合脚本，避免新效果误计入这次开始事件。
+        await combat.effectTurnEvents;
         const currCombatant = combat.combatants.get(currId);
         if (currCombatant?.actor) await _routeActorTurnScript(currCombatant.actor, "turnStart", "TurnStart");
         await EncounterManager.runFieldTrigger(combat, "combatantTurnStart", { combatant: currCombatant, round: currentRound, turn: transition.currentTurn });
