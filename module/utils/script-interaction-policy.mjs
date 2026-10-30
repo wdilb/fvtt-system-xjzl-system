@@ -210,15 +210,89 @@ export function validateInteractionDeadline(expiresAt, { now, maxWindowMs = SCRI
   return { ok: true, reason: null };
 }
 
+/** 检定配置字段的手动输入上下限；只拦截荒谬的网络载荷，不承担玩法限制。 */
+export const SCRIPT_INTERACTION_TEST_CONFIG_LIMITS = Object.freeze({
+  bonus: { min: -9999, max: 9999 },
+  level: { min: -99, max: 99 }
+});
+
 /**
- * 校验 ask 的表单声明并产出只含已知字段的规范化副本。
- * 第一步只支持 integer 字段；select 与检定配置在后续步骤开放。
- * @param {object} spec - 脚本传入的声明 { title, content?, buttons, fields? }
- * @param {object} [options]
- * @param {string[]} [options.allowedFieldTypes=["integer"]] - 当前开放的字段类型
+ * 校验检定配置上下文：规则端已算好的面板展示数据（label 与各项数值）。
+ * @param {object} check - { label, baseVal, sysBonus, sysLevel, defaultBonus?, defaultLevel? }
  * @returns {{ok: boolean, reason: string|null, normalized: object|null}}
  */
-export function validateInteractionSpec(spec, { allowedFieldTypes = ["integer"] } = {}) {
+export function validateTestConfigContext(check) {
+  if (!isPlainObject(check)) return invalid("check-not-object");
+  if (typeof check.label !== "string" || !check.label.trim()) return invalid("check-label-required");
+  for (const key of ["baseVal", "sysBonus", "sysLevel"]) {
+    if (typeof check[key] !== "number" || !Number.isFinite(check[key])) return invalid(`check-${key}-not-number`);
+  }
+  const defaults = {};
+  for (const key of ["defaultBonus", "defaultLevel"]) {
+    const raw = check[key] ?? 0;
+    if (typeof raw !== "number" || !Number.isFinite(raw)) return invalid(`check-${key}-not-number`);
+    defaults[key] = raw;
+  }
+  return {
+    ok: true,
+    reason: null,
+    normalized: {
+      label: check.label,
+      baseVal: check.baseVal,
+      sysBonus: check.sysBonus,
+      sysLevel: check.sysLevel,
+      ...defaults
+    }
+  };
+
+  function invalid(reason) {
+    return { ok: false, reason, normalized: null };
+  }
+}
+
+/**
+ * 组装检定配置的表单声明：单一“投掷”按钮加 bonus/level 两个整数字段，
+ * 并把面板展示数据挂在 check 块上。答案校验复用 validateInteractionAnswer，
+ * 原端与接收端按同一声明拦截越界值。
+ * @param {object} checkNormalized - validateTestConfigContext 产出的规范化数据
+ * @param {object} labels - { roll, bonus, level } 按钮与字段标签（由调用端本地化）
+ * @returns {object} 可交给 validateInteractionSpec 复核的完整声明
+ */
+export function buildTestConfigSpec(checkNormalized, labels) {
+  return {
+    title: `${checkNormalized.label} 检定配置`,
+    buttons: [{ action: "roll", label: labels.roll, default: true }],
+    fields: [
+      {
+        name: "bonus",
+        label: labels.bonus,
+        type: "integer",
+        value: checkNormalized.defaultBonus,
+        min: SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.bonus.min,
+        max: SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.bonus.max
+      },
+      {
+        name: "level",
+        label: labels.level,
+        type: "integer",
+        value: checkNormalized.defaultLevel,
+        min: SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.level.min,
+        max: SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.level.max
+      }
+    ],
+    check: checkNormalized
+  };
+}
+
+/**
+ * 校验 ask 的表单声明并产出只含已知字段的规范化副本。
+ * 第二步开放 select 字段；检定配置声明通过可选 check 块表达。
+ * @param {object} spec - 脚本传入的声明 { title, content?, buttons, fields?, check? }
+ * @param {object} [options]
+ * @param {string[]} [options.allowedFieldTypes=["integer","select"]] - 当前开放的字段类型
+ * @returns {{ok: boolean, reason: string|null, normalized: object|null}}
+ */
+export function validateInteractionSpec(spec, { allowedFieldTypes = ["integer", "select"] } = {}) {
   if (!isPlainObject(spec)) return invalid("spec-not-object");
   const title = spec.title;
   if (typeof title !== "string" || !title.trim()) return invalid("title-required");
@@ -243,19 +317,55 @@ export function validateInteractionSpec(spec, { allowedFieldTypes = ["integer"] 
   }
   if (defaultCount > 1) return invalid("button-default-duplicate");
 
+  // 检定配置块：规则端已算好的面板数据；出现即按 attributeTestConfig 表单处理。
+  let check = null;
+  if (spec.check !== undefined) {
+    const checkResult = validateTestConfigContext(spec.check);
+    if (!checkResult.ok) return invalid(`check-invalid:${checkResult.reason}`);
+    check = checkResult.normalized;
+  }
+
   const fieldsInput = spec.fields ?? [];
   if (!Array.isArray(fieldsInput)) return invalid("fields-type");
   const fields = [];
   const names = new Set();
   for (const field of fieldsInput) {
     if (!isPlainObject(field)) return invalid("field-not-object");
-    const { name, label, type, value, min, max, hint } = field;
+    const { name, label, type, value, min, max, hint, options } = field;
     if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return invalid("field-name-invalid");
     if (names.has(name)) return invalid("field-name-duplicate");
     names.add(name);
     if (typeof label !== "string" || !label.trim()) return invalid("field-label-required");
     if (!allowedFieldTypes.includes(type)) return invalid("field-type-unsupported");
     if (hint !== undefined && typeof hint !== "string") return invalid("field-hint-type");
+
+    if (type === "select") {
+      // select 只收合法枚举：选项必须是非空对象数组，value 不重复且默认值命中其一；
+      // 答案端按同一 options 白名单比对，不引入自由文本。
+      if (!Array.isArray(options) || options.length === 0) return invalid("field-options-required");
+      const optionValues = new Set();
+      const normalizedOptions = [];
+      for (const option of options) {
+        if (!isPlainObject(option)) return invalid("field-option-not-object");
+        if (typeof option.value !== "string" || option.value === "") return invalid("field-option-value-invalid");
+        if (typeof option.label !== "string" || !option.label.trim()) return invalid("field-option-label-required");
+        if (optionValues.has(option.value)) return invalid("field-option-duplicate");
+        optionValues.add(option.value);
+        normalizedOptions.push({ value: option.value, label: option.label });
+      }
+      if (value !== undefined && (typeof value !== "string" || !optionValues.has(value))) {
+        return invalid("field-value-not-option");
+      }
+      fields.push({
+        name,
+        label,
+        type,
+        value: value ?? normalizedOptions[0].value,
+        options: normalizedOptions,
+        ...(hint !== undefined ? { hint } : {})
+      });
+      continue;
+    }
 
     const numbers = { value, min, max };
     for (const [key, raw] of Object.entries(numbers)) {
@@ -287,7 +397,8 @@ export function validateInteractionSpec(spec, { allowedFieldTypes = ["integer"] 
       title,
       ...(spec.content !== undefined ? { content: spec.content } : {}),
       buttons,
-      fields
+      fields,
+      ...(check ? { check } : {})
     }
   };
 
@@ -328,6 +439,12 @@ export function validateInteractionAnswer(answer, spec) {
       if (!Number.isInteger(raw)) return invalid("value-not-integer", status, action, null);
       if (field.min !== undefined && raw < field.min) return invalid("value-below-min", status, action, null);
       if (field.max !== undefined && raw > field.max) return invalid("value-above-max", status, action, null);
+      checked[field.name] = raw;
+    } else if (field.type === "select") {
+      // select 答案必须是选项白名单内的字符串；非字符串或未知枚举一律无效。
+      if (typeof raw !== "string" || !field.options.some(option => option.value === raw)) {
+        return invalid("value-not-option", status, action, null);
+      }
       checked[field.name] = raw;
     } else {
       return invalid("field-type-unsupported", status, action, null);

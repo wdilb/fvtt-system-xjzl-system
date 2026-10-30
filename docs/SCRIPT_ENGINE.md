@@ -2,17 +2,7 @@
 
 本手册面向物品、招式、特性和 Active Effect（AE）脚本作者，说明脚本触发器、上下文和公共 API。仅依赖本文列出的上下文字段、可写字段和公共方法；源数据录入规则由项目内部规范维护。
 
-## 实现依据与安全边界
-
-文档与代码不一致时，以以下实现为准：
-
-- 触发器和脚本字段：`module/data/common.mjs`（`SCRIPT_TRIGGERS`、`TRIGGER_CHOICES`、`makeScriptEffectSchema`）
-- 脚本来源、执行顺序和沙盒：`module/documents/actor.mjs`
-- 招式前置流程：`module/documents/item.mjs`
-- 攻击卡、治疗卡和命中后流程：`module/managers/chat-manager.mjs`
-- 宏工具：`module/utils/macros.mjs`
-- 状态与枚举：`module/config.mjs`
-- 光环 API、Region 结算和快建入口：`module/region/xjzl-aura-manager.mjs`、`module/region/xjzl-aura-behavior.mjs`、`module/region/xjzl-aura-ledger.mjs`、`module/region/xjzl-aura-quick.mjs`
+## 安全边界
 
 `scripts` 中的代码是受系统注入变量约束的 JavaScript 字符串，不是安全隔离的权限沙盒。只运行可信数据中的脚本。
 
@@ -637,8 +627,8 @@ const result = await args.target.applyHealing({
 | `type` | `string`，默认 `hp` | `hp`、`mp`/`neili`、`huti`、`tili`、`rage`。 |
 | `showScrolling` | `boolean`，默认 `true` | 是否显示飘字。 |
 | `healer` | `Actor` 或 `null`，默认当前目标 Actor | 造成这次治疗或资源流失的 Actor，用于后续脚本与统计。跨 Actor 治疗时应显式传入脚本宿主，例如 `healer: actor`。 |
-| `move` / `item` | `Object` / `Item`，默认 `null` | 显式参数优先；如果 `healer`（未传时为目标）当前正在执行动作脚本，则从其脚本栈继承。 |
-| `source` | `string`，默认 `extra` | 显式值优先；同一脚本栈能够确定主动招式来源时可继承为 `move`。 |
+| `move` / `item` | `Object` / `Item`，默认 `null` | 显式参数优先；否则尝试沿用 `healer`（未传时为目标）当前动作脚本的招式和物品。 |
+| `source` | `string`，默认 `extra` | 显式值优先；能确定当前主动招式来源时可沿用为 `move`。 |
 
 常规返回 `Promise<object>`，包含 `actualHeal`、`type`、`oldVal`、`newVal`、`overflow`、`isBlocked`。正向治疗可能受满值、禁疗或上限影响；负数是直接资源流失。`amount: 0`、容器或部分不适用资源的安全返回可能只包含 `actualHeal` 等少数字段，调用方应对可选字段做空值处理。
 
@@ -663,7 +653,17 @@ await actor.changeResources({
 });
 ```
 
-`changeResources(updates, context)` 的 `updates` 默认是 Foundry 更新路径到绝对值的对象；如果需要原子增减，可显式传入 `{ delta: n }`，例如 `{"system.resources.rage.value": { delta: 1 }}`。普通数字的绝对值语义保持不变。`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。返回底层 Actor 更新结果。它会串行提交同一 Actor 的事务，并按实际差值派发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
+`changeResources(updates, context)` 的 `updates` 默认是 Foundry 更新路径到绝对值的对象；如果需要原子增减，可显式传入 `{ delta: n }`，例如 `{"system.resources.rage.value": { delta: 1 }}`。普通数字的绝对值语义保持不变。`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。默认返回底层 Actor 更新结果，资源实际变化后触发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
+
+需要确认本次实际消耗时，传 `context.returnChanges: true`，返回 `{ result, changes }`。`changes` 记录本次实际资源差值，字段与 `resourceChanged` 相同：`resource`、`path`、`oldValue`、`newValue`、`delta`；未发生变化时为空数组。固定费用必须足额扣除后才授予收益，例如：
+
+```javascript
+const pay = await actor.changeResources({ "system.resources.mp.value": { delta: -10 } }, { cause: "moveCost", returnChanges: true });
+const paid = pay.changes.find(c => c.path === "system.resources.mp.value" && c.delta <= -10);
+if (!paid) return;
+```
+
+正常返回不代表足额扣费；调用也可能抛错，处理方式见[资源事务错误](#资源事务错误)。
 
 这 6 类资源字段——`system.resources.hp.value`、`system.resources.mp.value`、`system.resources.rage.value`、`system.resources.huti`、`system.resources.tili.value`、`system.resources.morale.value`——在脚本中必须通过 `changeResources`（或语义匹配的 `applyDamage` / `applyHealing`）写入。不要直接 `actor.update()` / `args.target.update()` 修改这些路径，以保留非 owner 的 GM 委托和按实际差值触发的 `resourceChanged` 语义。
 
@@ -1100,7 +1100,9 @@ if (!Macros.checkStance(actor, args)) return;
 `spec` 必须包含 `title` 和至少一个 `buttons` 按钮，可选 `content`（HTML 说明）和 `fields`：
 
 - 按钮必填 `action`、`label`，可选 `icon`、`default`；`action` 不可重复，最多一个默认按钮。
-- 字段必填 `name`、`label`、`type: "integer"`；`value` 默认 `0`，可选 `min`、`max`。`name` 以英文字母或下划线开头，后接字母、数字或下划线。
+- 字段必填 `name`、`label`、`type`；`name` 以英文字母或下划线开头，后接字母、数字或下划线。
+- `type: "integer"`：`value` 默认 `0`，可选 `min`、`max`。
+- `type: "select"`：必填 `options`（非空数组，每项 `{ value, label }`，选项的 `value` 为不重复的非空字符串），字段的 `value` 默认取第一项且必须在选项内。答案按选项白名单校验，自由文本无效。
 
 ```javascript
 const answer = await ask({
@@ -1121,9 +1123,28 @@ if (answer.status === "answered" && answer.action === "confirm") {
 约束：
 
 - 每次问询最多等待 60 秒。
-- 输入必须是声明范围内的整数。零值合法；空值、非整数、非有限数和越界值按 `error` 处理。
+- 整数输入必须在声明范围内，零值合法；空值、非整数、非有限数和越界值按 `error` 处理。
 - 等待后重新读取 `actor.system`，复核来源仍生效、条件和余额；完成并核实实际消耗后，再修改伤害或授予收益。资源 API 的正常返回不一定代表足额支付，具体语义见[资源事务](#资源事务)。
 - 用 `fields` 定义输入控件，`content` 只用于说明。
+
+### 检定配置中继
+
+`actor.rollAttributeTest(key, options)` 默认在当前客户端显示检定配置框。防御侧或回合脚本需要玩家配置时，传 `promptTarget: "controller"`，按[决策人](#决策人)规则选择回答者。玩家只填写临时加值和层级，掷骰、发卡及后果仍由脚本执行端处理：
+
+```javascript
+const roll = await actor.rollAttributeTest("yanzou", {
+  promptTarget: "controller",
+  interactionTrigger: trigger,
+  interactionSource: thisItem
+});
+if (!roll) return;
+```
+
+- 需要配置框时，`interactionTrigger` 必填，传当前脚本的 `trigger`；缺失、未知值及 `passive` / `calc` 会立即报错。
+- `interactionSource` 传当前脚本来源，例如 `thisItem`，使来源被删除时中止交互；省略时不检查来源。可选 `interactionLabel` 用于标识脚本报错。
+- 取消、超时、决策人不可用或问询失败时返回 `null`，脚本须判空并保留默认后果。
+- `skipDialog: true` 直接投骰，不需要交互参数。
+- 未传 `promptTarget` 或传 `"caller"` 时，配置框显示在本机。
 
 ## 常用安全模式
 
@@ -1294,7 +1315,7 @@ if (args.isHit) {
 
 ### 玩家决策
 
-已有检定或对抗能力时使用 `Macros`，自定义选择使用[脚本交互（ask）](#脚本交互ask)。直接使用 Foundry 的 `DialogV2` 会固定在脚本执行端弹窗，不能代替跨客户端的玩家问询。
+自定义选择使用[脚本交互（ask）](#脚本交互ask)，属性检定配置使用[检定配置中继](#检定配置中继)，豁免或对抗使用 `Macros`。直接使用 `DialogV2` 会固定在脚本执行端弹窗。
 
 ### 共享数组并发更新
 

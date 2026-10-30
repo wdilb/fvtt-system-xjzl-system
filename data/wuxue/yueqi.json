@@ -130,7 +130,7 @@
                             "active": true,
                             "script": "const eff = thisItem.effects.getName('转').toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         },
-{
+                        {
                             "label": "靡靡之音-固定后果",
                             "trigger": "preAttack",
                             "active": true,
@@ -1999,7 +1999,7 @@
                         {
                             "label": "格挡反击",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst dc = 15 - (lvl - 1);\n\n// 自动投掷检定\nconst roll = await actor.rollAttributeTest(\"yanzou\");\nif (roll.total >= dc) {\n    ChatMessage.create({\n        content: `<div style=\"color:green; font-weight:bold;\">演奏检定成功！</div><p>请手动将 ${args.attacker.name} 拉近 1 米。</p>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    await game.xjzl.api.effects.toggleStatus(args.attacker, \"prone\", true);\n} else {\n    ui.notifications.warn(\"反击演奏检定失败。\");\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst dc = 15 - (lvl - 1);\n\n// 自动投掷检定：显式绑定本次触发的上下文（共用脚本栈在异步交错下不可靠），\n// 配置中继给宿主控制者，Roll 与发卡留在规则端；取消时放弃反击。\nconst roll = await actor.rollAttributeTest(\"yanzou\", { promptTarget: \"controller\", interactionTrigger: trigger, interactionSource: thisItem, interactionLabel: \"赛马曲·茫茫草原\" });\nif (!roll) return;\nif (roll.total >= dc) {\n    ChatMessage.create({\n        content: `<div style=\"color:green; font-weight:bold;\">演奏检定成功！</div><p>请手动将 ${args.attacker.name} 拉近 1 米。</p>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    await game.xjzl.api.effects.toggleStatus(args.attacker, \"prone\", true);\n} else {\n    ui.notifications.warn(\"反击演奏检定失败。\");\n}",
                             "active": true
                         }
                     ]

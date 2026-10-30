@@ -6,7 +6,7 @@ import * as MacrosModule from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { ScriptInteractionManager } from "../managers/script-interaction-manager.mjs";
-import { isScriptAbortError } from "../utils/script-interaction-policy.mjs";
+import { isScriptAbortError, INTERACTION_DECISION, resolveInteractionDecision, XJZLScriptInteractionForbiddenError } from "../utils/script-interaction-policy.mjs";
 import { queueHitEffect } from "../managers/combat-fx-manager.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
@@ -232,8 +232,11 @@ export class XJZLActor extends Actor {
    * 统一资源事务入口：提交成功后按实际差值触发 resourceChanged。
    * 入口保持同步：passive/calc 同步脚本调用时在任何 await 之前抛错阻断。
    * @param {Object} updates - Actor.update 使用的绝对值对象；资源路径也支持显式 { delta: number }
-   * @param {Object} context - cause、item、move、sourceActor 等触发上下文
-   * @returns {Promise<Document|null|undefined>} 原始 Actor 更新结果或 socket 空结果
+   * @param {Object} context - cause、item、move、sourceActor 等触发上下文；
+   *   returnChanges: true 时本笔提交在资源锁内快照前后差值，返回改为
+   *   { result, changes }（changes 为真实单笔提交凭证），供固定费用核实消耗，
+   *   默认仍返回原始更新结果，既有调用不受影响。
+   * @returns {Promise<Document|null|undefined|{result, changes}>} 原始 Actor 更新结果或 socket 空结果
    */
   changeResources(updates = {}, context = null) {
     assertNoSyncScriptWrite("Actor.changeResources", { document: this.name });
@@ -253,14 +256,15 @@ export class XJZLActor extends Actor {
       return unwrapResourceSocketResult(socketResult);
     }
 
+    const returnChanges = context?.returnChanges === true;
     const operation = this._hasResourceDeltaUpdates(updates)
       ? { xjzlResourceDelta: true }
       : {};
-    const transaction = await this._commitResourceChanges(updates, context, operation);
+    const transaction = await this._commitResourceChanges(updates, context, operation, { forceChanges: returnChanges });
     if (transaction.changes.length > 0) {
       await this._dispatchResourceChanges(transaction.changes, context);
     }
-    return transaction.result;
+    return returnChanges ? { result: transaction.result, changes: transaction.changes } : transaction.result;
   }
 
   /**
@@ -341,8 +345,10 @@ export class XJZLActor extends Actor {
    * 提交资源更新并计算真实差值；此方法不负责触发脚本，供伤害结算延迟派发。
    * @param {Object} [options]
    * @param {boolean} [options.lockHeld=false] - 调用方已持有资源锁时跳过再次加锁。
+   * @param {boolean} [options.forceChanges=false] - 跳过快速路径，强制走锁内快照提交，
+   *   保证返回的 changes 是本笔真实差值（returnChanges 凭证依赖此保证）。
    */
-  async _commitResourceChanges(updates = {}, context = {}, operation = {}, { lockHeld = false } = {}) {
+  async _commitResourceChanges(updates = {}, context = {}, operation = {}, { lockHeld = false, forceChanges = false } = {}) {
     // 增量描述必须在资源锁内解析；否则 current + delta 仍可能读取到旧值。
     if (operation?.xjzlResourceDelta && !lockHeld) {
       return await this._withResourceCommitLock(async () => {
@@ -351,7 +357,7 @@ export class XJZLActor extends Actor {
           resolvedUpdates,
           context,
           operation,
-          { lockHeld: true }
+          { lockHeld: true, forceChanges }
         );
       });
     }
@@ -370,8 +376,9 @@ export class XJZLActor extends Actor {
       script.trigger === SCRIPT_TRIGGERS.RESOURCE_CHANGED && script.active
     );
     // 缓存确认没有宿主脚本且本次没有招式脚本时，连资源路径解析也跳过。
+    // 需要提交凭证（forceChanges）时跳过快速路径，让锁内快照产出真实 changes。
     const scriptSourcesChanged = this._changesResourceScriptSources(updates);
-    if (this._resourceScriptCache === false && !contextHasResourceScript && !scriptSourcesChanged) {
+    if (!forceChanges && this._resourceScriptCache === false && !contextHasResourceScript && !scriptSourcesChanged) {
       const databaseOperation = getDatabaseOperation(operation);
       const result = this._getChangedResourceFields(updates).length > 0
         ? await commitFastPath(() => super.update(updates, databaseOperation))
@@ -385,7 +392,7 @@ export class XJZLActor extends Actor {
     const databaseOptions = getDatabaseOperation(operation);
 
     // 快速路径：没有资源字段，或 Actor 没有该触发器脚本时，行为等同原始 update。
-    if (!hasResourceScripts) {
+    if (!forceChanges && !hasResourceScripts) {
       const result = changedFields.length > 0
         ? await commitFastPath(() => super.update(updates, databaseOptions))
         : await super.update(updates, databaseOptions);
@@ -1861,16 +1868,73 @@ export class XJZLActor extends Actor {
   }
 
   /**
-   * 执行属性或技能检定
-   * 
+   * 经脚本交互通道向宿主控制者中继检定配置（promptTarget: "controller"）：
+   * 只转发已算好的面板数据并收回答案，Roll/发卡/后果仍留在本端。
+   * 交互资格已在 rollAttributeTest 同步入口校验（触发器/来源由脚本显式绑定），
+   * 这里的管理器校验仅为防御性再检查。
+   * @param {Object} context - _promptAttributeTestConfig 同形的面板数据
+   * @param {Object} options - rollAttributeTest 的原始选项（interactionTrigger 等）
+   * @returns {Promise<Object|null>} answered 时 { bonus, level }；取消/超时/失败返回 null
+   */
+  async _promptAttributeTestConfigViaController(context, options = {}) {
+    const sourceDoc = options.interactionSource instanceof Item
+      ? options.interactionSource
+      : (options.interactionSource instanceof ActiveEffect ? options.interactionSource : null);
+    const answer = await ScriptInteractionManager.promptControllerAttributeTestConfig({
+      actor: this,
+      trigger: options.interactionTrigger,
+      label: options.interactionLabel ?? context.label,
+      source: sourceDoc,
+      check: context
+    });
+    // 只有 answered 携带 action/values；取消/超时按既有契约返回 null，中止错误向上透传。
+    if (answer.status !== "answered" || answer.action !== "roll") return null;
+    return { bonus: answer.values.bonus, level: answer.values.level };
+  }
+
+  /**
+   * 执行属性或技能检定（同步入口）。
+   * promptTarget: "controller" 的交互资格在调用语句本身同步校验：passive/calc
+   * 与未知触发器立即抛错，不产生 rejected Promise（同步脚本不能 await）。
+   * 剩余流程见 _rollAttributeTestAsync。
+   *
    * @param {String} key 属性或技能的键名 (如 "liliang", "qiaoshou")
    * @param {Object} options 额外配置
    * @param {Number} options.level 临时优劣势层级 (正数=优, 负数=劣)
    * @param {Number} options.bonus 额外数值加值
    * @param {String} options.flavor 自定义 Flavor 文本
-   * @returns {Promise<Roll>} 返回 Roll 实例
+   * @param {Boolean} options.skipDialog 跳过配置弹窗，保持零交互
+   * @param {String} options.promptTarget 配置弹窗归属："caller"（默认，本机弹窗）或
+   *   "controller"（向宿主控制者中继配置，仅收集手动 bonus/level；Roll 与后果仍在本端）。
+   * @param {String} options.interactionTrigger controller 中继必传：当前脚本触发器。
+   *   异步脚本可交错执行，Actor 共用上下文栈的栈顶不属于当前调用者，必须由脚本
+   *   显式绑定（沙盒变量 `trigger`），不得传其他触发器。
+   * @param {Document} [options.interactionSource] controller 中继的脚本来源（Item/AE），
+   *   用于来源删除中止与日志定位；省略时不做来源复核。
+   * @param {String} [options.interactionLabel] controller 中继的脚本标签（日志用）。
+   * @returns {Promise<Roll>} 返回 Roll 实例；取消配置弹窗时返回 null
    */
-  async rollAttributeTest(key, options = {}) {
+  rollAttributeTest(key, options = {}) {
+    // skipDialog 保持零交互契约：本次根本没有配置弹窗，交互资格校验不得阻断正常投骰。
+    if (options.promptTarget === "controller" && !options.skipDialog) {
+      // 与 ask 相同的同步入口阻断：同步脚本不能 await 检定 Promise，
+      // 资格校验必须在调用处同步抛错，而不是等待后才出现的 rejected Promise。
+      const interactionDecision = resolveInteractionDecision(options.interactionTrigger);
+      if (!interactionDecision) {
+        throw new Error(`XJZL | 未知触发器不能发起检定配置问询 [${this.name}, ${options.interactionTrigger}, ${key}]`);
+      }
+      if (interactionDecision === INTERACTION_DECISION.FORBIDDEN) {
+        throw new XJZLScriptInteractionForbiddenError(
+          `passive/calc 同步脚本禁止检定交互（promptTarget: "controller"）[${this.name}，${options.interactionTrigger}，${key}]。`,
+          { actorName: this.name, trigger: options.interactionTrigger, label: key }
+        );
+      }
+    }
+    return this._rollAttributeTestAsync(key, options);
+  }
+
+  /** rollAttributeTest 的异步实现体；除同步检定交互阻断外与原行为一致。 */
+  async _rollAttributeTestAsync(key, options = {}) {
     // --- 容器没有属性 ---
     if (this.type === "container") return null;
 
@@ -1954,7 +2018,11 @@ export class XJZLActor extends Actor {
         defaultBonus: manualBonus,
         defaultLevel: manualLevel
       };
-      const dialogConfig = await this._promptAttributeTestConfig(context);
+      // controller 只中继配置（交互资格已在同步入口校验，触发器/来源由脚本显式绑定）；
+      // caller 与未知取值保持原有本机弹窗体验。
+      const dialogConfig = options.promptTarget === "controller"
+        ? await this._promptAttributeTestConfigViaController(context, options)
+        : await this._promptAttributeTestConfig(context);
 
       // 如果玩家点了关闭/取消，中止流程
       if (!dialogConfig) return null;

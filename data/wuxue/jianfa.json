@@ -110,7 +110,7 @@
                         {
                             "label": "格挡反击",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst inRange = await foundry.applications.api.DialogV2.confirm({\n    window: { title: '白猿托桃' },\n    content: `<div style=\"padding:5px;\"><p><b>${args.attacker.name}</b> 是否在 2 米范围内？</p><p>选择“是”将自动结算流失与【下盘不稳】。</p></div>`,\n    yes: { label: '是，在2米内' },\n    no: { label: '否，不触发' },\n    rejectClose: false\n});\nif (!inRange) return;\nawait args.attacker.applyHealing({ healer: actor, amount: -5, type: 'hp', showScrolling: true });\nconst hasBagua = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'bagua');\nlet appliedUnstable = false;\nif (hasBagua) {\n    const source = game.xjzl.api.effects.getStatus('unstable');\n    if (source) {\n        const effect = foundry.utils.deepClone(source);\n        effect.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.attacker, effect);\n        appliedUnstable = true;\n    }\n}\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #607d8b;\"><b>白猿托桃：</b>${args.attacker.name} 流失 5 点气血${appliedUnstable ? '，并获得一回合【下盘不稳】' : ''}。</div></div>` });",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst inRange = await ask({\n    title: '白猿托桃',\n    content: `<div style=\"padding:5px;\"><p><b>${args.attacker.name}</b> 是否在 2 米范围内？</p><p>选择“是”将自动结算流失与【下盘不稳】。</p></div>`,\n    buttons: [\n        { action: \"confirm\", label: \"是，在2米内\" },\n        { action: \"decline\", label: \"否，不触发\", default: true }\n    ]\n});\nif (!(inRange.status === \"answered\" && inRange.action === \"confirm\")) return;\nawait args.attacker.applyHealing({ healer: actor, amount: -5, type: 'hp', showScrolling: true });\nconst hasBagua = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'bagua');\nlet appliedUnstable = false;\nif (hasBagua) {\n    const source = game.xjzl.api.effects.getStatus('unstable');\n    if (source) {\n        const effect = foundry.utils.deepClone(source);\n        effect.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n        await game.xjzl.api.effects.addEffect(args.attacker, effect);\n        appliedUnstable = true;\n    }\n}\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #607d8b;\"><b>白猿托桃：</b>${args.attacker.name} 流失 5 点气血${appliedUnstable ? '，并获得一回合【下盘不稳】' : ''}。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -6138,7 +6138,9 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "chenbing",
-                        "immunities": ["bleed_stack"],
+                        "immunities": [
+                            "bleed_stack"
+                        ],
                         "stackable": false,
                         "tiedToStance": true
                     }

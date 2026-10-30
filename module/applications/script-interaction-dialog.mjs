@@ -1,5 +1,6 @@
 /**
- * 脚本交互问答的本地表单窗口（普通 form：按钮 + integer 字段）。
+ * 脚本交互问答的本地表单窗口（普通 form：按钮 + integer/select 字段；
+ * attributeTestConfig：复用检定配置模板，只回手动 bonus/level）。
  *
  * 仅负责展示与取值：输入按完整数值转换，非法值交由 script-interaction-policy
  * 按同一声明拦截，不做截断或折算。窗口由本模块直接构造并等待：
@@ -33,6 +34,65 @@ function renderIntegerField(field) {
   </div>`;
 }
 
+/** 渲染单个 select 字段；选项来自声明白名单，不引入自由文本输入。 */
+function renderSelectField(field) {
+  const name = escapeHtml(field.name);
+  const options = field.options
+    .map(option => `<option value="${escapeHtml(option.value)}"${option.value === field.value ? " selected" : ""}>${escapeHtml(option.label)}</option>`)
+    .join("");
+  return `
+  <div class="form-group">
+    <label>${escapeHtml(field.label)}</label>
+    <div class="form-fields">
+      <select name="${name}">${options}</select>
+    </div>
+  </div>`;
+}
+
+/** 按声明类型渲染字段；未开放类型已在声明校验拦截，这里只处理已知两类。 */
+function renderField(field) {
+  return field.type === "select" ? renderSelectField(field) : renderIntegerField(field);
+}
+
+/**
+ * 组装窗口内容；attributeTestConfig 复用系统检定模板（加减按钮等交互保留），
+ * 普通 form 由声明字段拼接。模板路径不进协议载荷：载荷只携带 check 数据块。
+ * @param {object} spec - 已通过协议校验的规范化声明
+ * @returns {Promise<string>} 内容 HTML
+ */
+async function buildDialogContent(spec) {
+  if (spec.check) {
+    return renderTemplate("systems/xjzl-system/templates/apps/attribute-test-config.hbs", {
+      ...spec.check,
+      formId: `attr-test-${foundry.utils.randomID()}`
+    });
+  }
+  return `
+  ${spec.content ?? ""}
+  <div class="form-group xjzl-script-interaction-fields">
+    ${spec.fields.map(renderField).join("")}
+  </div>
+  <p class="hint xjzl-script-interaction-remaining" data-remaining></p>`;
+}
+
+/**
+ * 为检定配置窗口补装加减按钮：按钮为 type=button，不触发提交；
+ * 只调整本窗口内对应输入框的值，不写全局状态。普通 form 无此交互。
+ */
+function wireTestConfigButtons(app) {
+  const root = app?.element;
+  if (!root || typeof root.addEventListener !== "function") return;
+  root.addEventListener("click", event => {
+    const button = event.target.closest?.("button[data-action]");
+    if (!button) return;
+    event.preventDefault();
+    const input = root.querySelector(`input[name="${button.dataset.target}"]`);
+    if (!input) return;
+    const current = Number(input.value) || 0;
+    input.value = button.dataset.action === "increase" ? current + 1 : current - 1;
+  });
+}
+
 /** 尽力关闭窗口：close 的拒绝只记录，不影响已经完成的等待。 */
 function closeQuietly(app) {
   if (!app) return;
@@ -58,6 +118,8 @@ export function openScriptInteractionDialog(payload, { getExternalCloseReason } 
   let settled = false;
   let closeReason = null;
   let app = null;
+  // 窗口实例提升到外层：渲染失败（含模板加载失败）时 catch 仍能清理已构造的窗口。
+  let dialog = null;
 
   const remainingMs = () => payload.expiresAt - game.time.serverTime;
 
@@ -100,101 +162,100 @@ export function openScriptInteractionDialog(payload, { getExternalCloseReason } 
     return { promise, close: () => {} };
   }
 
-  // 独立截止计时：不依赖渲染完成；窗口到期即解除等待。
+  // 独立截止计时：模板加载与窗口渲染期间同样生效，不依赖渲染完成。
   expiryTimer = setTimeout(() => requestClose("timedOut"), Math.max(0, remainingMs()));
 
-  const buttons = spec.buttons.map(button => ({
-    action: button.action,
-    label: button.label,
-    ...(button.icon ? { icon: button.icon } : {}),
-    ...(button.default ? { default: true } : {}),
-    // 回调从 button.form 读取字段：文字点击、图标点击与键盘提交都汇聚到提交按钮（V14 契约）。
-    callback: (_event, buttonElement) => {
-      const values = {};
-      for (const field of spec.fields) {
-        const raw = buttonElement.form?.elements[field.name]?.value;
-        // 完整数值转换后交给声明校验：parseInt 的截断（1.9→1、1e1→1）会篡改玩家
-        // 选择的消耗数量；空输入保持 NaN，由整数校验按 error 拒绝。
-        const trimmed = typeof raw === "string" ? raw.trim() : raw;
-        values[field.name] = trimmed === undefined || trimmed === null || trimmed === ""
-          ? NaN
-          : Number(trimmed);
+  void (async () => {
+    const contentHtml = await buildDialogContent(spec);
+
+    const buttons = spec.buttons.map(button => ({
+      action: button.action,
+      label: button.label,
+      ...(button.icon ? { icon: button.icon } : {}),
+      ...(button.default ? { default: true } : {}),
+      // 回调从 button.form 读取字段：文字点击、图标点击与键盘提交都汇聚到提交按钮（V14 契约）。
+      callback: (_event, buttonElement) => {
+        const values = {};
+        for (const field of spec.fields) {
+          const raw = buttonElement.form?.elements[field.name]?.value;
+          const trimmed = typeof raw === "string" ? raw.trim() : raw;
+          if (field.type === "select") {
+            // select 保留字符串枚举原值，不做数值转换；空值交由声明校验拒绝。
+            values[field.name] = trimmed === undefined || trimmed === null || trimmed === "" ? null : trimmed;
+          } else {
+            // 完整数值转换后交给声明校验：parseInt 的截断（1.9→1、1e1→1）会篡改玩家
+            // 选择的消耗数量；空输入保持 NaN，由整数校验按 error 拒绝。
+            values[field.name] = trimmed === undefined || trimmed === null || trimmed === ""
+              ? NaN
+              : Number(trimmed);
+          }
+        }
+        return { status: "answered", action: button.action, values, reason: null };
       }
-      return { status: "answered", action: button.action, values, reason: null };
-    }
-  }));
+    }));
 
-  const contentHtml = `
-  ${spec.content ?? ""}
-  <div class="form-group xjzl-script-interaction-fields">
-    ${spec.fields.map(renderIntegerField).join("")}
-  </div>
-  <p class="hint xjzl-script-interaction-remaining" data-remaining></p>`;
-
-  // 复刻核心 DialogV2.wait 的解析语义：按钮回调结果经 submit resolve（关窗事件不再改变结果），
-  // 关窗（rejectClose:false）解析为 null。区别在于 render 的 Promise 由本模块直接观察：
-  // 渲染失败立即以确定的 error 结案并清理，而不是产生 unhandledRejection 并挂起等待。
-  const dialog = new foundry.applications.api.DialogV2({
-    window: { title: spec.title },
-    content: contentHtml,
-    buttons,
-    rejectClose: false,
-    submit: result => {
-      if (settled) return;
-      if (result && typeof result === "object") {
-        finish({ ...result });
-        return;
-      }
-      finishClosed(closeReason ?? "dismissed");
-    }
-  });
-  dialog.addEventListener("close", () => {
-    if (intervalId !== null) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-    // 玩家关窗（Esc/取消）不经过 submit：按已记录原因或取消结案，避免挂到截止。
-    if (!settled) finishClosed(closeReason ?? "dismissed");
-  }, { once: true });
-
-  const startRemainingTimer = () => {
-    const updateRemaining = () => {
-      if (settled) return;
-      const left = remainingMs();
-      const node = app?.element?.querySelector?.(".xjzl-script-interaction-remaining");
-      if (node) {
-        node.textContent = left > 0
-          ? game.i18n.format("XJZL.ScriptInteraction.RemainingTime", { seconds: Math.ceil(left / 1000) })
-          : game.i18n.localize("XJZL.ScriptInteraction.Expired");
-      }
-      const externalNow = getExternalCloseReason?.();
-      if (left <= 0) return requestClose("timedOut");
-      if (externalNow) requestClose(externalNow);
-    };
-    updateRemaining();
-    intervalId = setInterval(updateRemaining, 1000);
-  };
-
-  Promise.resolve()
-    .then(() => dialog.render({ force: true }))
-    .then(() => {
-      app = dialog;
-      // 等待已独立终结（取消/截止先到）：迟到的窗口直接关闭，不再启动计时。
-      if (settled) return closeQuietly(app);
-      // 窗口登记完成后再查一次终态：关闭通知或中止可能发生在模板加载期间。
-      const external = getExternalCloseReason?.();
-      if (external) return requestClose(external);
-      startRemainingTimer();
-    })
-    .catch(err => {
-      // 渲染或渲染后处理失败：立即记录并以确定的 error 结案，清理窗口与计时，
-      // 不产生 unhandledRejection，也不让问询挂到截止。
-      console.error("XJZL | 脚本交互窗口渲染或显示失败:", err);
-      if (!settled) {
-        closeQuietly(dialog);
-        finish({ status: "error", action: null, values: null, reason: "render-failed" });
+    // 复刻核心 DialogV2.wait 的解析语义：按钮回调结果经 submit resolve（关窗事件不再改变结果），
+    // 关窗（rejectClose:false）解析为 null。区别在于 render 的 Promise 由本模块直接观察：
+    // 渲染失败立即以确定的 error 结案并清理，而不是产生 unhandledRejection 并挂起等待。
+    dialog = new foundry.applications.api.DialogV2({
+      window: { title: spec.title },
+      content: contentHtml,
+      buttons,
+      rejectClose: false,
+      submit: result => {
+        if (settled) return;
+        if (result && typeof result === "object") {
+          finish({ ...result });
+          return;
+        }
+        finishClosed(closeReason ?? "dismissed");
       }
     });
+    dialog.addEventListener("close", () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+      // 玩家关窗（Esc/取消）不经过 submit：按已记录原因或取消结案，避免挂到截止。
+      if (!settled) finishClosed(closeReason ?? "dismissed");
+    }, { once: true });
+
+    const startRemainingTimer = () => {
+      const updateRemaining = () => {
+        if (settled) return;
+        const left = remainingMs();
+        const node = app?.element?.querySelector?.(".xjzl-script-interaction-remaining");
+        if (node) {
+          node.textContent = left > 0
+            ? game.i18n.format("XJZL.ScriptInteraction.RemainingTime", { seconds: Math.ceil(left / 1000) })
+            : game.i18n.localize("XJZL.ScriptInteraction.Expired");
+        }
+        const externalNow = getExternalCloseReason?.();
+        if (left <= 0) return requestClose("timedOut");
+        if (externalNow) requestClose(externalNow);
+      };
+      updateRemaining();
+      intervalId = setInterval(updateRemaining, 1000);
+    };
+
+    await dialog.render({ force: true });
+    app = dialog;
+    wireTestConfigButtons(app);
+    // 等待已独立终结（取消/截止先到）：迟到的窗口直接关闭，不再启动计时。
+    if (settled) return closeQuietly(app);
+    // 窗口登记完成后再查一次终态：关闭通知或中止可能发生在模板加载期间。
+    const external = getExternalCloseReason?.();
+    if (external) return requestClose(external);
+    startRemainingTimer();
+  })().catch(err => {
+    // 模板渲染或窗口显示失败：立即记录并以确定的 error 结案，清理窗口与计时，
+    // 不产生 unhandledRejection，也不让问询挂到截止。
+    console.error("XJZL | 脚本交互窗口渲染或显示失败:", err);
+    if (!settled) {
+      closeQuietly(dialog);
+      finish({ status: "error", action: null, values: null, reason: "render-failed" });
+    }
+  });
 
   return { promise, close };
 }

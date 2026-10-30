@@ -1,5 +1,5 @@
 /**
- * 脚本交互（ask）管理器：控制者选择、本机/远端纯问答、终结与清理。
+ * 脚本交互（ask）管理器：控制者选择、本机/远端纯问答、检定配置中继、终结与清理。
  *
  * 职责边界：只发送问题并收回答案；规则写入、Roll 与后果留在规则执行端。
  * 不承担生命周期远程执行协议、不持久化问答状态；短期状态只服务当前请求
@@ -26,7 +26,9 @@ import {
   resolveInteractionTarget,
   validateInteractionDeadline,
   validateInteractionSpec,
-  validateInteractionAnswer
+  validateInteractionAnswer,
+  validateTestConfigContext,
+  buildTestConfigSpec
 } from "../utils/script-interaction-policy.mjs";
 
 // 原端等待记录：requestId → { requestId, actorUuid, recipientUserId, remote, abort, cancelWith }
@@ -80,6 +82,52 @@ function buildSourceInfo(source) {
   };
 }
 
+/**
+ * 检定配置中继（rollAttributeTest promptTarget: "controller" 的内部入口）：
+ * 规则端已算好面板数据，控制者只回手动 bonus/level；Roll、发卡与后果留在规则端。
+ * 入口保持同步：passive/calc 与未知触发器在调用入口立即抛错（不产生 rejected Promise），
+ * 与沙盒 ask 的禁止交互契约一致；其余情况返回问答 Promise。
+ * @param {object} params
+ * @param {Actor} params.actor - 检定宿主 Actor
+ * @param {string} params.trigger - 当前脚本触发器
+ * @param {string} params.label - 脚本标签，用于日志定位
+ * @param {Document|null} params.source - 脚本来源（Item/AE 等，可为 null）
+ * @param {object} params.check - validateTestConfigContext 形状的面板数据
+ * @returns {Promise<{requestId, status, action, values, reason}>}
+ *   answered 且 action 为 "roll" 时 values 为 { bonus, level }。
+ */
+export function promptControllerAttributeTestConfig({ actor, trigger, label, source, check }) {
+  const decision = resolveInteractionDecision(trigger);
+  if (!decision) {
+    throw new Error(`XJZL | 未知触发器不能发起检定配置问询 [${actor?.name}, ${trigger}, ${label}]`);
+  }
+  if (decision === INTERACTION_DECISION.FORBIDDEN) {
+    // 同步脚本禁止交互：与 ask 一致，在调用入口立即同步抛错。
+    throw new XJZLScriptInteractionForbiddenError(
+      `passive/calc 同步脚本禁止检定交互（promptTarget: "controller"）[${actor?.name}，${trigger}，${label}]。`,
+      { actorName: actor?.name, trigger, label }
+    );
+  }
+  const checkResult = validateTestConfigContext(check);
+  if (!checkResult.ok) {
+    console.warn(`XJZL | 检定配置数据无效 [${actor?.name}, ${trigger}, ${label}]: ${checkResult.reason}`);
+    return Promise.resolve(failedResult(null, SCRIPT_INTERACTION_STATUS.ERROR, checkResult.reason));
+  }
+  const spec = buildTestConfigSpec(checkResult.normalized, {
+    roll: game.i18n.localize("XJZL.ScriptInteraction.TestConfig.Roll"),
+    bonus: game.i18n.localize("XJZL.ScriptInteraction.TestConfig.Bonus"),
+    level: game.i18n.localize("XJZL.ScriptInteraction.TestConfig.Level")
+  });
+  return executeAsk({
+    actor,
+    trigger,
+    label,
+    sourceInfo: buildSourceInfo(source),
+    decision,
+    spec
+  });
+}
+
 /** 构造统一的问答结果对象；只有 answered 携带 action/values。 */
 function failedResult(requestId, status, reason) {
   return { requestId, status, action: null, values: null, reason };
@@ -92,15 +140,17 @@ function failedResult(requestId, status, reason) {
 /**
  * 执行一次问答：按决策归属锁定决策人、生成本协议载荷并等待结果。
  * 当前主动操作者触发器本机决策；宿主控制者触发器按归属顺序选择。
+ * 表单类型由声明派生：含 check 块为 attributeTestConfig，否则为 form。
  * @returns {Promise<{requestId, status, action, values, reason}>}
  *   宿主/来源删除时以 XJZLScriptAbortError 拒绝，交由脚本运行器透传。
  */
 async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec }) {
-  const specCheck = validateInteractionSpec(spec, { allowedFieldTypes: ["integer"] });
+  const specCheck = validateInteractionSpec(spec);
   if (!specCheck.ok) {
     console.warn(`XJZL | 脚本交互声明无效 [${actor?.name}, ${trigger}, ${label}]: ${specCheck.reason}`);
     return failedResult(null, SCRIPT_INTERACTION_STATUS.ERROR, specCheck.reason);
   }
+  const formType = specCheck.normalized.check ? "attributeTestConfig" : "form";
 
   const target = resolveInteractionTarget({
     decision,
@@ -130,7 +180,7 @@ async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec })
     requesterUserId: game.user.id,
     trigger,
     source: sourceInfo,
-    formType: "form",
+    formType,
     spec: specCheck.normalized,
     expiresAt
   };
@@ -332,12 +382,17 @@ async function handleInteractionQuery(payload, context) {
   if (!isInteractiveTrigger(payload.trigger)) {
     return failedResult(requestId, SCRIPT_INTERACTION_STATUS.UNAVAILABLE, "trigger-not-interactive");
   }
-  if (payload.formType !== "form") {
+  // 表单类型白名单：form（普通问询）与 attributeTestConfig（检定配置中继）。
+  // check 块只允许出现在检定配置中，普通 form 不携带面板数据。
+  if (payload.formType !== "form" && payload.formType !== "attributeTestConfig") {
     return failedResult(requestId, SCRIPT_INTERACTION_STATUS.ERROR, "form-type-unsupported");
   }
-  const specCheck = validateInteractionSpec(payload.spec, { allowedFieldTypes: ["integer"] });
+  const specCheck = validateInteractionSpec(payload.spec);
   if (!specCheck.ok) {
     return failedResult(requestId, SCRIPT_INTERACTION_STATUS.ERROR, `spec-invalid:${specCheck.reason}`);
+  }
+  if ((payload.formType === "attributeTestConfig") !== Boolean(specCheck.normalized.check)) {
+    return failedResult(requestId, SCRIPT_INTERACTION_STATUS.ERROR, "form-type-mismatch");
   }
 
   // 以核心传入的真实发送者授权；载荷自称的请求者只做一致性核对。
@@ -556,6 +611,7 @@ function buildHostAbortError(record, reason) {
 
 export const ScriptInteractionManager = {
   createScriptAsk,
+  promptControllerAttributeTestConfig,
   handleInteractionQuery,
   handleCloseNotification
 };

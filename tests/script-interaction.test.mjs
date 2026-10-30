@@ -1,5 +1,5 @@
 /**
- * 脚本交互（ask）回归：真实 policy/manager/dialog 模块 + 真实迁移后伏气功脚本。
+ * 脚本交互（ask）回归：真实 policy/manager/dialog 模块 + 真实迁移后官方脚本。
  * 只替换网络（User.query/socketlib）、UI（DialogV2）与 Foundry 全局边界；
  * 控制流、校验、终结与清理全部走真实实现。DialogV2 的 button.form 契约
  * 按核实的 V14 源码行为模拟（回调自 button.form.elements 取值）。
@@ -55,6 +55,40 @@ globalThis.foundry = {
   }
 };
 
+// rollAttributeTest 与检定配置渲染依赖的 Foundry 全局；本回归只断言结果。
+const renderTemplateCalls = [];
+globalThis.renderTemplate = async (path, data) => {
+  renderTemplateCalls.push({ path, data });
+  return `<div data-template="${path}"></div>`;
+};
+const rollCalls = [];
+globalThis.Roll = class MockRoll {
+  constructor(formula, data) {
+    this.formula = formula;
+    this.data = data;
+    rollCalls.push(this);
+  }
+  async evaluate() {
+    this.total = 10 + (this.data?.val ?? 0) + (this.data?.extra ?? 0) + (this.data?.bonus ?? 0);
+    return this;
+  }
+  async toMessage() { return {}; }
+};
+globalThis.CONFIG = {
+  XJZL: {
+    attributes: {},
+    skills: { shuxie: "XJZL.Skills.Shuxie", yanzou: "XJZL.Skills.Yanzou" },
+    arts: {},
+    weaponTypes: {}
+  }
+};
+globalThis.document = { getElementById: () => null };
+const chatMessages = [];
+globalThis.ChatMessage = {
+  getSpeaker: ({ actor }) => ({ actor: actor?.name ?? null }),
+  create: async data => { chatMessages.push(data); }
+};
+
 // XJZLActor 的基类：super.update 可被用例接管以模拟核心更新取消。
 globalThis.Actor = class MockActorRoot {
   async update(changes) {
@@ -82,6 +116,20 @@ globalThis.ui = { notifications: {
   error: message => notices.push(message)
 } };
 
+const statusTemplates = {
+  prone: { name: "倒地", img: "icons/svg/fallen.svg" },
+  shizhun: { name: "失准", img: "icons/svg/downgrade.svg" },
+  unstable: { name: "下盘不稳", img: "icons/svg/trap.svg" },
+  cuogu: { name: "错骨", img: "icons/svg/bone.svg" }
+};
+const addedEffects = [];
+const removedEffects = [];
+const MacrosMock = {
+  stanceActive: true,
+  checkStance: () => MacrosMock.stanceActive
+};
+globalThis.Macros = MacrosMock;
+
 globalThis.game = {
   user: null,
   users: [],
@@ -90,6 +138,40 @@ globalThis.game = {
   i18n: {
     localize: key => key,
     format: (key, values) => `${key}:${JSON.stringify(values ?? {})}`
+  },
+  xjzl: {
+    api: {
+      effects: {
+        getStatus: slug => statusTemplates[slug] ? structuredClone(statusTemplates[slug]) : undefined,
+        addEffect: async (actor, data, count = 1) => {
+          addedEffects.push({
+            actor: actor?.name ?? null,
+            slug: data?.flags?.["xjzl-system"]?.slug ?? data?.name,
+            count
+          });
+          return { id: `added-${addedEffects.length}` };
+        },
+        removeEffect: async (actor, slug, amount = 1) => {
+          const effect = actor.effects.find(e => e.getFlag("xjzl-system", "slug") === slug);
+          if (!effect) return undefined;
+          // 模拟真实叠层契约：可叠层且移除量小于当前层数时只减层（返回 undefined），
+          // 否则整条删除（返回被删效果）。原地操作，保留 effects 数组身份与 get 辅助方法。
+          const currentStacks = effect.getFlag("xjzl-system", "stacks") || 1;
+          if (effect.getFlag("xjzl-system", "stackable") && amount < currentStacks) {
+            effect._stacks = currentStacks - amount;
+            removedEffects.push({ actor: actor?.name ?? null, slug, amount, effect, stacked: true });
+            return undefined;
+          }
+          actor.effects.splice(actor.effects.indexOf(effect), 1);
+          removedEffects.push({ actor: actor?.name ?? null, slug, amount, effect });
+          return effect;
+        },
+        toggleStatus: async (actor, slug, active) => {
+          addedEffects.push({ actor: actor?.name ?? null, slug, toggle: active });
+          return { id: `toggled-${addedEffects.length}` };
+        }
+      }
+    }
   }
 };
 
@@ -119,6 +201,8 @@ let scriptedResponses = [];
 let dialogImpl = null;
 let dialogConfigs = [];
 const dialogInstances = [];
+// DialogV2.wait（本机检定配置回退路径）的可控返回值；null 表示取消。
+let dialogWaitResult = null;
 // 模拟模板加载缓慢/失败：render 推迟执行或直接拒绝，渲染回归使用。
 let deferRender = false;
 let renderFailure = null;
@@ -135,6 +219,9 @@ function flushDeferredRenders() {
 }
 
 foundry.applications.api.DialogV2 = class MockDialogV2 {
+  // 本机 _promptAttributeTestConfig 使用 DialogV2.wait；回归只覆盖取消与配置返回。
+  static async wait() { return dialogWaitResult; }
+
   constructor(config) {
     dialogConfigs.push(config);
     dialogInstances.push(this);
@@ -408,14 +495,45 @@ for (const [label, spec] of Object.entries({
   "重复按钮 action": { ...baseSpec, buttons: [{ action: "a", label: "1" }, { action: "a", label: "2" }] },
   "多个默认按钮": { ...baseSpec, buttons: [{ action: "a", label: "1", default: true }, { action: "b", label: "2", default: true }] },
   "非法字段名": { ...baseSpec, fields: [{ name: "1bad", label: "x", type: "integer" }] },
-  "select 未开放": { ...baseSpec, fields: [{ name: "pick", label: "x", type: "select", options: [] }] },
+  "未知字段类型": { ...baseSpec, fields: [{ name: "pick", label: "x", type: "richText" }] },
   "上下限倒置": { ...baseSpec, fields: [{ name: "n", label: "x", type: "integer", min: 5, max: 1 }] },
   "默认值越界": { ...baseSpec, fields: [{ name: "n", label: "x", type: "integer", value: 9, min: 0, max: 5 }] },
-  "非整数值": { ...baseSpec, fields: [{ name: "n", label: "x", type: "integer", value: 1.5 }] }
+  "非整数值": { ...baseSpec, fields: [{ name: "n", label: "x", type: "integer", value: 1.5 }] },
+  "select 缺少选项": { ...baseSpec, fields: [{ name: "pick", label: "x", type: "select", options: [] }] },
+  "select 选项缺标签": { ...baseSpec, fields: [{ name: "pick", label: "x", type: "select", options: [{ value: "a", label: "" }] }] },
+  "select 选项重复": { ...baseSpec, fields: [{ name: "pick", label: "x", type: "select", options: [{ value: "a", label: "1" }, { value: "a", label: "2" }] }] },
+  "select 默认值不在枚举": { ...baseSpec, fields: [{ name: "pick", label: "x", type: "select", value: "z", options: [{ value: "a", label: "1" }] }] }
 })) {
   assert.equal(validateInteractionSpec(spec).ok, false, label);
 }
-pass("非法 spec 全部被拒绝（含第一步未开放的 select）");
+pass("非法 spec 全部被拒绝（含 select 选项白名单约束）");
+
+{
+  // select 字段：合法声明规范化，默认值缺省取第一项
+  const check = validateInteractionSpec({
+    title: "选择",
+    buttons: [{ action: "confirm", label: "确认" }],
+    fields: [{ name: "element", label: "属性", type: "select", options: [{ value: "yin", label: "阴" }, { value: "yang", label: "阳" }] }]
+  });
+  assert.equal(check.ok, true);
+  assert.deepEqual(check.normalized.fields[0], {
+    name: "element", label: "属性", type: "select", value: "yin",
+    options: [{ value: "yin", label: "阴" }, { value: "yang", label: "阳" }]
+  });
+  const spec = check.normalized;
+  const valid = validateInteractionAnswer(
+    { status: "answered", action: "confirm", values: { element: "yang" } }, spec);
+  assert.equal(valid.ok, true);
+  assert.deepEqual(valid.values, { element: "yang" });
+  for (const [label, answer] of Object.entries({
+    "非字符串": { status: "answered", action: "confirm", values: { element: 1 } },
+    "未知枚举": { status: "answered", action: "confirm", values: { element: "gang" } },
+    "空值": { status: "answered", action: "confirm", values: { element: null } }
+  })) {
+    assert.equal(validateInteractionAnswer(answer, spec).ok, false, label);
+  }
+}
+pass("select 字段按选项白名单校验答案：枚举内合法，非字符串与未知枚举无效");
 
 {
   const spec = validateInteractionSpec(baseSpec).normalized;
@@ -843,7 +961,9 @@ for (const [label, payload, context, expectedStatus, expectedReason] of [
   ["非接收者", buildPayload({ recipientUserId: "other" }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.UNAVAILABLE, "not-recipient"],
   ["已过期", buildPayload({ expiresAt: serverTime - 1 }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.TIMED_OUT, "expired"],
   ["触发器不允许交互", buildPayload({ trigger: "passive" }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.UNAVAILABLE, "trigger-not-interactive"],
-  ["表单类型未开放", buildPayload({ formType: "attributeTestConfig" }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.ERROR, "form-type-unsupported"],
+  ["未知表单类型", buildPayload({ formType: "richText" }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.ERROR, "form-type-unsupported"],
+  ["普通 form 携带 check 块", buildPayload({ formType: "form", spec: validateInteractionSpec({ ...baseSpec, check: { label: "体魄", baseVal: 5, sysBonus: 0, sysLevel: 0 } }).normalized }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.ERROR, "form-type-mismatch"],
+  ["检定配置缺少 check 块", buildPayload({ formType: "attributeTestConfig" }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.ERROR, "form-type-mismatch"],
   ["伪装发送者", buildPayload(), { user: makeUser("mallory") }, SCRIPT_INTERACTION_STATUS.UNAVAILABLE, "sender-mismatch"],
   ["宿主缺失", buildPayload({ actorUuid: "Actor.missing" }), { user: remoteGM }, SCRIPT_INTERACTION_STATUS.UNAVAILABLE, "host-missing"],
   ["非 OWNER 发送者", buildPayload({ requesterUserId: "p2" }), { user: remotePlayer }, SCRIPT_INTERACTION_STATUS.UNAVAILABLE, "sender-forbidden"]
@@ -1638,6 +1758,990 @@ pass("socket 边界：普通提交错误与无关错误行为不变");
   assert.equal(dialogConfigs.length, 0);
 }
 pass("终态缓存以真实发送者＋requestId 为实际键：不同发送者不能互相覆盖");
+
+/* -------------------------------------------- */
+/*  L. 检定配置声明（attributeTestConfig）          */
+/* -------------------------------------------- */
+
+console.log("L. 检定配置声明（attributeTestConfig）");
+
+const {
+  validateTestConfigContext, buildTestConfigSpec, SCRIPT_INTERACTION_TEST_CONFIG_LIMITS
+} = policy;
+
+{
+  const check = validateTestConfigContext({ label: "演奏", baseVal: 30, sysBonus: 2, sysLevel: -1 });
+  assert.equal(check.ok, true);
+  assert.deepEqual(check.normalized, { label: "演奏", baseVal: 30, sysBonus: 2, sysLevel: -1, defaultBonus: 0, defaultLevel: 0 });
+  const withDefaults = validateTestConfigContext({ label: "书写", baseVal: 1, sysBonus: 0, sysLevel: 0, defaultBonus: 2, defaultLevel: 3 });
+  assert.deepEqual(withDefaults.normalized, { label: "书写", baseVal: 1, sysBonus: 0, sysLevel: 0, defaultBonus: 2, defaultLevel: 3 });
+}
+pass("检定配置上下文规范化：缺失的默认 bonus/level 补 0");
+
+for (const [label, check] of Object.entries({
+  "缺少标签": { baseVal: 1, sysBonus: 0, sysLevel: 0 },
+  "非数值面板": { label: "x", baseVal: "a", sysBonus: 0, sysLevel: 0 },
+  "非数值默认加值": { label: "x", baseVal: 1, sysBonus: 0, sysLevel: 0, defaultBonus: "b" }
+})) {
+  assert.equal(validateTestConfigContext(check).ok, false, label);
+}
+pass("检定配置上下文拒绝缺失标签与非数值字段");
+
+{
+  const normalized = validateTestConfigContext({ label: "演奏", baseVal: 30, sysBonus: 0, sysLevel: 0, defaultBonus: 2, defaultLevel: 1 }).normalized;
+  const spec = validateInteractionSpec(buildTestConfigSpec(normalized, { roll: "投掷", bonus: "加值", level: "层级" }));
+  assert.equal(spec.ok, true);
+  assert.equal(spec.normalized.title, "演奏 检定配置");
+  assert.deepEqual(spec.normalized.buttons.map(button => button.action), ["roll"]);
+  assert.deepEqual(spec.normalized.check, normalized);
+  const bonusField = spec.normalized.fields.find(field => field.name === "bonus");
+  const levelField = spec.normalized.fields.find(field => field.name === "level");
+  assert.deepEqual(
+    { bonus: [bonusField.min, bonusField.max], level: [levelField.min, levelField.max] },
+    { bonus: [SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.bonus.min, SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.bonus.max], level: [SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.level.min, SCRIPT_INTERACTION_TEST_CONFIG_LIMITS.level.max] }
+  );
+  const answered = validateInteractionAnswer(
+    { status: "answered", action: "roll", values: { bonus: -2, level: 1 } }, spec.normalized);
+  assert.equal(answered.ok, true);
+  assert.deepEqual(answered.values, { bonus: -2, level: 1 });
+  assert.equal(validateInteractionAnswer({ status: "answered", action: "roll", values: { bonus: 99999, level: 0 } }, spec.normalized).reason, "value-above-max");
+  assert.equal(validateInteractionAnswer({ status: "answered", action: "roll", values: { bonus: 0 } }, spec.normalized).ok, false);
+}
+pass("检定配置声明组装 bonus/level 整数字段，答案按同一声明校验上下限");
+
+/* -------------------------------------------- */
+/*  M. 检定配置中继（manager + 接收端）              */
+/* -------------------------------------------- */
+
+console.log("M. 检定配置中继（manager + 接收端）");
+
+{
+  const ask = () => ScriptInteractionManager.promptControllerAttributeTestConfig({
+    actor: { name: "甲" }, trigger: "passive", label: "被动检定", source: null,
+    check: { label: "体魄", baseVal: 1, sysBonus: 0, sysLevel: 0 }
+  });
+  assert.throws(() => ask(), error => error instanceof XJZLScriptInteractionForbiddenError);
+  let threw = false;
+  try { ask(); } catch { threw = true; }
+  assert.equal(threw, true, "必须同步抛错而非 rejected Promise");
+  assert.throws(
+    () => ScriptInteractionManager.promptControllerAttributeTestConfig({
+      actor: { name: "甲" }, trigger: "not_a_trigger", label: "坏", source: null,
+      check: { label: "体魄", baseVal: 1, sysBonus: 0, sysLevel: 0 }
+    }),
+    /未知触发器/
+  );
+}
+pass("passive/calc 的检定配置中继同步抛错；未知触发器在入口报错");
+
+{
+  const result = await ScriptInteractionManager.promptControllerAttributeTestConfig({
+    actor: hostActor, trigger: "preTake", label: "检定", source: null,
+    check: { baseVal: 1, sysBonus: 0, sysLevel: 0 }
+  });
+  assert.equal(result.status, SCRIPT_INTERACTION_STATUS.ERROR);
+  assert.equal(result.reason, "check-label-required");
+}
+pass("检定配置数据无效时返回 error，不发起问询");
+
+{
+  setClient(localPlayer, [localPlayer, otherGM], "gm-other");
+  dialogConfigs = [];
+  closeCommands.length = 0;
+  renderTemplateCalls.length = 0;
+  const result = await withDialog([{ action: "roll", values: { bonus: 2, level: -1 } }], null, () =>
+    ScriptInteractionManager.promptControllerAttributeTestConfig({
+      actor: hostActor, trigger: "preTake", label: "护体检定", source: null,
+      check: { label: "体魄", baseVal: 16, sysBonus: 1, sysLevel: 0, defaultBonus: 0, defaultLevel: 0 }
+    }));
+  assert.equal(result.status, SCRIPT_INTERACTION_STATUS.ANSWERED);
+  assert.equal(result.action, "roll");
+  assert.deepEqual(result.values, { bonus: 2, level: -1 });
+  assert.equal(dialogConfigs.length, 1);
+  assert.equal(renderTemplateCalls.length, 1, "检定配置窗口复用系统模板");
+  assert.equal(renderTemplateCalls[0].path, "systems/xjzl-system/templates/apps/attribute-test-config.hbs");
+  assert.equal(renderTemplateCalls[0].data.label, "体魄");
+  assert.equal(renderTemplateCalls[0].data.baseVal, 16);
+  assert.equal(typeof renderTemplateCalls[0].data.formId, "string");
+  assert.equal(closeCommands.length, 0);
+}
+pass("本机检定配置中继：模板窗口收 bonus/level，零 RPC");
+
+{
+  setClient(remoteGM, [remoteGM, remotePlayer], "gm1");
+  dialogConfigs = [];
+  remotePlayer.nextQueryResult = data => ({
+    requestId: data.requestId, status: "answered", action: "roll", values: { bonus: 1, level: 2 }
+  });
+  const result = await withDialog([], null, () =>
+    ScriptInteractionManager.promptControllerAttributeTestConfig({
+      actor: remoteHost, trigger: "damaged", label: "反击检定", source: null,
+      check: { label: "棋术", baseVal: 8, sysBonus: 0, sysLevel: 0 }
+    }));
+  const call = remotePlayer.queryCalls.at(-1);
+  assert.equal(call.name, "xjzl.scriptInteraction");
+  const payload = JSON.parse(JSON.stringify(call.data));
+  assert.equal(payload.formType, "attributeTestConfig");
+  assert.deepEqual(payload.spec.check, { label: "棋术", baseVal: 8, sysBonus: 0, sysLevel: 0, defaultBonus: 0, defaultLevel: 0 });
+  assert.deepEqual(payload.spec.fields.map(field => field.name), ["bonus", "level"]);
+  assert.equal(result.status, SCRIPT_INTERACTION_STATUS.ANSWERED);
+  assert.deepEqual(result.values, { bonus: 1, level: 2 });
+}
+pass("远端检定配置中继：载荷只携带面板数据与 bonus/level 声明");
+
+{
+  // 接收端处理 attributeTestConfig 载荷：开窗 → 回答 → 原端收到经同一声明校验的答案
+  setClient(remotePlayer, [remoteGM, remotePlayer], "gm1");
+  dialogConfigs = [];
+  const configSpec = validateInteractionSpec(buildTestConfigSpec(
+    validateTestConfigContext({ label: "演奏", baseVal: 8, sysBonus: 0, sysLevel: 0 }).normalized,
+    { roll: "投掷", bonus: "加值", level: "层级" }
+  )).normalized;
+  const result = await withDialog([{ action: "roll", values: { bonus: 3, level: 0 } }], null, () =>
+    ScriptInteractionManager.handleInteractionQuery(
+      buildPayload({ requestId: "cfg-1", formType: "attributeTestConfig", spec: configSpec }),
+      { user: remoteGM }));
+  assert.equal(result.status, SCRIPT_INTERACTION_STATUS.ANSWERED);
+  assert.equal(result.action, "roll");
+  assert.deepEqual(result.values, { bonus: 3, level: 0 });
+  assert.equal(dialogConfigs.length, 1);
+}
+pass("接收端按同一声明处理检定配置载荷并回传 bonus/level");
+
+/* -------------------------------------------- */
+/*  N. rollAttributeTest 的 promptTarget（真实 actor.mjs） */
+/* -------------------------------------------- */
+
+console.log("N. rollAttributeTest 的 promptTarget（真实 actor.mjs）");
+
+const skillHost = Object.assign(Object.create(XJZLActor.prototype), {
+  uuid: "Actor.skill-host", name: "技能宿主", type: "character", isOwner: true,
+  ownership: { "p2": CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER },
+  system: {
+    resources: { hp: { value: 20, max: 100 }, mp: { value: 9, max: 10 }, rage: { value: 0, max: 10 } },
+    skills: { yanzou: { total: 30, checkMod: 0 }, shuxie: { total: 25, checkMod: 0 } }
+  },
+  _source: { system: { resources: { hp: { value: 20, max: 100 }, mp: { value: 9, max: 10 }, rage: { value: 0, max: 10 } } } },
+  xjzlStatuses: {},
+  effects: [],
+  _resourceScriptCache: false,
+  collectScripts: () => []
+});
+registry.set(skillHost.uuid, skillHost);
+// 来源必须以 Item 实例进入显式绑定选项，才能随问询做存在性复核。
+const scriptSourceItem = Object.assign(new Item(), { uuid: "Item.gujin", name: "古今秘谱" });
+registry.set("Item.gujin", scriptSourceItem);
+
+{
+  // caller 默认：无 promptTarget 时保持本机弹窗（DialogV2.wait），不发起任何问询 RPC
+  setClient(localPlayer, [localPlayer, otherGM], "gm-other");
+  remotePlayer.queryCalls.length = 0;
+  dialogWaitResult = { bonus: 3, level: -1 };
+  const roll = await skillHost.rollAttributeTest("yanzou", { bonus: 1 });
+  assert.equal(roll.total, 10 + 30 + 3, "本地弹窗返回值覆盖传入的默认加值后照常掷骰");
+  assert.equal(roll.formula, "2d20kl + @val + @bonus", "层级 -1 表达为劣势骰");
+  assert.equal(remotePlayer.queryCalls.length, 0);
+}
+pass("普通 caller 检定保持本机弹窗体验，零 RPC");
+
+{
+  // controller：本机 OWNER 决策 → 本地配置窗口 → 回答只取 bonus/level，Roll 留在本端
+  setClient(remotePlayer, [remoteGM, remotePlayer], "gm1");
+  dialogConfigs = [];
+  remotePlayer.queryCalls.length = 0;
+  renderTemplateCalls.length = 0;
+  const roll = await withDialog([{ action: "roll", values: { bonus: 2, level: 0 } }], null, () =>
+    skillHost.rollAttributeTest("yanzou", {
+      promptTarget: "controller",
+      interactionTrigger: "preTake",
+      interactionSource: scriptSourceItem,
+      interactionLabel: "古谱检定"
+    }));
+  assert.equal(roll.total, 10 + 30 + 2);
+  assert.equal(roll.formula, "1d20 + @val + @bonus");
+  assert.equal(dialogConfigs.length, 1, "本机决策开本地窗口");
+  assert.equal(renderTemplateCalls.length, 1);
+  assert.equal(remotePlayer.queryCalls.length, 0);
+}
+pass("controller 检定在本机 OWNER 客户端开配置窗口，掷骰与卡片仍在本端");
+
+{
+  // controller：宿主 OWNER 在远端 → 配置中继经 User.query，答案只回 bonus/level
+  setClient(remoteGM, [remoteGM, remotePlayer], "gm1");
+  remotePlayer.queryCalls.length = 0;
+  rollCalls.length = 0;
+  remotePlayer.nextQueryResult = data => ({
+    requestId: data.requestId, status: "answered", action: "roll", values: { bonus: 2, level: 1 }
+  });
+  const roll = await withDialog([], null, () =>
+    skillHost.rollAttributeTest("yanzou", {
+      promptTarget: "controller",
+      interactionTrigger: "damaged",
+      interactionSource: scriptSourceItem,
+      interactionLabel: "格挡反击",
+      flavor: "反击检定"
+    }));
+  const payload = JSON.parse(JSON.stringify(remotePlayer.queryCalls.at(-1).data));
+  assert.equal(payload.formType, "attributeTestConfig");
+  assert.equal(payload.trigger, "damaged", "触发器来自脚本显式绑定");
+  assert.equal(payload.spec.check.baseVal, 30);
+  assert.equal(payload.source.uuid, scriptSourceItem.uuid, "来源随显式绑定传输");
+  assert.deepEqual(payload.spec.fields.map(field => field.name), ["bonus", "level"]);
+  assert.equal(roll.total, 10 + 30 + 2, "远端答案回本端后才掷骰");
+  assert.equal(roll.formula, "2d20kh + @val + @bonus", "层级 +1 表达为优势骰");
+}
+pass("controller 检定经远端中继收集配置，Roll/发卡留在规则执行端");
+
+{
+  // controller：取消配置 → rollAttributeTest 返回 null（与本地取消契约一致）
+  setClient(remoteGM, [remoteGM, remotePlayer], "gm1");
+  rollCalls.length = 0;
+  remotePlayer.nextQueryResult = data => ({ requestId: data.requestId, status: "cancelled" });
+  const roll = await withDialog([], null, () =>
+    skillHost.rollAttributeTest("yanzou", { promptTarget: "controller", interactionTrigger: "damaged" }));
+  assert.equal(roll, null);
+  assert.equal(rollCalls.length, 0, "取消后不产生掷骰");
+}
+pass("controller 检定取消时返回 null，不掷骰");
+
+{
+  // controller：passive 触发器必须在调用语句本身同步抛错（同步脚本不能 await，
+  // rejected Promise 只会变成未处理拒绝），后续语句不得执行。
+  let reached = false;
+  const throwsSync = () => {
+    skillHost.rollAttributeTest("yanzou", { promptTarget: "controller", interactionTrigger: "passive" });
+    reached = true;
+  };
+  assert.throws(throwsSync, error => error instanceof XJZLScriptInteractionForbiddenError);
+  assert.equal(reached, false, "同步抛错发生在调用语句，未继续执行后续语句");
+
+  // 真实同步运行器验证：同步脚本（Function 编译，无 await）调用后语句不执行。
+  const syncScript = "actor.rollAttributeTest('yanzou', { promptTarget: 'controller', interactionTrigger: trigger });\nactor.marker = 'after-throw';";
+  const syncRunner = new Function("actor", "trigger", syncScript);
+  assert.throws(() => syncRunner(skillHost, "calc"), error => error instanceof XJZLScriptInteractionForbiddenError);
+  assert.equal(skillHost.marker, undefined, "同步运行器内调用即抛出，错误之后的语句未执行");
+
+  // 未知触发器与缺失绑定同样同步抛错：绑定上下文是 controller 中继的必要条件，
+  // 静默回退本机弹窗会把问询留在执行端，重新引入迁移要解决的问题。
+  assert.throws(
+    () => skillHost.rollAttributeTest("yanzou", { promptTarget: "controller", interactionTrigger: "not_a_trigger" }),
+    /未知触发器/
+  );
+  assert.throws(
+    () => skillHost.rollAttributeTest("yanzou", { promptTarget: "controller" }),
+    /未知触发器/
+  );
+}
+pass("controller 检定在同步入口立即抛错（passive/未知/未绑定）；真实同步运行器中错误后语句不执行");
+
+{
+  // skipDialog 保持零交互契约：不受 promptTarget 影响，无需交互参数即照常投骰
+  setClient(localPlayer, [localPlayer, otherGM], "gm-other");
+  remotePlayer.queryCalls.length = 0;
+  dialogConfigs = [];
+  rollCalls.length = 0;
+  const roll = await skillHost.rollAttributeTest("yanzou", { promptTarget: "controller", skipDialog: true });
+  assert.equal(roll.total, 10 + 30, "无手动修正时按面板等级投骰");
+  assert.equal(roll.formula, "1d20 + @val");
+  assert.equal(rollCalls.length, 1);
+  assert.equal(remotePlayer.queryCalls.length, 0);
+  assert.equal(dialogConfigs.length, 0);
+}
+pass("skipDialog 不受 promptTarget 影响：无需交互参数即可零交互投骰");
+
+/* -------------------------------------------- */
+/*  O. 真实迁移脚本：官方交互全链                     */
+/* -------------------------------------------- */
+
+console.log("O. 真实迁移脚本：官方交互全链");
+
+const loadEntry = (file, index, path) =>
+  path.split(".").reduce((value, key) => value?.[key], JSON.parse(readFileSync(resolve(root, file), "utf8"))[index]);
+
+/**
+ * 构造可跑真实 changeResources 的脚本宿主：isOwner、_source 资源齐备，
+ * effects 数组带 get(id)，资源脚本收集置空（resourceChanged 派发为空操作）。
+ */
+function makeScriptActor(name, { mp = 10, morale = null, rage = 0, flags = {}, effects = [] } = {}) {
+  const resources = {
+    hp: { value: 50, max: 100 },
+    mp: { value: mp, max: 200 },
+    rage: { value: rage, max: 10 }
+  };
+  const sourceResources = {
+    hp: { value: 50, max: 100 },
+    mp: { value: mp, max: 200 },
+    rage: { value: rage, max: 10 }
+  };
+  if (morale !== null) {
+    resources.morale = { value: morale, max: 10 };
+    sourceResources.morale = { value: morale, max: 10 };
+  }
+  const actor = Object.assign(Object.create(XJZLActor.prototype), {
+    uuid: `Actor.script-${++sequence}`, name, type: "character", isOwner: true,
+    ownership: {},
+    system: { resources, martial: { stance: "yinshen", stanceActive: true }, skills: {} },
+    _source: { system: { resources: sourceResources } },
+    xjzlStatuses: {},
+    _resourceScriptCache: false,
+    collectScripts: () => [],
+    effects,
+    _flags: flags,
+    getFlag(scope, key) { return this._flags[key]; },
+    showFloatyText(content) { this.floatyTexts = this.floatyTexts ?? []; this.floatyTexts.push(content); },
+    async applyHealing(data) {
+      this.healCalls = this.healCalls ?? [];
+      this.healCalls.push(data);
+      const resource = data.type === "mp" ? this.system.resources.mp : this.system.resources.hp;
+      const before = resource.value;
+      resource.value = Math.max(0, Math.min(resource.max, before + data.amount));
+      return { actualHeal: resource.value - before, type: data.type };
+    },
+    async stopStance() {
+      this.system.martial.stanceActive = false;
+      this.stanceStopped = true;
+    }
+  });
+  actor.effects.get = id => actor.effects.find(effect => effect.id === id) ?? null;
+  return actor;
+}
+
+function makeEffect(id, slug, stacks = null) {
+  return {
+    id,
+    name: slug,
+    _stacks: stacks,
+    // 真实 XJZLActiveEffect 暴露 stacks getter，官方脚本会直接读该属性
+    get stacks() { return this._stacks; },
+    getFlag(scope, key) {
+      if (key === "slug") return slug;
+      if (key === "stacks") return this._stacks;
+      // stacks 为 null 表示不可叠层的单条效果
+      if (key === "stackable") return this._stacks !== null;
+      return undefined;
+    }
+  };
+}
+
+/** 以 mock ask 执行迁移后脚本；askImpl(spec) 返回结构化答案。 */
+async function runScript(entry, actor, { askImpl, thisItem = null, args = null, trigger = "preTake" } = {}) {
+  const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
+  const fn = new AsyncFunction("ask", "actor", "S", "args", "thisItem", "move", "item", "trigger", "Macros", "game", "ui", "ChatMessage", "canvas", "foundry", entry.script);
+  const sandboxArgs = args ?? {};
+  await fn(
+    askImpl, actor, actor.system, sandboxArgs,
+    thisItem ?? { id: "item-src", name: "来源", system: { moves: [] }, effects: { getName: () => ({ toObject: () => ({ name: "模板", flags: { "xjzl-system": {} } }) }) } },
+    undefined, null, trigger, MacrosMock, game, ui, ChatMessage, undefined, foundry
+  );
+  return sandboxArgs;
+}
+
+/**
+ * 绑定运功来源与阶段：模拟 DataModel 派生的 item.system.stage / current.scripts，
+ * 供金刚、紫眸等脚本在等待后复核运功资格。thisItem 的 id 需与 itemId 一致。
+ */
+function bindNeigong(actor, itemId, stage, scriptLabel) {
+  actor.system.martial.active_neigong = itemId;
+  actor.items = {
+    get: id => id === itemId
+      ? { id: itemId, system: { stage, current: { scripts: [{ label: scriptLabel, trigger: "preTake", active: true }] } } }
+      : null
+  };
+}
+
+const jinGangEntry = loadEntry("data/neigong/wanfosi.json", 5, "system.config.stage2.scripts.0");
+
+{
+  // 金刚护体(1:2)：足额消耗按真实扣减兑现抵伤（运功来源与阶段资格复核通过）
+  const actor = makeScriptActor("金刚侠", { mp: 105 });
+  bindNeigong(actor, "item-src", 2, "金刚护体(1:2)");
+  const args = await runScript(jinGangEntry, actor, {
+    args: { type: "waigong", output: { damage: 10 } },
+    askImpl: async () => ({ status: "answered", action: "confirm", values: { spendCount: 3 } })
+  });
+  assert.equal(actor.system.resources.mp.value, 102);
+  assert.equal(args.output.damage, 4, "3 内力 × 2 比率 = 抵 6 点");
+}
+pass("金刚护体：足额消耗按真实扣减 1:2 抵伤");
+
+{
+  // 金刚护体：等待后内力跌破规则门槛（>100）时复核不通过，不扣费也不减伤
+  const actor = makeScriptActor("金刚侠", { mp: 105 });
+  bindNeigong(actor, "item-src", 2, "金刚护体(1:2)");
+  const args = await runScript(jinGangEntry, actor, {
+    args: { type: "waigong", output: { damage: 10 } },
+    askImpl: async () => {
+      actor.system.resources.mp.value = 2;
+      actor._source.system.resources.mp.value = 2;
+      return { status: "answered", action: "confirm", values: { spendCount: 3 } };
+    }
+  });
+  assert.equal(actor.system.resources.mp.value, 2, "门槛复核失败不扣费");
+  assert.equal(args.output.damage, 10, "门槛复核失败无免费减伤");
+}
+pass("金刚护体：等待后内力不满足门槛时放弃消耗与抵伤");
+
+{
+  // 金刚护体：等待期间切换运功（来源/阶段资格失效）时放弃消耗与抵伤
+  const actor = makeScriptActor("金刚侠", { mp: 105 });
+  bindNeigong(actor, "item-src", 2, "金刚护体(1:2)");
+  const args = await runScript(jinGangEntry, actor, {
+    args: { type: "waigong", output: { damage: 10 } },
+    askImpl: async () => {
+      actor.system.martial.active_neigong = "item-other";
+      return { status: "answered", action: "confirm", values: { spendCount: 3 } };
+    }
+  });
+  assert.equal(actor.system.resources.mp.value, 105, "运功来源已切换：不扣费");
+  assert.equal(args.output.damage, 10, "运功来源已切换：无免费减伤");
+}
+pass("金刚护体：等待后运功资格复核失败时放弃消耗与抵伤");
+
+{
+  // 金刚护体：取消与零值答案均不消耗、不减伤
+  for (const answer of [
+    { status: "cancelled" },
+    { status: "answered", action: "confirm", values: { spendCount: 0 } },
+    { status: "timedOut" }
+  ]) {
+    const actor = makeScriptActor("金刚侠", { mp: 105 });
+    bindNeigong(actor, "item-src", 2, "金刚护体(1:2)");
+    const args = await runScript(jinGangEntry, actor, {
+      args: { type: "waigong", output: { damage: 10 } },
+      askImpl: async () => answer
+    });
+    assert.equal(actor.system.resources.mp.value, 105, `${answer.status} 不扣内力`);
+    assert.equal(args.output.damage, 10, `${answer.status} 不减伤`);
+  }
+}
+pass("金刚护体：取消/超时/零值走默认分支，保留全额伤害");
+
+{
+  // 金刚护体：全链（真实 manager 与声明校验）下越界答案按 error 拒绝，不消耗不抵伤
+  setClient(localPlayer, [localPlayer, otherGM], "gm-other");
+  const actor = makeScriptActor("金刚侠", { mp: 105 });
+  actor.ownership["p1"] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+  registry.set(actor.uuid, actor);
+  const args = { type: "waigong", output: { damage: 10 } };
+  const ask = createScriptAsk({ actor, trigger: "preTake", label: "金刚护体(1:2)", source: null });
+  await withDialog([{ action: "confirm", values: { spendCount: 6 } }], null, () =>
+    runScript(jinGangEntry, actor, { args, askImpl: ask }));
+  assert.equal(actor.system.resources.mp.value, 105, "越界答案不扣内力");
+  assert.equal(args.output.damage, 10, "越界答案不抵伤");
+  registry.delete(actor.uuid);
+}
+pass("金刚护体：越界答案经真实声明校验拒绝，无免费收益");
+
+const ziMouEntry = loadEntry("data/neigong/jianghushili1.json", 69, "system.config.stage2.scripts.0");
+
+{
+  // 紫眸·护体：足额扣 10 内力才减 30；取消、扣费失败、内力不足、运功失效均无减伤
+  const paid = makeScriptActor("紫眸侠", { mp: 50 });
+  bindNeigong(paid, "item-src", 2, "紫眸·护体");
+  const paidArgs = await runScript(ziMouEntry, paid, {
+    args: { isCrit: true, type: "waigong", output: { damage: 45 } },
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(paid.system.resources.mp.value, 40);
+  assert.equal(paidArgs.output.damage, 15);
+
+  const cancelled = makeScriptActor("紫眸侠", { mp: 50 });
+  bindNeigong(cancelled, "item-src", 2, "紫眸·护体");
+  const cancelledArgs = await runScript(ziMouEntry, cancelled, {
+    args: { isCrit: true, output: { damage: 45 } },
+    askImpl: async () => ({ status: "cancelled" })
+  });
+  assert.equal(cancelled.system.resources.mp.value, 50);
+  assert.equal(cancelledArgs.output.damage, 45);
+
+  const failedPay = makeScriptActor("紫眸侠", { mp: 50 });
+  bindNeigong(failedPay, "item-src", 2, "紫眸·护体");
+  failedPay._cancelNextUpdate = true; // 提交被取消：凭证为空
+  const failedArgs = await runScript(ziMouEntry, failedPay, {
+    args: { isCrit: true, output: { damage: 45 } },
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(failedPay.system.resources.mp.value, 50);
+  assert.equal(failedArgs.output.damage, 45, "扣费未提交时不得免费减伤");
+
+  const emptyAfterWait = makeScriptActor("紫眸侠", { mp: 50 });
+  bindNeigong(emptyAfterWait, "item-src", 2, "紫眸·护体");
+  const emptyArgs = await runScript(ziMouEntry, emptyAfterWait, {
+    args: { isCrit: true, output: { damage: 45 } },
+    askImpl: async () => {
+      emptyAfterWait.system.resources.mp.value = 5;
+      emptyAfterWait._source.system.resources.mp.value = 5;
+      return { status: "answered", action: "confirm" };
+    }
+  });
+  assert.equal(emptyArgs.output.damage, 45, "等待后内力不足：不扣费也不减伤");
+
+  const switched = makeScriptActor("紫眸侠", { mp: 50 });
+  bindNeigong(switched, "item-src", 2, "紫眸·护体");
+  const switchedArgs = await runScript(ziMouEntry, switched, {
+    args: { isCrit: true, output: { damage: 45 } },
+    askImpl: async () => {
+      switched.system.martial.active_neigong = "item-other";
+      return { status: "answered", action: "confirm" };
+    }
+  });
+  assert.equal(switched.system.resources.mp.value, 50, "运功来源已切换：不扣费");
+  assert.equal(switchedArgs.output.damage, 45, "运功来源已切换：无免费减伤");
+}
+pass("紫眸·护体：先核实运功资格与扣费再减伤；取消/失败/不足/失效无免费收益");
+
+const yingYueEntry = loadEntry("data/wuxue/yuepu.json", 23, "effects.0.flags.xjzl-system.scripts.0");
+
+{
+  // 映月：实际移除 [映月] 才减免 40；来源缺失或移除失败不减免。
+  // yingyueRageBonus 由 AE 的 changes 派生：移除效果时随 Actor 重置消失。
+  const withDerivedRage = actor => {
+    const originalRemove = game.xjzl.api.effects.removeEffect;
+    game.xjzl.api.effects.removeEffect = async (target, slug, amount) => {
+      const result = await originalRemove(target, slug, amount);
+      if (target === actor && slug === "yingyue" && result) delete actor._flags.yingyueRageBonus;
+      return result;
+    };
+    return originalRemove;
+  };
+
+  const actor = makeScriptActor("映月侠", { rage: 3, flags: { yingyueRageBonus: 2 } });
+  actor.effects.push(makeEffect("yy1", "yingyue"));
+  const restoreRemove = withDerivedRage(actor);
+  let args;
+  try {
+    args = await runScript(yingYueEntry, actor, {
+      args: { type: "waigong", isCrit: true, output: { damage: 60 } },
+      askImpl: async () => ({ status: "answered", action: "confirm" })
+    });
+  } finally {
+    game.xjzl.api.effects.removeEffect = restoreRemove;
+  }
+  assert.equal(args.output.damage, 20);
+  assert.equal(actor.effects.length, 0, "[映月] 已实际移除");
+  assert.equal(actor._flags.yingyueRageBonus, undefined, "移除后派生加成已消失");
+  assert.equal(actor.system.resources.rage.value, 5, "天籁怒气按移除前读取的加成发放");
+
+  const missing = makeScriptActor("映月侠", { flags: {} });
+  const missingArgs = await runScript(yingYueEntry, missing, {
+    args: { type: "waigong", isCrit: true, output: { damage: 60 } },
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(missingArgs.output.damage, 60, "来源缺失时不减免");
+
+  const failed = makeScriptActor("映月侠", { flags: {} });
+  failed.effects.push(makeEffect("yy2", "yingyue"));
+  const originalRemove = game.xjzl.api.effects.removeEffect;
+  game.xjzl.api.effects.removeEffect = async (target, slug, amount) => {
+    if (target === failed && slug === "yingyue") return undefined;
+    return originalRemove(target, slug, amount);
+  };
+  try {
+    const failedArgs = await runScript(yingYueEntry, failed, {
+      args: { type: "waigong", isCrit: true, output: { damage: 60 } },
+      askImpl: async () => ({ status: "answered", action: "confirm" })
+    });
+    assert.equal(failedArgs.output.damage, 60, "移除失败不产生免费减伤");
+    assert.equal(failed.effects.length, 1);
+  } finally {
+    game.xjzl.api.effects.removeEffect = originalRemove;
+  }
+
+  const declined = makeScriptActor("映月侠", { flags: {} });
+  declined.effects.push(makeEffect("yy3", "yingyue"));
+  const declinedArgs = await runScript(yingYueEntry, declined, {
+    args: { type: "waigong", isCrit: true, output: { damage: 60 } },
+    askImpl: async () => ({ status: "cancelled" })
+  });
+  assert.equal(declinedArgs.output.damage, 60);
+  assert.equal(declined.effects.length, 1, "保留 [映月]");
+}
+pass("映月：怒气按移除前读取的派生加成兑现；来源缺失/移除失败/取消无免费收益");
+
+const xiaoAoEntry = loadEntry("data/wuxue/yuepu.json", 31, "effects.0.flags.xjzl-system.scripts.0");
+
+{
+  // 笑傲：实际移除 [笑傲] 才抵挡 30；非内外功类型不问询
+  const actor = makeScriptActor("笑傲侠");
+  actor.effects.push(makeEffect("xa1", "xiaoao"));
+  const args = await runScript(xiaoAoEntry, actor, {
+    args: { type: "waigong", output: { damage: 50 } },
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(args.output.damage, 20);
+  assert.equal(actor.effects.length, 0);
+
+  const mental = makeScriptActor("笑傲侠");
+  mental.effects.push(makeEffect("xa2", "xiaoao"));
+  let asked = 0;
+  const mentalArgs = await runScript(xiaoAoEntry, mental, {
+    args: { type: "mental", output: { damage: 50 } },
+    askImpl: async () => { asked += 1; return { status: "answered", action: "confirm" }; }
+  });
+  assert.equal(asked, 0, "精神伤害不触发问询");
+  assert.equal(mentalArgs.output.damage, 50);
+}
+pass("笑傲：实际移除 [笑傲] 才抵挡；类型门槛保持不变");
+
+const fanKeEntry = loadEntry("data/wuxue/fenghuayuan.json", 1, "system.moves.1.scripts.0");
+
+{
+  // 反客为主：默认一层失准不可跳过；气刃核实消耗后才加到两层
+  const noQiren = makeScriptActor("花雨侠");
+  await runScript(fanKeEntry, noQiren, {
+    args: { attacker: { name: "敌" } },
+    askImpl: async () => { throw new Error("无气刃不应问询"); }
+  });
+  assert.equal(addedEffects.at(-1).count, 1, "无气刃仍施加默认一层失准");
+
+  const cancelled = makeScriptActor("花雨侠");
+  cancelled.effects.push(makeEffect("qr1", "qiren", 2));
+  await runScript(fanKeEntry, cancelled, {
+    args: { attacker: { name: "敌" } },
+    askImpl: async () => ({ status: "cancelled" })
+  });
+  assert.equal(addedEffects.at(-1).count, 1, "取消时保留默认一层");
+  assert.equal(cancelled.effects.length, 1, "气刃保留");
+
+  const consumed = makeScriptActor("花雨侠");
+  consumed.effects.push(makeEffect("qr2", "qiren", 2));
+  await runScript(fanKeEntry, consumed, {
+    args: { attacker: { name: "敌" } },
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(addedEffects.at(-1).count, 2, "核实层数减少后施加两层");
+  assert.equal(consumed.effects.length, 1, "气刃 2→1 层");
+
+  const vanished = makeScriptActor("花雨侠");
+  vanished.effects.push(makeEffect("qr3", "qiren", 2));
+  await runScript(fanKeEntry, vanished, {
+    args: { attacker: { name: "敌" } },
+    askImpl: async () => {
+      vanished.effects.splice(0); // 等待期间气刃消失
+      return { status: "answered", action: "confirm" };
+    }
+  });
+  assert.equal(addedEffects.at(-1).count, 1, "来源已消失时回落到默认一层");
+
+  // 消耗抛出普通异常：不得吞掉默认一层失准
+  const throwing = makeScriptActor("花雨侠");
+  throwing.effects.push(makeEffect("qr4", "qiren", 2));
+  const originalRemove = game.xjzl.api.effects.removeEffect;
+  game.xjzl.api.effects.removeEffect = async (target, slug, amount) => {
+    if (target === throwing && slug === "qiren") throw new Error("数据库失败");
+    return originalRemove(target, slug, amount);
+  };
+  try {
+    await runScript(fanKeEntry, throwing, {
+      args: { attacker: { name: "敌" } },
+      askImpl: async () => ({ status: "answered", action: "confirm" })
+    });
+    assert.equal(addedEffects.at(-1).count, 1, "普通消耗异常后仍施加默认一层失准");
+  } finally {
+    game.xjzl.api.effects.removeEffect = originalRemove;
+  }
+
+  // 宿主删除等中止错误（含资源提交包装）必须向上透传，不能被默认分支吞掉
+  const aborting = makeScriptActor("花雨侠");
+  aborting.effects.push(makeEffect("qr5", "qiren", 2));
+  const abortError = new Error("宿主已删除");
+  abortError.name = "XJZLScriptAbortError";
+  game.xjzl.api.effects.removeEffect = async () => { throw abortError; };
+  try {
+    await assert.rejects(
+      () => runScript(fanKeEntry, aborting, {
+        args: { attacker: { name: "敌" } },
+        askImpl: async () => ({ status: "answered", action: "confirm" })
+      }),
+      error => error === abortError, "中止错误原样透传"
+    );
+  } finally {
+    game.xjzl.api.effects.removeEffect = originalRemove;
+  }
+}
+pass("反客为主：默认一层失准不可跳过；消耗异常保留默认后果且中止错误透传");
+
+const juXianEntry = loadEntry("data/wuxue/gunfa.json", 19, "system.moves.2.scripts.0");
+
+{
+  // 据险坚守：解除架招与延迟 AE 都成功才免除本次伤害
+  const actor = makeScriptActor("棍法侠");
+  const args = await runScript(juXianEntry, actor, {
+    args: { output: { damage: 40 } },
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(actor.stanceStopped, true);
+  assert.equal(args.output.damage, 0);
+  assert.equal(addedEffects.at(-1).slug.startsWith("delayed_pain_"), true, "延迟 AE 独立成条");
+
+  // 等待期间架招已被解除：复核不通过，正常承受
+  const droppedStance = makeScriptActor("棍法侠");
+  const droppedArgs = await runScript(juXianEntry, droppedStance, {
+    args: { output: { damage: 40 } },
+    askImpl: async () => {
+      MacrosMock.stanceActive = false;
+      return { status: "answered", action: "confirm" };
+    }
+  });
+  assert.equal(droppedArgs.output.damage, 40, "原架招已不在：不免除本次伤害");
+  assert.equal(droppedStance.stanceStopped, undefined);
+  MacrosMock.stanceActive = true;
+
+  // 解除架招被取消（stance 仍激活）：不得创建延期 AE，否则本次照常承受、
+  // 下一回合又结算一次延期伤害，造成重复承伤。
+  const failedStop = makeScriptActor("棍法侠");
+  failedStop.stopStance = async () => { /* 更新被取消：架招保持激活 */ };
+  const beforeDelayed = addedEffects.filter(e => String(e.slug).startsWith("delayed_pain_")).length;
+  const failedStopArgs = await runScript(juXianEntry, failedStop, {
+    args: { output: { damage: 40 } },
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  const afterDelayed = addedEffects.filter(e => String(e.slug).startsWith("delayed_pain_")).length;
+  assert.equal(failedStopArgs.output.damage, 40, "解除未完成：本次伤害照常结算");
+  assert.equal(afterDelayed, beforeDelayed, "解除未完成：不得创建延期伤害 AE");
+
+  // 延迟 AE 创建失败：不免除本次伤害，如实报告
+  const failedCreate = makeScriptActor("棍法侠");
+  const originalAdd = game.xjzl.api.effects.addEffect;
+  game.xjzl.api.effects.addEffect = async (target, data) => {
+    if (target === failedCreate && data?.flags?.["xjzl-system"]?.slug?.startsWith("delayed_pain_")) return null;
+    return originalAdd(target, data);
+  };
+  try {
+    const failedArgs = await runScript(juXianEntry, failedCreate, {
+      args: { output: { damage: 40 } },
+      askImpl: async () => ({ status: "answered", action: "confirm" })
+    });
+    assert.equal(failedArgs.output.damage, 40, "延期 AE 失败不能留下已免除的伤害");
+  } finally {
+    game.xjzl.api.effects.addEffect = originalAdd;
+  }
+
+  // 取消：正常承受
+  const declined = makeScriptActor("棍法侠");
+  const declinedArgs = await runScript(juXianEntry, declined, {
+    args: { output: { damage: 40 } },
+    askImpl: async () => ({ status: "declined" })
+  });
+  assert.equal(declinedArgs.output.damage, 40);
+}
+pass("据险坚守：确认后复核原架招，解除与延期都成功才免除伤害；部分失败如实报告");
+
+const chongFengEntry = loadEntry("data/wuxue/jiangjunying.json", 17, "effects.1.flags.xjzl-system.scripts.0");
+const juZhongEntry = loadEntry("data/wuxue/jiangjunying.json", 17, "effects.6.flags.xjzl-system.scripts.0");
+
+{
+  // 全军冲锋：扣费核实后保留增益；取消/士气不足/扣费失败按默认后果解除状态
+  const kept = makeScriptActor("号令侠", { morale: 8 });
+  kept.effects.push(makeEffect("hl1", "haoling_2"));
+  await runScript(chongFengEntry, kept, {
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(kept.system.resources.morale.value, 3);
+  assert.equal(kept.effects.length, 1, "扣费成功保留 [全军冲锋]");
+
+  const declined = makeScriptActor("号令侠", { morale: 8 });
+  declined.effects.push(makeEffect("hl2", "haoling_2"));
+  await runScript(chongFengEntry, declined, {
+    askImpl: async () => ({ status: "cancelled" })
+  });
+  assert.equal(declined.system.resources.morale.value, 8);
+  assert.equal(declined.effects.length, 0, "不消耗时按默认后果解除状态");
+
+  const insufficient = makeScriptActor("号令侠", { morale: 3 });
+  insufficient.effects.push(makeEffect("hl3", "haoling_2"));
+  await runScript(chongFengEntry, insufficient, {
+    askImpl: async () => { throw new Error("士气不足不应问询"); }
+  });
+  assert.equal(insufficient.effects.length, 0);
+
+  const droppedMorale = makeScriptActor("号令侠", { morale: 8 });
+  droppedMorale.effects.push(makeEffect("hl4", "haoling_2"));
+  await runScript(chongFengEntry, droppedMorale, {
+    askImpl: async () => {
+      droppedMorale.system.resources.morale.value = 2;
+      droppedMorale._source.system.resources.morale.value = 2;
+      return { status: "answered", action: "confirm" };
+    }
+  });
+  assert.equal(droppedMorale.system.resources.morale.value, 2, "等待后士气不足不扣费");
+  assert.equal(droppedMorale.effects.length, 0, "来源复核失败解除状态");
+
+  // 扣费抛错与扣费不足同责：普通异常进入解除增益分支，不保留增益也不吞日志
+  const thrown = makeScriptActor("号令侠", { morale: 8 });
+  thrown.effects.push(makeEffect("hl5", "haoling_2"));
+  thrown.changeResources = async () => { throw new Error("数据库失败"); };
+  await runScript(chongFengEntry, thrown, {
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(thrown.system.resources.morale.value, 8, "扣费抛错：士气不变");
+  assert.equal(thrown.effects.length, 0, "扣费抛错：按默认后果解除增益");
+
+  // 宿主删除等中止错误继续透传，不进入解除分支
+  const aborting = makeScriptActor("号令侠", { morale: 8 });
+  aborting.effects.push(makeEffect("hl6", "haoling_2"));
+  const abortError = new Error("宿主已删除");
+  abortError.name = "XJZLScriptAbortError";
+  aborting.changeResources = async () => { throw abortError; };
+  await assert.rejects(
+    () => runScript(chongFengEntry, aborting, { askImpl: async () => ({ status: "answered", action: "confirm" }) }),
+    error => error === abortError, "中止错误原样透传"
+  );
+}
+pass("号令·全军冲锋：扣费核实后才保留增益；取消/不足/抛错/失败按默认后果解除且中止透传");
+
+{
+  // 合军聚众：扣费核实后才回复；取消不消耗也不回复
+  const healed = makeScriptActor("号令侠", { morale: 6 });
+  await runScript(juZhongEntry, healed, {
+    askImpl: async () => ({ status: "answered", action: "confirm" })
+  });
+  assert.equal(healed.system.resources.morale.value, 1);
+  assert.deepEqual(healed.healCalls, [{ healer: healed, amount: 5, type: "hp", showScrolling: true }]);
+
+  const declined = makeScriptActor("号令侠", { morale: 6 });
+  await runScript(juZhongEntry, declined, {
+    askImpl: async () => ({ status: "cancelled" })
+  });
+  assert.equal(declined.system.resources.morale.value, 6);
+  assert.equal(declined.healCalls, undefined);
+}
+pass("号令·合军聚众：扣费核实后才回复，取消不消耗");
+
+const huangQuanEntry = loadEntry("data/neigong/jianghushili2.json", 4, "system.config.stage2.scripts.0");
+
+{
+  // 九死黄泉功：按具体文档核实层数减少后才回复；来源消失时不回复
+  const actor = makeScriptActor("黄泉侠");
+  const hq = makeEffect("hq1", "huangquanqi", 3);
+  actor.effects.push(hq);
+  await runScript(huangQuanEntry, actor, {
+    askImpl: async () => ({ status: "answered", action: "hp" })
+  });
+  assert.equal(actor.effects.length, 1, "黄泉气 3→2 层");
+  assert.deepEqual(actor.healCalls, [{ healer: actor, amount: 10, type: "hp", showScrolling: true }]);
+
+  const vanished = makeScriptActor("黄泉侠");
+  const hq2 = makeEffect("hq2", "huangquanqi", 3);
+  vanished.effects.push(hq2);
+  await runScript(huangQuanEntry, vanished, {
+    askImpl: async () => {
+      vanished.effects.splice(0); // 等待期间黄泉气消失（原地清空，保留 effects.get）
+      return { status: "answered", action: "hp" };
+    }
+  });
+  assert.equal(vanished.healCalls, undefined, "来源已消失不回复");
+
+  const declined = makeScriptActor("黄泉侠");
+  declined.effects.push(makeEffect("hq3", "huangquanqi", 1));
+  await runScript(huangQuanEntry, declined, {
+    askImpl: async () => ({ status: "answered", action: "decline" })
+  });
+  assert.equal(declined.healCalls, undefined);
+  assert.equal(declined.effects.length, 1, "不消耗保留黄泉气");
+}
+pass("九死黄泉功：按实际层数消耗兑现回复；来源消失与拒绝时不回复");
+
+const guJinEntry = loadEntry("data/neigong/jianghushili1.json", 6, "system.config.stage2.scripts.0");
+
+{
+  // 古今秘谱：ask 选择 + controller 检定（脚本显式绑定 trigger/来源），检定完成后覆盖书音值
+  const actor = makeScriptActor("古谱侠");
+  actor.ownership["p1"] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+  registry.set(actor.uuid, actor);
+  actor.system.skills.shuxie = { total: 25, checkMod: 0 };
+  setClient(localPlayer, [localPlayer, otherGM], "gm-other");
+  const setFlags = [];
+  actor.setFlag = async (scope, key, value) => { setFlags.push(value); };
+  await withDialog([{ action: "roll", values: { bonus: 0, level: 0 } }], null, () =>
+    runScript(guJinEntry, actor, { askImpl: async () => ({ status: "answered", action: "shuxie" }), trigger: "combatStart" }));
+  assert.deepEqual(setFlags, [10 + 25], "检定完成后覆盖书音值");
+  registry.delete(actor.uuid);
+}
+pass("古今秘谱：选择后 controller 检定并覆盖书音值");
+
+{
+  // 古今秘谱：检定取消（roll 为 null）时不覆盖书音值
+  const actor = makeScriptActor("古谱侠二");
+  actor.ownership["p1"] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+  registry.set(actor.uuid, actor);
+  actor.system.skills.yanzou = { total: 25, checkMod: 0 };
+  setClient(localPlayer, [localPlayer, otherGM], "gm-other");
+  const setFlags = [];
+  actor.setFlag = async (scope, key, value) => { setFlags.push(value); };
+  await withDialog([], null, () =>
+    runScript(guJinEntry, actor, { askImpl: async () => ({ status: "answered", action: "yanzou" }), trigger: "combatStart" }));
+  assert.deepEqual(setFlags, [], "检定取消时不覆盖书音值");
+  registry.delete(actor.uuid);
+}
+pass("古今秘谱：检定被取消时保留默认，不写书音值");
+
+const saiMaEntry = loadEntry("data/wuxue/yueqi.json", 9, "system.moves.2.scripts.0");
+
+{
+  // 赛马曲：controller 检定成功拉人倒地；取消时放弃反击
+  const actor = makeScriptActor("赛马侠");
+  actor.system.skills.yanzou = { total: 30, checkMod: 0 };
+  actor.ownership["p1"] = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+  registry.set(actor.uuid, actor);
+  setClient(localPlayer, [localPlayer, otherGM], "gm-other");
+  const attacker = { name: "骑手" };
+  await withDialog([{ action: "roll", values: { bonus: 0, level: 0 } }], null, () =>
+    runScript(saiMaEntry, actor, { args: { attacker }, trigger: "damaged" }));
+  assert.equal(addedEffects.at(-1).slug, "prone", "检定成功（30 ≥ 15）对攻击者施加倒地");
+  assert.equal(chatMessages.at(-1).speaker.actor, "赛马侠");
+  registry.delete(actor.uuid);
+
+  // 取消检定：放弃反击，不施加新状态
+  const before = addedEffects.length;
+  const cancelled = makeScriptActor("赛马侠");
+  cancelled.system.skills.yanzou = { total: 30, checkMod: 0 };
+  registry.set(cancelled.uuid, cancelled);
+  await withDialog([], null, () =>
+    runScript(saiMaEntry, cancelled, { args: { attacker: { name: "骑手" } }, trigger: "damaged" }));
+  assert.equal(addedEffects.length, before, "取消检定不触发新的倒地施加");
+  registry.delete(cancelled.uuid);
+}
+pass("赛马曲：controller 检定判空——取消时放弃反击且不误施状态");
+
+/* -------------------------------------------- */
+/*  P. 迁移数据断言：confirm 类弹窗默认按钮为否定项   */
+/* -------------------------------------------- */
+
+console.log("P. 迁移数据断言：confirm 类弹窗默认按钮为否定项");
+
+{
+  // 原 DialogV2.confirm 在 V14 中默认聚焦 no；迁移后 Enter 必须仍落在"保留/不消耗"侧，
+  // 不得把默认选择变成支付资源或触发效果。金刚/方圆源自 DialogV2.prompt（确认默认），不在清单内。
+  const confirmOrigin = [
+    ["data/neigong/jianghushili1.json", 69, "system.config.stage2.scripts.0"],
+    ["data/neigong/jianghushili1.json", 69, "system.config.stage3.scripts.0"],
+    ["data/wuxue/yuepu.json", 23, "effects.0.flags.xjzl-system.scripts.0"],
+    ["data/wuxue/yuepu.json", 23, "effects.1.flags.xjzl-system.scripts.0"],
+    ["data/wuxue/yuepu.json", 31, "effects.0.flags.xjzl-system.scripts.0"],
+    ["data/wuxue/yuepu.json", 31, "effects.1.flags.xjzl-system.scripts.1"],
+    ["data/wuxue/yuepu.json", 32, "effects.0.flags.xjzl-system.scripts.0"],
+    ["data/wuxue/yuepu.json", 32, "effects.1.flags.xjzl-system.scripts.1"],
+    ["data/wuxue/fenghuayuan.json", 1, "system.moves.1.scripts.0"],
+    ["data/wuxue/gunfa.json", 19, "system.moves.2.scripts.0"],
+    ["data/wuxue/jianfa.json", 0, "system.moves.2.scripts.0"],
+    ["data/wuxue/tushou.json", 7, "system.moves.0.scripts.0"],
+    ["data/wuxue/tushou.json", 8, "system.moves.0.scripts.0"],
+    ["data/wuxue/tushou.json", 29, "system.moves.2.scripts.0"],
+    ["data/wuxue/tushou.json", 53, "effects.0.flags.xjzl-system.scripts.3"],
+    ["data/neigong/jianghushili2.json", 4, "system.config.stage1.scripts.0"],
+    ["data/wuxue/jiangjunying.json", 17, "effects.1.flags.xjzl-system.scripts.0"],
+    ["data/wuxue/jiangjunying.json", 17, "effects.6.flags.xjzl-system.scripts.0"],
+    ["data/wuxue/jiangjunying.json", 17, "effects.7.flags.xjzl-system.scripts.0"]
+  ];
+  for (const [file, index, path] of confirmOrigin) {
+    const node = path.split(".").reduce((value, key) => value?.[key], JSON.parse(readFileSync(resolve(root, file), "utf8"))[index]);
+    const defaults = (node.script.match(/action:\s*["']([a-zA-Z_]+)["'][^}]*?default:\s*true/gs) ?? [])
+      .map(match => match.match(/action:\s*["']([a-zA-Z_]+)["']/)[1]);
+    assert.deepEqual(defaults, ["decline"], `${file} ${path} 的默认按钮应为 decline（保留/不消耗）`);
+  }
+}
+pass("confirm 类弹窗默认按钮保留否定项：Enter 不再默认支付资源");
 
 /* -------------------------------------------- */
 
