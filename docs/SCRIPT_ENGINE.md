@@ -69,6 +69,7 @@
 | `thisItem` | `Item` / `ActiveEffect` / `null` | 当前脚本来源。Item 脚本指向该 Item；AE 脚本指向该 AE。 |
 | `thisEffect` | `ActiveEffect` / `null` | 当前脚本来自 AE 时指向该 AE，否则为 `null`。 |
 | `Macros` | `XJZLMacros` | 系统公开宏工具，例如 `requestSave()`、`requestContest()` 和 `checkStance()`。 |
+| `ask` | `Function` | 用 `await ask(spec)` 收集玩家选择。详见[脚本交互（ask）](#脚本交互ask)。 |
 | `game` / `ui` / `console` | Foundry 全局对象 | 游戏对象、通知对象和控制台。 |
 
 脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 Foundry 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。生成随机 ID 时使用 `foundry.utils.randomID()`，不要依赖全局 `randomID`。
@@ -671,12 +672,12 @@ await actor.changeResources({
 `changeResources`、`applyDamage`、`applyHealing` 及其跨权限代理在资源事务失败时可能抛出 `XJZLResourceCommitError`。该错误包含 `committed`、`phase`、`cause`、`actorUuid`、`resourceChanges` 和 `originalError`，用于判断能否安全重试：
 
 - `committed: true`：数据库主更新已经提交，禁止自动重试，否则会造成二次伤害、治疗或重复资源变动。
-- `committed: false`：已确认主更新未提交，可以按业务规则重试。
+- `committed: false`：已确认主更新未提交；重试前仍需检查脚本此前是否已扣费或执行其他操作。
 - `committed: "unknown"`：无法确认是否提交，默认禁止自动重试；需要人工核对 Actor 当前值后再决定。
 - `phase` 标识失败阶段，例如 `database` 或 `resourceIntegrity`。
 - `resourceChanges` 为 `null` 表示失败时未能可靠计算变化数组；它不能用于判断资源是否已经变更。
 
-单个 `resourceChanged` 脚本错误仍由脚本执行器隔离并记录，不会抛出为 `XJZLResourceCommitError`。
+单个 `resourceChanged` 脚本的普通错误会被隔离并记录；宿主或脚本来源删除引起的中止会向上传播。已经发生的资源变化不会自动回滚。
 
 ## 状态 API
 
@@ -1077,6 +1078,53 @@ if (!Macros.checkStance(actor, args)) return;
 
 `checkStance()` 要求架招已开启、攻击未被判定为闪避、伤害类型为 `waigong` 或 `neigong`，且 `args.config.ignoreStance` 不为真。适用于 `preTake`、`damaged` 等防御侧脚本。
 
+## 脚本交互（ask）
+
+需要玩家选择时，在异步触发器中调用 `await ask(spec)`。它会把问题显示给本次决策人并返回选择结果；脚本仍负责复核条件、扣费和应用效果。
+
+### 决策人
+
+| 触发器 | 决策归属 |
+|---|---|
+| `passive` / `calc` | 禁止交互；ask 调用入口立即同步抛错 |
+| `preAttack` / `attack` / `check` / `preDamage` / `hit` / `hit_once` | 当前主动操作者 |
+| `avoided` / `preDefense` / `preTake` / `dying` / `death` / `damaged` / `resourceChanged` | 宿主控制者 |
+| `combatStart` / `turnStart` / `turnEnd` | 宿主控制者 |
+
+主动操作的问询显示在当前操作者客户端。选择宿主控制者时，依次使用：当前操作者（须为在线非 GM 所有者）→ 在用户配置中指定该角色的在线非 GM 所有者 → 按用户 ID 排序的其他在线非 GM 所有者 → 活动 GM。所有者判断包含默认所有者权限。
+
+一次问询固定决策人，脚本不能指定其他用户；无人可用时返回 `unavailable`，等待期间控制者失去权限时返回 `error`。
+
+### 表单与结果
+
+`spec` 必须包含 `title` 和至少一个 `buttons` 按钮，可选 `content`（HTML 说明）和 `fields`：
+
+- 按钮必填 `action`、`label`，可选 `icon`、`default`；`action` 不可重复，最多一个默认按钮。
+- 字段必填 `name`、`label`、`type: "integer"`；`value` 默认 `0`，可选 `min`、`max`。`name` 以英文字母或下划线开头，后接字母、数字或下划线。
+
+```javascript
+const answer = await ask({
+  title: "伏气功 - 护体决断",
+  content: "<p>每消耗 1 点内力可抵消 3 点伤害。</p>",
+  buttons: [{ action: "confirm", label: "确认消耗", default: true }],
+  fields: [{ name: "mpCost", label: "消耗内力", type: "integer", value: 4, min: 0, max: 4 }]
+});
+if (answer.status === "answered" && answer.action === "confirm") {
+  const wantCost = answer.values.mpCost;
+}
+```
+
+结果为 `{ requestId, status, action, values, reason }`。`status` 有 `answered`（已回答）、`cancelled`（已取消）、`timedOut`（超时）、`unavailable`（无人可答）、`error`（问询失败）。只有 `answered` 时才能读取 `action` 和 `values`，不要用 `if (answer)` 判断成功；选择了消耗数量不代表已经扣费。
+
+其他状态按脚本默认分支处理，通常放弃可选部分，同时保留规则要求的默认后果。宿主或脚本来源被删除会中止该宿主的后续脚本，不能当作普通取消继续执行。已发生的扣费和其他操作不会自动回滚。
+
+约束：
+
+- 每次问询最多等待 60 秒。
+- 输入必须是声明范围内的整数。零值合法；空值、非整数、非有限数和越界值按 `error` 处理。
+- 等待后重新读取 `actor.system`，复核来源仍生效、条件和余额；完成并核实实际消耗后，再修改伤害或授予收益。资源 API 的正常返回不一定代表足额支付，具体语义见[资源事务](#资源事务)。
+- 用 `fields` 定义输入控件，`content` 只用于说明。
+
 ## 常用安全模式
 
 画布距离判定使用 `canvas.grid.measurePath(waypoints).distance`，路径点传画布像素坐标（如 Token 的 `center`）。开启自定义距离规则且方格场景的对角线规则为“等效”时，`.distance` 按 1-2-2-2 家规计算；其他场景使用核心结果。总 `cost` 保留核心累计成本，不能当作家规距离。
@@ -1246,18 +1294,7 @@ if (args.isHit) {
 
 ### 玩家决策
 
-已有检定或对抗能力时使用 `Macros`。确实需要简单选择时使用 Foundry 的 `DialogV2`：
-
-```javascript
-const confirmed = await foundry.applications.api.DialogV2.confirm({
-  window: { title: "是否消耗状态？" },
-  content: "<p>消耗一层状态，使本次伤害 +10。</p>",
-  yes: { label: "消耗" },
-  no: { label: "保留" }
-});
-```
-
-Dialog 只能出现在异步触发器中。取消操作后的资源退款、状态恢复等行为必须由脚本明确处理。
+已有检定或对抗能力时使用 `Macros`，自定义选择使用[脚本交互（ask）](#脚本交互ask)。直接使用 Foundry 的 `DialogV2` 会固定在脚本执行端弹窗，不能代替跨客户端的玩家问询。
 
 ### 共享数组并发更新
 

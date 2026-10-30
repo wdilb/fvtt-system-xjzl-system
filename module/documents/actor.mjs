@@ -5,6 +5,8 @@ import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import * as MacrosModule from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
+import { ScriptInteractionManager } from "../managers/script-interaction-manager.mjs";
+import { isScriptAbortError } from "../utils/script-interaction-policy.mjs";
 import { queueHitEffect } from "../managers/combat-fx-manager.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
@@ -630,13 +632,22 @@ export class XJZLActor extends Actor {
         eventContext.move || eventContext.item
       );
     } catch (err) {
-      // 数据库主更新已提交；这里只记录并反馈派发失败，不向上抛出，避免调用方误判为未提交。
       console.error("XJZL | resourceChanged 派发失败", {
         actor: this.uuid,
         cause: eventContext.cause,
         changes,
         error: err
       });
+      if (isScriptAbortError(err) && (!err.actorUuid || err.actorUuid === this.uuid)) {
+        // 宿主删除等中止必须保持可识别并继续向上传播（脚本可能经 changeResources
+        // 再次进入运行器）；主更新已提交的事实随错误就地携带，调用端据此避免
+        // 把整笔业务当成未提交而重试造成二次变动。其他宿主的中止仍按普通错误隔离。
+        err.committed = true;
+        err.phase = "resourceChangedDispatch";
+        err.resourceChanges = changes;
+        throw err;
+      }
+      // 普通脚本错误保持隔离：只记录并反馈派发失败，不向上抛出，避免调用方误判为未提交。
       ui.notifications.error(game.i18n.format("XJZL.Script.Notifications.ResourceDispatchFailed", { name: this.name }));
     } finally {
       this._resourceEventContext = previousContext;
@@ -1547,6 +1558,37 @@ export class XJZLActor extends Actor {
   }
 
   /**
+   * 为当前脚本条目绑定闭包隔离的 ask，执行后恢复沙盒原状。
+   * ask 闭包绑定本次宿主、触发器与脚本来源，不使用全局“当前异步脚本”变量；
+   * passive/calc 绑定调用即同步抛错的桩函数，未知触发器在绑定时即报错。
+   * @param {Object} sandbox - 本次触发共享的脚本沙盒
+   * @param {Object} entry - 当前脚本条目（含 label 与 source）
+   * @returns {Function|null} 恢复函数；绑定失败（未知触发器）时返回 null
+   */
+  _bindScriptAsk(sandbox, entry) {
+    let boundAsk;
+    try {
+      boundAsk = ScriptInteractionManager.createScriptAsk({
+        actor: this,
+        trigger: sandbox.trigger,
+        label: entry.label,
+        source: entry.source ?? null
+      });
+    } catch (err) {
+      // 绑定即报错：交由当前条目的异常处理记录，不静默跳过。
+      console.error(`XJZL | 脚本交互绑定失败 [${entry.label}] (${this.name}):`, err);
+      return null;
+    }
+    const askExisted = Object.prototype.hasOwnProperty.call(sandbox, "ask");
+    const previousAsk = sandbox.ask;
+    sandbox.ask = boundAsk;
+    return () => {
+      if (askExisted) sandbox.ask = previousAsk;
+      else delete sandbox.ask;
+    };
+  }
+
+  /**
    * 临时把脚本来源招式注入 sandbox.move / args.move，并返回精确恢复函数。
    * @param {Object} sandbox - 本次触发共享的脚本沙盒
    * @param {Object} contextData - 来源招式数据
@@ -1591,6 +1633,7 @@ export class XJZLActor extends Actor {
     const actionMove = sandbox.move;
     for (const entry of scripts) {
       let restoreMove = null;
+      let restoreAsk = null;
       // 无资格脚本运行前快照攻击输入，脚本结束后立即还原；finally 中也要可访问，须在 try 外声明。
       let externalDamageInput = null;
       // 同步写入防护的恢复函数：脚本执行期间（含嵌套派生/面板计算）保持生效，异常退出同样恢复。
@@ -1619,6 +1662,8 @@ export class XJZLActor extends Actor {
         }
         // 临时注入来源招式，脚本执行后精确恢复，避免污染同一批后续脚本。
         restoreMove = this._injectContextMove(sandbox, entry.contextData);
+        // 同步触发器绑定调用即抛错的 ask 桩：passive/calc 禁止交互，调用入口立即同步报错。
+        restoreAsk = this._bindScriptAsk(sandbox, entry);
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
         // 每个脚本都可能通过 await 更新 Actor；重新绑定可避免同一触发批次中的后续脚本读取旧 system。
@@ -1657,6 +1702,7 @@ export class XJZLActor extends Actor {
         exitSyncGuard?.();
         restoreExternalDamageInput(sandbox, externalDamageInput);
         restoreMove?.();
+        restoreAsk?.();
         // 出栈：无论成功失败，保证栈的清洁
         this._scriptContextStack.pop();
       }
@@ -1682,6 +1728,7 @@ export class XJZLActor extends Actor {
 
     for (const entry of scripts) {
       let restoreMove = null;
+      let restoreAsk = null;
       // 无资格脚本运行前快照攻击输入，脚本结束后立即还原；finally 中也要可访问，须在 try 外声明。
       let externalDamageInput = null;
       try {
@@ -1708,6 +1755,8 @@ export class XJZLActor extends Actor {
         }
         // 临时注入来源招式，脚本执行后精确恢复，避免污染同一批后续脚本。
         restoreMove = this._injectContextMove(sandbox, entry.contextData);
+        // 为当前条目绑定闭包隔离的 ask；passive/calc 为同步抛错桩。
+        restoreAsk = this._bindScriptAsk(sandbox, entry);
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
         // 每个脚本都可能通过 await 更新 Actor；重新绑定可避免同一触发批次中的后续脚本读取旧 system。
@@ -1730,11 +1779,19 @@ export class XJZLActor extends Actor {
         const fn = getCompiledScript(AsyncFunction, paramNames, entry.script);
         await fn(...paramValues);
       } catch (err) {
+        // 中止可能被嵌套伤害入口包装为 XJZLResourceCommitError：按 scriptAbort 身份识别，
+        // 只放行本宿主的中止（其他宿主的中止仍按普通脚本错误隔离，不误停当前业务）。
+        if (isScriptAbortError(err) && (!err.actorUuid || err.actorUuid === this.uuid)) {
+          // 宿主删除等中止：向上透传并停止该宿主余下脚本；伤害入口按资源提交语义包装。
+          console.error(`XJZL | 脚本交互中止，停止余下脚本 [${entry.label}] (${this.name}):`, err);
+          throw err;
+        }
         console.error(`[XJZL] 异步脚本错误 [${entry.label}]:`, err);
         ui.notifications.error(game.i18n.format("XJZL.Script.Notifications.EffectExecutionFailed", { label: entry.label }));
       } finally {
         restoreExternalDamageInput(sandbox, externalDamageInput);
         restoreMove?.();
+        restoreAsk?.();
         // 出栈：无论成功失败，保证栈的清洁
         this._scriptContextStack.pop();
       }
@@ -2110,6 +2167,36 @@ export class XJZLActor extends Actor {
   }
 
   /**
+   * 执行伤害链中的单段脚本触发；宿主删除等脚本中止按既有资源错误语义包装，
+   * committed 标记真实主资源提交状态：调用端不能把已提交后效的失败当作整笔未提交，
+   * 也不会对可选费用（如 preTake 中已扣的内力）自动重试整笔业务。
+   * 普通脚本错误仍由脚本执行器隔离，不会进入本方法。
+   * @param {String} trigger - SCRIPT_TRIGGERS 中的触发器名
+   * @param {Object} context - 传给脚本的阶段上下文
+   * @param {Object} [options]
+   * @param {boolean} options.committed - 主资源更新是否已提交
+   * @param {Array} [options.resourceChanges] - 已提交时的实际资源变化
+   */
+  async _runDamageScripts(trigger, context, { committed, resourceChanges = null } = {}) {
+    try {
+      await this.runScripts(trigger, context);
+    } catch (err) {
+      // 嵌套伤害传来的中止可能已带包装：识别 scriptAbort 身份并保留原始中止，
+      // 使同一宿主的中止继续穿过外层调用（外层运行器同样按该身份识别）。
+      if (!isScriptAbortError(err)) throw err;
+      const wrapper = new XJZLResourceCommitError(`XJZL | 伤害流程因宿主删除中止 [${this.name}, ${trigger}]`, {
+        committed,
+        phase: `scriptAbort:${trigger}`,
+        actorUuid: this.uuid,
+        resourceChanges,
+        originalError: err
+      });
+      wrapper.scriptAbort = isScriptAbortError(err) && err.name === "XJZLScriptAbortError" ? err : err.scriptAbort;
+      throw wrapper;
+    }
+  }
+
+  /**
    * [核心] 伤害结算处理函数
    * 流程：AVOIDED -> PRE_DEFENSE -> (计算暴击/防御) -> PRE_TAKE -> (扣血) -> DAMAGED
    * 结算完成后广播受击视觉反馈；特效失败不改变结算结果。
@@ -2336,7 +2423,7 @@ export class XJZLActor extends Actor {
         outcome: { isHit: false, isBroken: isBroken } // 只读结果
       };
 
-      await this.runScripts(SCRIPT_TRIGGERS.AVOIDED, avoidContext);
+      await this._runDamageScripts(SCRIPT_TRIGGERS.AVOIDED, avoidContext, { committed: false });
 
       // 飘字：闪避
       this.showFloatyText("闪避", { fontSize: 32, fill: "#ffffff" });
@@ -2365,7 +2452,7 @@ export class XJZLActor extends Actor {
       config: config
     };
 
-    await this.runScripts(SCRIPT_TRIGGERS.PRE_DEFENSE, preDefContext);
+    await this._runDamageScripts(SCRIPT_TRIGGERS.PRE_DEFENSE, preDefContext, { committed: false });
 
     // PRE_DEFENSE 允许脚本修改效果和战斗属性；此处重新读取，避免后续减伤沿用旧快照。
     const combat = this.system.combat;
@@ -2470,7 +2557,7 @@ export class XJZLActor extends Actor {
       }
     };
 
-    await this.runScripts(SCRIPT_TRIGGERS.PRE_TAKE, takeContext);
+    await this._runDamageScripts(SCRIPT_TRIGGERS.PRE_TAKE, takeContext, { committed: false });
 
     // 脚本可能强行中止 (如无敌)
     if (takeContext.output.abort) {
@@ -2577,18 +2664,29 @@ export class XJZLActor extends Actor {
     if (totalMpLost > 0) updates["system.resources.mp.value"] = currentMP;
 
     let resourceTransaction = { result: null, changes: [] };
+    // committed 必须反映真实提交结果：更新被 preUpdate 取消或无实际差值时按未提交处理，
+    // 不能因进入濒死/死亡/受击后效阶段就假定主资源已提交。
+    let mainResourceCommitted = false;
     if (!foundry.utils.isEmpty(updates)) {
-      // 先提交资源，待 DYING/DEATH/DAMAGED 原有流程完成后再派发资源后效。
-      resourceTransaction = await this._commitResourceChanges(updates, {
-        cause: "damage",
-        attacker,
-        target: this,
-        type,
-        damageType: type,
-        element: config.element,
-        move,
-        item,
-        source
+      // 采样与判定必须在同一资源锁内完成：锁外余额差会混入排队期间其他操作的变化，
+      // 不能用锁外余额差证明本笔提交。快照在 preTake 脚本（可能已扣可选费用）之后、
+      // 本笔提交边界内取值，只度量本次伤害提交本身的差值。
+      await this._withResourceCommitLock(async () => {
+        const applicableFields = this._getApplicableResourceFields();
+        const beforeDamage = this._snapshotResources(applicableFields);
+        // 先提交资源，待 DYING/DEATH/DAMAGED 原有流程完成后再派发资源后效。
+        resourceTransaction = await this._commitResourceChanges(updates, {
+          cause: "damage",
+          attacker,
+          target: this,
+          type,
+          damageType: type,
+          element: config.element,
+          move,
+          item,
+          source
+        }, {}, { lockHeld: true });
+        mainResourceCommitted = this._computeResourceChanges(applicableFields, beforeDamage).length > 0;
       });
     }
 
@@ -2613,7 +2711,7 @@ export class XJZLActor extends Actor {
       // 如果是“刚被打入濒死(isDying)” 必定触发
       // 如果是“躺着被鞭尸(isHitWhileDying)”，则必须来源有效才触发
       if (isDying || (isHitWhileDying && validWhipCorpse)) {
-        await this.runScripts(SCRIPT_TRIGGERS.DYING, statusCtx);
+        await this._runDamageScripts(SCRIPT_TRIGGERS.DYING, statusCtx, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes });
         if (statusCtx.preventDying) {
           isDying = false;
         } else {
@@ -2641,7 +2739,7 @@ export class XJZLActor extends Actor {
 
       // B. 死亡判定
       if (isDead) {
-        await this.runScripts(SCRIPT_TRIGGERS.DEATH, statusCtx);
+        await this._runDamageScripts(SCRIPT_TRIGGERS.DEATH, statusCtx, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes });
 
         if (statusCtx.preventDeath) {
           isDead = false;
@@ -2687,7 +2785,7 @@ export class XJZLActor extends Actor {
       item: item
     };
 
-    await this.runScripts(SCRIPT_TRIGGERS.DAMAGED, damagedContext);
+    await this._runDamageScripts(SCRIPT_TRIGGERS.DAMAGED, damagedContext, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes });
 
     await this._dispatchResourceChanges(resourceTransaction.changes, {
       cause: "damage",
@@ -3096,6 +3194,19 @@ export class XJZLActor extends Actor {
           {},
           { lockHeld: true }
         );
+        // 事实值契约：actualHeal/newVal 必须反映真实提交的差值。更新被 preUpdate
+        // 拦截取消或提交前资源已变化时，预计算值会失真；在锁内重读当前值修正，
+        // 避免调用方按未发生的消耗兑现收益（如伏气护体按实际负向 actualHeal 抵伤）。
+        const field = RESOURCE_FIELDS.find(candidate =>
+          candidate.key === (type === "neili" ? "mp" : type));
+        if (field) {
+          const afterValue = this._readResourceValue(field);
+          const committedDelta = Number.isFinite(afterValue) ? afterValue - oldVal : 0;
+          if (committedDelta !== actualHeal) {
+            actualHeal = committedDelta;
+            newVal = oldVal + committedDelta;
+          }
+        }
       }
     });
 

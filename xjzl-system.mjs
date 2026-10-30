@@ -52,6 +52,8 @@ import { CombatReorderManager } from "./module/managers/combat-reorder-manager.m
 import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs";
 import { CombatStatsManager } from "./module/managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./module/managers/encounter-manager.mjs";
+import { ScriptInteractionManager, initScriptInteraction } from "./module/managers/script-interaction-manager.mjs";
+import { SCRIPT_INTERACTION_QUERY_NAME } from "./module/utils/script-interaction-policy.mjs";
 
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
@@ -90,6 +92,13 @@ Hooks.once("init", async function () {
 
   // 1. 将自定义配置挂载到全局 CONFIG
   CONFIG.XJZL = XJZL;
+
+  // 脚本交互（ask）问答通道：所有客户端都可能作为决策人接收问题。
+  // 处理入口校验真实发送者、宿主、接收者与载荷后打开本地表单。
+  CONFIG.queries[SCRIPT_INTERACTION_QUERY_NAME] = (data, context) =>
+    ScriptInteractionManager.handleInteractionQuery(data, context);
+  // 问答生命周期钩子：断线取消与宿主删除中止。
+  initScriptInteraction();
 
   // 类型声明位于 system.json；客户端模型需在本地化扫描前注册。
   registerAuraBehavior();

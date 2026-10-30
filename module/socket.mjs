@@ -1,6 +1,7 @@
 import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./managers/encounter-manager.mjs";
 import { XJZLContainerTransactionManager } from "./managers/container-transaction-manager.mjs";
+import { ScriptInteractionManager } from "./managers/script-interaction-manager.mjs";
 import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
 import { assertNoSyncScriptWrite } from "./utils/sync-script-guard.mjs";
 import { AuraLedger } from "./region/xjzl-aura-ledger.mjs";
@@ -48,6 +49,8 @@ export function setupSocket() {
     xjzlSocket.register("containerNeedPrompt", _socketContainerNeedPrompt);
     xjzlSocket.register("containerConcedePrompt", _socketContainerConcedePrompt);
     xjzlSocket.register("containerNeedResult", _socketContainerNeedResult);
+    // 脚本交互问答的纯 UI 关闭通知：只用于结束已终结请求的本地窗口。
+    xjzlSocket.register("scriptInteractionCloseUI", ScriptInteractionManager.handleCloseNotification);
 
     Hooks.on("xjzl.containerNeedTimeout", async request => {
         if (!game.user.isGM || !game.users.activeGM?.isSelf) return;
