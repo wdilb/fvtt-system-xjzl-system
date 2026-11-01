@@ -739,7 +739,7 @@
                     "label": "万刃流失",
                     "trigger": "turnStart",
                     "active": true,
-                    "script": "if (game.combat) {\n    ui.notifications.info(`${actor.name} 受到万刃反噬！`);\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', isHit: true });\n    // 扣除内力\n    const newMp = Math.max(0, actor.system.resources.mp.value - 20);\n    await actor.changeResources({ 'system.resources.mp.value': newMp }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}"
+                    "script": "if (combat) {\n    ui.notifications.info(`${actor.name} 受到万刃反噬！`);\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', isHit: true });\n    // 扣除内力\n    const newMp = Math.max(0, actor.system.resources.mp.value - 20);\n    await actor.changeResources({ 'system.resources.mp.value': newMp }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}"
                 }
             ]
         }
@@ -1409,13 +1409,13 @@
                     "label": "清辉华盖光环",
                     "trigger": "combatStart",
                     "active": true,
-                    "script": "// 清辉华盖：进战后生成 1 米跟随范围显示（卸下武器或脱战时消散）；\n// 恢复结算在主人回合初由[清辉回护]脚本按规则时点执行。\nawait game.xjzl.aura.create(actor, {\n    label: \"weapon-qinghui-\" + actor.id,\n    displayName: \"清辉华盖\",\n    follow: true,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"equip\",\n    sourceItemUuid: thisItem.uuid,\n    combatId: game.combat?.id ?? null\n});"
+                    "script": "// 清辉华盖：进战后生成 1 米跟随范围显示（卸下武器或脱战时消散）；\n// 恢复结算在主人回合初由[清辉回护]脚本按规则时点执行。\nawait game.xjzl.aura.create(combatant?.token, {\n    label: \"weapon-qinghui-\" + actor.id,\n    displayName: \"清辉华盖\",\n    follow: true,\n    radius: 1,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    lifecycle: \"equip\",\n    sourceItemUuid: thisItem.uuid,\n    combatId: combat?.id ?? null\n});"
                 },
                 {
                     "label": "清辉回护",
                     "trigger": "turnStart",
                     "active": true,
-                    "script": "// 清辉回护：主人回合初为范围内友方（含己）恢复 5 点护体真气。\nconst qhRegion = game.xjzl.aura.query(\"weapon-qinghui-\" + actor.id, {source: actor})[0];\nif (!qhRegion) return;\nconst qhOwnerTok = actor.getActiveTokens?.()[0];\nif (!qhOwnerTok) return;\nconst qhOwnerDisp = qhOwnerTok.document?.disposition ?? qhOwnerTok.disposition;\nfor (const qhT of qhRegion.tokens) {\n    if (!qhT.actor) continue;\n    if (qhT.disposition !== qhOwnerDisp) continue;\n    await qhT.actor.applyHealing({ amount: 5, type: \"huti\", healer: actor });\n}"
+                    "script": "// 清辉回护：主人回合初为范围内友方（含己）恢复 5 点护体真气。\nconst qhRegion = game.xjzl.aura.query(\"weapon-qinghui-\" + actor.id, {scene: combatant?.token?.parent, source: combatant?.token})[0];\nif (!qhRegion) return;\nconst qhOwnerTok = combatant?.token;\nif (!qhOwnerTok) return;\nconst qhOwnerDisp = qhOwnerTok.document?.disposition ?? qhOwnerTok.disposition;\nfor (const qhT of qhRegion.tokens) {\n    if (!qhT.actor) continue;\n    if (qhT.disposition !== qhOwnerDisp) continue;\n    await qhT.actor.applyHealing({ amount: 5, type: \"huti\", healer: actor });\n}"
                 }
             ]
         }
@@ -2111,7 +2111,7 @@
                     "label": "万刃噬主",
                     "trigger": "turnStart",
                     "active": true,
-                    "script": "if (actor) {\n    // 流失气血 (真实伤害)\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', ignoreDefense: true, isHit: true });\n    // 扣除内力\n    const currentMp = actor.system.resources.mp.value;\n    if (currentMp > 0) {\n        await actor.changeResources({ 'system.resources.mp.value': Math.max(0, currentMp - 20) }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        if (actor.token?.object) {\n            actor.showFloatyText('-20 内力', { \n                fill: '#0000FF', stroke: '#000000', strokeThickness: 4 \n            });\n        }\n    }\n}"
+                    "script": "if (actor) {\n    // 流失气血 (真实伤害)\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', ignoreDefense: true, isHit: true });\n    // 扣除内力\n    const currentMp = actor.system.resources.mp.value;\n    if (currentMp > 0) {\n        await actor.changeResources({ 'system.resources.mp.value': Math.max(0, currentMp - 20) }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        if (actor.token) {\n            actor.showFloatyText('-20 内力', { \n                fill: '#0000FF', stroke: '#000000', strokeThickness: 4 \n            });\n        }\n    }\n}"
                 }
             ]
         },
@@ -2934,7 +2934,7 @@
                     "label": "万刃噬主",
                     "trigger": "turnStart",
                     "active": true,
-                    "script": "if (actor) {\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', ignoreDefense: true, isHit: true });\n    const currentMp = actor.system.resources.mp.value;\n    if (currentMp > 0) {\n        await actor.changeResources({ 'system.resources.mp.value': Math.max(0, currentMp - 20) }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        if (actor.token?.object) {\n            actor.showFloatyText('-20 内力', { \n                fill: '#0000FF', stroke: '#000000', strokeThickness: 4 \n            });\n        }\n    }\n}"
+                    "script": "if (actor) {\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', ignoreDefense: true, isHit: true });\n    const currentMp = actor.system.resources.mp.value;\n    if (currentMp > 0) {\n        await actor.changeResources({ 'system.resources.mp.value': Math.max(0, currentMp - 20) }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        if (actor.token) {\n            actor.showFloatyText('-20 内力', { \n                fill: '#0000FF', stroke: '#000000', strokeThickness: 4 \n            });\n        }\n    }\n}"
                 }
             ]
         },
@@ -3757,7 +3757,7 @@
                     "label": "万刃噬主",
                     "trigger": "turnStart",
                     "active": true,
-                    "script": "if (actor) {\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', ignoreDefense: true, isHit: true });\n    const currentMp = actor.system.resources.mp.value;\n    if (currentMp > 0) {\n        await actor.changeResources({ 'system.resources.mp.value': Math.max(0, currentMp - 20) }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        if (actor.token?.object) {\n            actor.showFloatyText('-20 内力', { \n                fill: '#0000FF', stroke: '#000000', strokeThickness: 4 \n            });\n        }\n    }\n}"
+                    "script": "if (actor) {\n    await actor.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', ignoreDefense: true, isHit: true });\n    const currentMp = actor.system.resources.mp.value;\n    if (currentMp > 0) {\n        await actor.changeResources({ 'system.resources.mp.value': Math.max(0, currentMp - 20) }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        if (actor.token) {\n            actor.showFloatyText('-20 内力', { \n                fill: '#0000FF', stroke: '#000000', strokeThickness: 4 \n            });\n        }\n    }\n}"
                 }
             ]
         },

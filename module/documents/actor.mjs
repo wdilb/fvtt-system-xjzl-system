@@ -1568,6 +1568,7 @@ export class XJZLActor extends Actor {
    * 为当前脚本条目绑定闭包隔离的 ask，执行后恢复沙盒原状。
    * ask 闭包绑定本次宿主、触发器与脚本来源，不使用全局“当前异步脚本”变量；
    * passive/calc 绑定调用即同步抛错的桩函数，未知触发器在绑定时即报错。
+   * 进战/回合触发器额外绑定事件 Combat 作用域，战斗删除时由管理器取消问询。
    * @param {Object} sandbox - 本次触发共享的脚本沙盒
    * @param {Object} entry - 当前脚本条目（含 label 与 source）
    * @returns {Function|null} 恢复函数；绑定失败（未知触发器）时返回 null
@@ -1579,7 +1580,12 @@ export class XJZLActor extends Actor {
         actor: this,
         trigger: sandbox.trigger,
         label: entry.label,
-        source: entry.source ?? null
+        source: entry.source ?? null,
+        // 普通受击不因 game.combat 存在就绑定战斗作用域；仅生命周期触发器
+        // 且上下文确有事件 Combat 时携带。
+        combat: GLOBAL_WUXUE_TRIGGERS.includes(sandbox.trigger)
+          ? (sandbox.args?.combat ?? null)
+          : null
       });
     } catch (err) {
       // 绑定即报错：交由当前条目的异常处理记录，不静默跳过。
@@ -1880,11 +1886,14 @@ export class XJZLActor extends Actor {
     const sourceDoc = options.interactionSource instanceof Item
       ? options.interactionSource
       : (options.interactionSource instanceof ActiveEffect ? options.interactionSource : null);
+    // 事件 Combat 同样由脚本显式传入：异步交错下 Actor 共用的脚本栈顶不属于
+    // 当前调用者，进战/回合触发器应传 args.combat 以绑定战斗作用域（删除时取消）。
     const answer = await ScriptInteractionManager.promptControllerAttributeTestConfig({
       actor: this,
       trigger: options.interactionTrigger,
       label: options.interactionLabel ?? context.label,
       source: sourceDoc,
+      combat: options.interactionCombat ?? null,
       check: context
     });
     // 只有 answered 携带 action/values；取消/超时按既有契约返回 null，中止错误向上透传。

@@ -713,7 +713,9 @@ export class AuraManager {
      * @returns {object} meta
      */
     static #buildMeta(params, resolved, sourceInfo, uniqueness) {
-        const combat = game.combat;
+        // 时限锚定优先使用调用方声明的战斗：战斗流转脚本在活动 GM 本地执行，
+        // GM 当前查看的战斗（game.combat）可能不是本次事件的战斗。
+        const combat = game.combats.get(params.combatId) ?? game.combat;
         const lifecycle = params.lifecycle || "manual";
         // 时限以创建时轮次为基准，每轮开始由 updateCombat 统一递减；
         // 时限锚定创建时的战斗（combatId）：普通生命周期光环设了

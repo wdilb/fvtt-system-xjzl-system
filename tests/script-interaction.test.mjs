@@ -130,9 +130,11 @@ const MacrosMock = {
 };
 globalThis.Macros = MacrosMock;
 
+const mockCombat = { id: "combat-mock", uuid: "Combat.combat-mock", round: 1 }; // 作用域判断要求同一实例且 round>0
 globalThis.game = {
   user: null,
   users: [],
+  combats: { get: id => (id === mockCombat.id ? mockCombat : null) }, // 第三步作用域复核用
   settings: { get: () => false },
   time: { get serverTime() { return serverTime; } },
   i18n: {
@@ -2126,12 +2128,13 @@ function makeEffect(id, slug, stacks = null) {
 /** 以 mock ask 执行迁移后脚本；askImpl(spec) 返回结构化答案。 */
 async function runScript(entry, actor, { askImpl, thisItem = null, args = null, trigger = "preTake" } = {}) {
   const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
-  const fn = new AsyncFunction("ask", "actor", "S", "args", "thisItem", "move", "item", "trigger", "Macros", "game", "ui", "ChatMessage", "canvas", "foundry", entry.script);
+  const fn = new AsyncFunction("ask", "actor", "S", "args", "thisItem", "move", "item", "trigger", "Macros", "game", "ui", "ChatMessage", "canvas", "foundry", "combat", entry.script);
   const sandboxArgs = args ?? {};
   await fn(
     askImpl, actor, actor.system, sandboxArgs,
     thisItem ?? { id: "item-src", name: "来源", system: { moves: [] }, effects: { getName: () => ({ toObject: () => ({ name: "模板", flags: { "xjzl-system": {} } }) }) } },
-    undefined, null, trigger, MacrosMock, game, ui, ChatMessage, undefined, foundry
+    undefined, null, trigger, MacrosMock, game, ui, ChatMessage, undefined, foundry,
+    mockCombat // 第三步：进战/回合脚本显式引用事件 combat（与 combats mock 同一实例）
   );
   return sandboxArgs;
 }

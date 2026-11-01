@@ -8,6 +8,7 @@
 
 import { xjzlSocket } from "../socket.mjs";
 import { openScriptInteractionDialog } from "../applications/script-interaction-dialog.mjs";
+import { isCombatEventLive } from "../utils/combat-lifecycle.mjs";
 import {
   SCRIPT_INTERACTION_QUERY_NAME,
   SCRIPT_INTERACTION_CLOSE_COMMAND,
@@ -33,6 +34,8 @@ import {
 
 // 原端等待记录：requestId → { requestId, actorUuid, recipientUserId, remote, abort, cancelWith }
 const outboundAsks = new Map();
+// 事件作用域索引：Combat ID → 该战斗下待答请求 ID 集合；战斗删除时统一取消。
+const outboundAsksByCombat = new Map();
 // 接收端窗口登记：requestId → { requesterUserId, actorUuid, expiresAt, closeRequested, dialog }
 const inboundWindows = new Map();
 // 接收端终态记录：requestId → 记录到期时间；只用于防重复弹窗，过期回收。
@@ -50,10 +53,12 @@ const terminalRecords = new Map();
  * @param {string} params.trigger - 当前触发器（SCRIPT_TRIGGERS 之一）
  * @param {string} params.label - 脚本标签，用于日志定位
  * @param {Document|null} params.source - 脚本来源（Item/AE 等，可为 null）
+ * @param {Combat|null} [params.combat] - 生命周期触发器的事件 Combat；
+ *   提供时问询绑定该战斗作用域，战斗删除时按取消结算
  * @returns {Function} ask(spec)；passive/calc 返回调用即同步抛错的桩函数
  * @throws {Error} 未知触发器在绑定时立即报错
  */
-export function createScriptAsk({ actor, trigger, label, source }) {
+export function createScriptAsk({ actor, trigger, label, source, combat = null }) {
   const decision = resolveInteractionDecision(trigger);
   if (!decision) {
     throw new Error(`XJZL | 未知触发器不能绑定脚本交互 [${actor?.name}, ${trigger}, ${label}]`);
@@ -70,7 +75,7 @@ export function createScriptAsk({ actor, trigger, label, source }) {
       );
     };
   }
-  return spec => executeAsk({ actor, trigger, label, sourceInfo, decision, spec });
+  return spec => executeAsk({ actor, trigger, label, sourceInfo, decision, spec, combat });
 }
 
 /** 序列化脚本来源为普通 JSON；只保留身份字段，不传函数或文档实例。 */
@@ -92,11 +97,12 @@ function buildSourceInfo(source) {
  * @param {string} params.trigger - 当前脚本触发器
  * @param {string} params.label - 脚本标签，用于日志定位
  * @param {Document|null} params.source - 脚本来源（Item/AE 等，可为 null）
+ * @param {Combat|null} [params.combat] - 生命周期触发器的事件 Combat 作用域
  * @param {object} params.check - validateTestConfigContext 形状的面板数据
  * @returns {Promise<{requestId, status, action, values, reason}>}
  *   answered 且 action 为 "roll" 时 values 为 { bonus, level }。
  */
-export function promptControllerAttributeTestConfig({ actor, trigger, label, source, check }) {
+export function promptControllerAttributeTestConfig({ actor, trigger, label, source, combat = null, check }) {
   const decision = resolveInteractionDecision(trigger);
   if (!decision) {
     throw new Error(`XJZL | 未知触发器不能发起检定配置问询 [${actor?.name}, ${trigger}, ${label}]`);
@@ -124,6 +130,7 @@ export function promptControllerAttributeTestConfig({ actor, trigger, label, sou
     label,
     sourceInfo: buildSourceInfo(source),
     decision,
+    combat,
     spec
   });
 }
@@ -141,10 +148,11 @@ function failedResult(requestId, status, reason) {
  * 执行一次问答：按决策归属锁定决策人、生成本协议载荷并等待结果。
  * 当前主动操作者触发器本机决策；宿主控制者触发器按归属顺序选择。
  * 表单类型由声明派生：含 check 块为 attributeTestConfig，否则为 form。
+ * 携带事件 Combat 时登记战斗作用域，战斗删除时按取消结算（不重问、不换人）。
  * @returns {Promise<{requestId, status, action, values, reason}>}
  *   宿主/来源删除时以 XJZLScriptAbortError 拒绝，交由脚本运行器透传。
  */
-async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec }) {
+async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec, combat = null }) {
   const specCheck = validateInteractionSpec(spec);
   if (!specCheck.ok) {
     console.warn(`XJZL | 脚本交互声明无效 [${actor?.name}, ${trigger}, ${label}]: ${specCheck.reason}`);
@@ -171,6 +179,12 @@ async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec })
   const requestId = foundry.utils.randomID();
   // 跨端截止以各自同步后的 serverTime 表达；两端均不比较对方机器的 Date.now()。
   const expiresAt = game.time.serverTime + SCRIPT_INTERACTION_TIMEOUT_MS;
+  const combatId = combat?.id ?? null;
+  // 绑定战斗已过期（删除，或回退到 round 0 的战前状态）时不发出请求，
+  // 按取消结算交由脚本默认分支处理；与生命周期执行共用同一作用域判断。
+  if (combat && !isCombatEventLive(combat)) {
+    return failedResult(null, SCRIPT_INTERACTION_STATUS.CANCELLED, "combat-ended");
+  }
   const payload = {
     version: SCRIPT_INTERACTION_PROTOCOL_VERSION,
     requestId,
@@ -184,6 +198,8 @@ async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec })
     spec: specCheck.normalized,
     expiresAt
   };
+  // 确属事件作用域（生命周期触发器且上下文带 Combat）时才携带战斗标识。
+  if (combatId) payload.combatUuid = combat.uuid;
 
   return await new Promise((resolve, reject) => {
     let timer = null;
@@ -195,11 +211,17 @@ async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec })
       remote: !target.local,
       hostController: decision === INTERACTION_DECISION.HOST_CONTROLLER,
       sourceUuid: sourceInfo?.uuid ?? null,
+      combatId,
       localDialog: null,
       abort: null,
       cancelWith: null
     };
     outboundAsks.set(requestId, record);
+    if (combatId) {
+      const scope = outboundAsksByCombat.get(combatId) ?? new Set();
+      scope.add(requestId);
+      outboundAsksByCombat.set(combatId, scope);
+    }
 
     // 终结与清理共用一条路径：计时器、窗口与待答记录全部回收；首个终结者生效。
     // 远端问答终结后按职责关闭接收端可能残留的纯 UI 视图；断线取消可抑制通知。
@@ -208,6 +230,11 @@ async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec })
       finished = true;
       if (timer !== null) clearTimeout(timer);
       outboundAsks.delete(requestId);
+      if (combatId) {
+        const scope = outboundAsksByCombat.get(combatId);
+        scope?.delete(requestId);
+        if (scope && scope.size === 0) outboundAsksByCombat.delete(combatId);
+      }
       settleFn(arg);
       if (record.remote && !record.suppressCloseNotify) void notifyCloseUI(record);
     };
@@ -309,6 +336,13 @@ async function executeAsk({ actor, trigger, label, sourceInfo, decision, spec })
           ));
           return;
         }
+      }
+      // 消费答案前复核事件作用域：绑定战斗已删除或回退到战前状态时丢弃
+      // 迟到答案并按取消结算，不把已失效事件的抉择写回业务。
+      if (record.combatId && !isCombatEventLive(game.combats.get(record.combatId))) {
+        record.localDialog?.close("cancelled");
+        complete(failedResult(requestId, SCRIPT_INTERACTION_STATUS.CANCELLED, "combat-ended"));
+        return;
       }
       if (record.hostController) {
         const controllerUser = game.users.get(record.recipientUserId);
@@ -536,6 +570,31 @@ export function initScriptInteraction() {
   Hooks.on("deleteActiveEffect", effect => {
     abortOutboundBySourceUuid(effect?.uuid, "source-deleted");
   });
+  // 事件作用域取消：进战/回合问询绑定实际 Combat，战斗删除（含战后清理）
+  // 时按普通取消结算（脚本走放弃可选部分的默认分支），不是宿主中止。
+  Hooks.on("deleteCombat", combat => {
+    cancelByCombatId(combat?.id);
+  });
+  // 回退到战前状态（round 回到 0）与删除同样使已排队事件的问询过期；
+  // 仅按本次更新确到 0 判定，正常流转轮次恒 ≥1 不受影响。
+  Hooks.on("updateCombat", (combat, updateData) => {
+    if (!combat?.id || !("round" in (updateData ?? {}))) return;
+    if (!(Number(updateData.round) > 0)) cancelByCombatId(combat.id);
+  });
+}
+
+/** 取消绑定指定战斗的全部待答问询：按普通取消结算并通知接收端关闭窗口。 */
+function cancelByCombatId(combatId) {
+  if (!combatId) return;
+  for (const requestId of [...(outboundAsksByCombat.get(combatId) ?? [])]) {
+    const record = outboundAsks.get(requestId);
+    if (!record) continue;
+    record.localDialog?.close("cancelled");
+    // 接收端通常仍在线：按默认职责发送关闭通知，窗口随终态回收。
+    record.cancelWith(
+      failedResult(requestId, SCRIPT_INTERACTION_STATUS.CANCELLED, "combat-ended")
+    );
+  }
 }
 
 /** 按完整文档 UUID 中止匹配的原端等待，并同步关闭接收端可能存在的窗口。 */

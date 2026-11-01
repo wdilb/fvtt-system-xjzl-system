@@ -54,6 +54,7 @@ import { CombatStatsManager } from "./module/managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./module/managers/encounter-manager.mjs";
 import { ScriptInteractionManager, initScriptInteraction } from "./module/managers/script-interaction-manager.mjs";
 import { SCRIPT_INTERACTION_QUERY_NAME } from "./module/utils/script-interaction-policy.mjs";
+import { isCombatEventLive, runCombatLifecycleScripts } from "./module/utils/combat-lifecycle.mjs";
 
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
@@ -1239,8 +1240,9 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
     currentCombatantId: combat.current.combatantId,
     previousRound: Number(combat.previous.round) || 0,
     currentRound: Number(combat.round) || 0,
-    previousTurn: combat.previous.turn,
-    currentTurn: combat.turn
+    // 无有效回合位置时按约定保留 null（不使用 undefined）。
+    previousTurn: combat.previous.turn ?? null,
+    currentTurn: combat.turn ?? null
   };
 
   // 如果既不是战斗开始，也不是轮次流转，直接返回
@@ -1255,7 +1257,17 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
     // 第 1 轮先完成系统进战，再结算战局 combatStart。
     if (isCombatStart) {
       console.log("XJZL | 战斗正式开始！正在触发所有参战者脚本...");
-      await triggerCombatStartScripts(combat.combatants);
+      // round/turn 已在 transition（进队列与任何 await 之前）捕获；
+      // 进战保持各 Combatant 并行的原语义，活动 GM 本地等待全部脚本完成。
+      await runCombatLifecycleScripts({
+        combat,
+        combatants: [...combat.combatants],
+        trigger: "combatStart",
+        round: transition.currentRound,
+        turn: transition.currentTurn,
+        parallel: true
+      });
+      if (!isCombatEventLive(combat)) return;
       await EncounterManager.runFieldTrigger(combat, "combatStart", { round: 1, turn: transition.currentTurn });
     }
 
@@ -1269,7 +1281,17 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
       // 1-2. 上一个角色的系统与战局回合结束。
       if (prevId && !isCombatStart) {
         const prevCombatant = combat.combatants.get(prevId);
-        if (prevCombatant?.actor) await _routeActorTurnScript(prevCombatant.actor, "turnEnd", "TurnEnd");
+        if (prevCombatant?.actor) {
+          // turnEnd 使用上一回合的事件轮次与位置快照。
+          await runCombatLifecycleScripts({
+            combat,
+            combatants: prevCombatant,
+            trigger: "turnEnd",
+            round: transition.previousRound,
+            turn: transition.previousTurn
+          });
+          if (!isCombatEventLive(combat)) return;
+        }
         await EncounterManager.runFieldTrigger(combat, "combatantTurnEnd", { combatant: prevCombatant, round: previousRound, turn: transition.previousTurn });
       }
 
@@ -1289,7 +1311,16 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
         // 等待核心计数和过期删除，再运行本回合脚本，避免新效果误计入这次开始事件。
         await combat.effectTurnEvents;
         const currCombatant = combat.combatants.get(currId);
-        if (currCombatant?.actor) await _routeActorTurnScript(currCombatant.actor, "turnStart", "TurnStart");
+        if (currCombatant?.actor) {
+          await runCombatLifecycleScripts({
+            combat,
+            combatants: currCombatant,
+            trigger: "turnStart",
+            round: transition.currentRound,
+            turn: transition.currentTurn
+          });
+          if (!isCombatEventLive(combat)) return;
+        }
         await EncounterManager.runFieldTrigger(combat, "combatantTurnStart", { combatant: currCombatant, round: currentRound, turn: transition.currentTurn });
       }
     }
@@ -1308,8 +1339,15 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
   // 只有当战斗“已经开始”后加入的人，才立即执行脚本
   // 如果战斗还在 Round 0，则不执行，等着上面那个 updateCombat 一起处理
   if (combat.round > 0) {
+    // 事件数值在钩子入口（首次 await 之前）捕获，处理期间保持不变。
     console.log(`XJZL | 检测到中途加入战斗: ${combatant.name}`);
-    await triggerCombatStartScripts([combatant]);
+    await runCombatLifecycleScripts({
+      combat,
+      combatants: [combatant],
+      trigger: "combatStart",
+      round: Number(combat.round) || 0,
+      turn: combat.turn
+    });
   }
 });
 
@@ -1405,96 +1443,9 @@ Hooks.on("deleteCombatant", combatant => {
   if (combatant.combat) Hooks.callAll("xjzl.encounterUpdated", combatant.combat);
 });
 
-/**
- * 执行战斗开始脚本，把公共部分抽象出来了
- * GM 路由：将每个 actor 的脚本路由到对应玩家端执行，如果无 owner 则在 GM 端执行
- */
-async function triggerCombatStartScripts(combatants) {
-  const promises = combatants.map(async (combatant) => {
-    const actor = combatant.actor;
-    if (!actor) return;
-
-    const context = {
-      combatant: combatant,
-      combat: combatant.combat
-    };
-
-    const ownerUserId = actor.getFirstOwnerId();
-
-    // 场景 A: NPC 无 owner 或玩家掉线 → GM 端直接执行
-    if (!ownerUserId) {
-      try {
-        await actor.runScripts("combatStart", context);
-      } catch (err) {
-        console.error(`XJZL | [GM] 进战脚本执行错误 [${actor.name}]:`, err);
-      }
-      return;
-    }
-
-    // 场景 B: 在线玩家 → 路由到玩家端执行
-    try {
-      await xjzlSocket.executeForUsers(
-        "runActorScript",
-        [ownerUserId],
-        actor.uuid,
-        "combatStart",
-        context
-      );
-    } catch (err) {
-      console.error(`XJZL | 路由脚本执行失败 [${actor.name}]:`, err);
-      // 路由失败时，GM 端兜底执行
-      try {
-        await actor.runScripts("combatStart", context);
-      } catch (fallbackErr) {
-        console.error(`XJZL | [GM兜底] 进战脚本执行错误 [${actor.name}]:`, fallbackErr);
-      }
-    }
-  });
-
-  await Promise.all(promises);
-};
-
-/**
- * 路由单个 actor 的回合脚本执行
- * 将 processRegen 和 runScripts 路由到对应玩家端执行
- * @param {Actor} actor - 目标 Actor
- * @param {string} trigger - 触发时机 (turnStart/turnEnd)
- * @param {string} regenTiming - processRegen 的时机 (TurnStart/TurnEnd)
- */
-async function _routeActorTurnScript(actor, trigger, regenTiming) {
-  const ownerUserId = actor.getFirstOwnerId();
-
-  // 场景 A: NPC 无 owner 或玩家掉线 → GM 端直接执行
-  if (!ownerUserId) {
-    try {
-      await actor.processRegen(regenTiming);
-      await actor.runScripts(trigger, {});
-    } catch (err) {
-      console.error(`XJZL | [GM] ${trigger} 脚本执行错误 [${actor.name}]:`, err);
-    }
-    return;
-  }
-
-  // 场景 B: 在线玩家 → 路由到玩家端执行
-  try {
-    await xjzlSocket.executeForUsers(
-      "runActorScriptWithRegen",
-      [ownerUserId],
-      actor.uuid,
-      trigger,
-      regenTiming
-    );
-  } catch (err) {
-    console.error(`XJZL | 路由脚本执行失败 [${actor.name}]:`, err);
-    // 路由失败时，GM 端兜底执行
-    try {
-      await actor.processRegen(regenTiming);
-      await actor.runScripts(trigger, {});
-    } catch (fallbackErr) {
-      console.error(`XJZL | [GM兜底] ${trigger} 脚本执行错误 [${actor.name}]:`, fallbackErr);
-    }
-  }
-}
+// 战斗流转三时机的执行端已收敛为活动 GM 本地等待（module/utils/combat-lifecycle.mjs）；
+// 原按 owner 整批路由的 triggerCombatStartScripts 与 _routeActorTurnScript 已删除，
+// socket 中同名的两个旧注册入口仅作为外部调用边界保留，系统流程不再调用。
 
 // 应该没有必要浪费性能去实现这种功能
 // 监听世界时间变化 (Seconds 变化)来清理过期AE

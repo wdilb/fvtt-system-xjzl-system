@@ -75,7 +75,9 @@ export function setupSocket() {
     xjzlSocket.register("playUltimateEffect", renderUltimateEffect);
 
     // === 脚本执行路由 ===
-    // 注册Actor脚本执行（用于战斗流转脚本路由到玩家端执行）
+    // 旧战斗流转路由入口：系统战斗流转已改为活动 GM 本地执行（combat-lifecycle），
+    // 不再调用这两个注册名。仅作为外部调用边界保留，不承诺旧脚本兼容；
+    // context 需自带 combat/combatant 等完整上下文，无上下文时脚本按缺省运行。
     xjzlSocket.register("runActorScript", _socketRunActorScript);
     xjzlSocket.register("runActorScriptWithRegen", _socketRunActorScriptWithRegen);
 

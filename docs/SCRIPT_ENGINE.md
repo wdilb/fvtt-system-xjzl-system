@@ -31,7 +31,7 @@
 - 内功脚本位于阶段配置中，运行时读取 `system.current.scripts`。
 - AE 脚本位于 `flags.xjzl-system.scripts`。
 
-`trigger` 必须来自 `module/data/common.mjs#SCRIPT_TRIGGERS`。Item、招式和内功脚本受 Schema 选项约束；AE 脚本虽然存放在普通 flags 中，标准编辑界面也只提供这些选项。未知触发器不会在攻击、受伤或回合等标准时机执行，不应使用。
+`trigger` 必须使用下文[触发器参考](#触发器完整参数参考)列出的名称；标准编辑界面也只提供这些选项。自定义名称不会在攻击、受伤或回合等标准时机执行。
 
 ## 脚本参数
 
@@ -109,7 +109,7 @@
 
 ### 脚本来源与生效范围
 
-`XJZLActor.collectScripts()` 按以下来源收集并依次执行：
+每次触发按以下来源收集并依次执行脚本：
 
 1. 当前激活内功的当前阶段脚本。
 2. 已装备的武器、防具和奇珍脚本；`ignoreArmorEffects` 会屏蔽头、衣、裤、鞋部位的防具脚本。
@@ -120,7 +120,7 @@
 7. 当前生效 AE 的脚本。
 8. `combatStart`、`turnStart`、`turnEnd` 时，全部已领悟武学招式的对应脚本。
 
-当前实现按收集顺序串行执行，并共享本次触发的 `args` 对象。可以在同一业务的一组脚本中写入事件标记，但不要让不同物品暗中依赖彼此的执行顺序。
+同一次触发按上述顺序逐段执行，并共享 `args` 对象。可以在同一业务的一组脚本中写入事件标记，但不要让不同物品暗中依赖彼此的执行顺序。
 
 “已领悟招式”指 `move.computedLevel > 0`。第 5、8 类是额外的武学遍历规则，不影响内功、装备、特性和 AE 等通用来源。
 
@@ -541,33 +541,32 @@ await actor.applyHealing({
 
 ### `combatStart`（异步）
 
-**时机：**战斗开始时，每个 Combatant 执行一次。
-
-| `args` 字段 | 类型 | 访问 | 含义 |
-|---|---|---|---|
-| `combatant` | `Combatant` | 只读 | 当前 Actor 对应的战斗单位。 |
-| `combat` | `Combat` | 只读 | 当前战斗。 |
-| `move` | `Object` | 条件提供 | 脚本来自已领悟武学招式时，临时指向所属招式。 |
+**时机：**战斗开始时，每个 Combatant 执行一次；战斗中途加入的 Combatant 也会单独触发一次。
 
 ### `turnStart`（异步）
 
-**时机：** Actor 回合开始，自动回复或消耗完成后。
-
-| `args` 字段 | 类型 | 访问 | 含义 |
-|---|---|---|---|
-| 无回合专属字段 | — | — | 通常 `args` 为空对象。 |
-| `move` | `Object` | 条件提供 | 脚本来自已领悟武学招式时，临时指向所属招式。 |
+**时机：**Actor 回合开始，自动回复或消耗完成后。
 
 ### `turnEnd`（异步）
 
-**时机：** Actor 回合结束，自动回复或消耗完成后。
+**时机：**Actor 回合结束，自动回复或消耗完成后。
+
+### 进战与回合的共用参数
 
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
-| 无回合专属字段 | — | — | 通常 `args` 为空对象。 |
+| `combat` | `Combat` | 只读 | 本次事件所属战斗。 |
+| `combatant` | `Combatant` | 只读 | 本次事件的战斗单位；`turnEnd` 为结束回合的单位。 |
+| `round` | `number` | 只读 | 本次事件轮次；`turnEnd` 为结束回合的轮次，中途加入为加入时轮次。 |
+| `turn` | `number` / `null` | 只读 | 本次事件的零基回合位置；`turnEnd` 为结束回合的位置，无有效位置时为 `null`。 |
 | `move` | `Object` | 条件提供 | 脚本来自已领悟武学招式时，临时指向所属招式。 |
 
-`combatStart`、`turnStart`、`turnEnd` 会遍历该 Actor 全部已领悟武学招式。执行由活动 GM 统筹并路由给在线 owner，无在线玩家 owner 时由 GM 执行；脚本不要假设执行客户端一定是 GM。
+这三个时机还会执行该 Actor 全部已领悟招式的对应脚本，由活动 GM 等待执行完成后继续战局结算。需要玩家选择时使用 [`ask`](#脚本交互ask)。
+
+编写这三个时机的脚本时：
+
+- 用 `args.round`、`args.turn` 判断本次事件的轮次和位置；等待玩家回答后，这两个值仍保持不变，`args.combat` 则反映战斗的当前状态。
+- 用 `args.combatant.token` 定位来源 Token，其 `parent` 是所属场景；没有 Token 时跳过依赖位置的效果。创建光环以该 Token 为来源，查询、检查或移除时指定来源 Token 和所属场景，避免使用当前画布、`game.combat` 或第一个活动 Token 代替事件来源。
 
 ## 公共结算 API
 
@@ -709,7 +708,7 @@ await game.xjzl.api.effects.removeEffect(args.target, "prone", 1);
 }
 ```
 
-Actor 每次派生数据时从已应用 AE 重建内存中的免疫缓存，再执行 `passive` 脚本。来源被禁用、抑制、移除或到期后，其免疫随下一次派生计算失效；多份来源声明同一免疫时保留全部来源。免疫结果不写入 Actor 持久 flags。
+AE 提供的免疫在每次属性重算时更新，并在 `passive` 脚本执行前生效。来源被禁用、抑制、移除或到期后，其免疫随下一次重算失效；其他来源仍提供同一免疫时继续生效。
 
 依赖当前运功内功、阶段或其他来源条件时，在已有门控的 `passive` 脚本中调用同步方法；不要给提示标记叠加无条件免疫：
 
@@ -1123,6 +1122,7 @@ if (answer.status === "answered" && answer.action === "confirm") {
 约束：
 
 - 每次问询最多等待 60 秒。
+- 进战/回合脚本的问询随本次战斗结束：战斗删除或回退到第 0 轮时返回 `cancelled`。其他触发器的问询不受战斗结束影响。
 - 整数输入必须在声明范围内，零值合法；空值、非整数、非有限数和越界值按 `error` 处理。
 - 等待后重新读取 `actor.system`，复核来源仍生效、条件和余额；完成并核实实际消耗后，再修改伤害或授予收益。资源 API 的正常返回不一定代表足额支付，具体语义见[资源事务](#资源事务)。
 - 用 `fields` 定义输入控件，`content` 只用于说明。
@@ -1135,13 +1135,15 @@ if (answer.status === "answered" && answer.action === "confirm") {
 const roll = await actor.rollAttributeTest("yanzou", {
   promptTarget: "controller",
   interactionTrigger: trigger,
-  interactionSource: thisItem
+  interactionSource: thisItem,
+  interactionCombat: args.combat // 进战/回合脚本传入本次战斗
 });
 if (!roll) return;
 ```
 
 - 需要配置框时，`interactionTrigger` 必填，传当前脚本的 `trigger`；缺失、未知值及 `passive` / `calc` 会立即报错。
 - `interactionSource` 传当前脚本来源，例如 `thisItem`，使来源被删除时中止交互；省略时不检查来源。可选 `interactionLabel` 用于标识脚本报错。
+- 进战/回合脚本传 `interactionCombat: args.combat`，使配置框随本次战斗结束而取消；省略时不随战斗结束取消。
 - 取消、超时、决策人不可用或问询失败时返回 `null`，脚本须判空并保留默认后果。
 - `skipDialog: true` 直接投骰，不需要交互参数。
 - 未传 `promptTarget` 或传 `"caller"` 时，配置框显示在本机。
@@ -1321,7 +1323,7 @@ if (args.isHit) {
 
 多个角色共用一个计数器时，常见做法是把它记在共享文档的数组 flag 里（例如记在 Combat 上），脚本每次“读取数组 → 本地修改 → 整体写回”。这种写法在并发下会丢更新：两个脚本都基于同一份旧值各自加一，后写回的数组会冲掉先写回的增量，而 Foundry 的更新是整字段覆盖，没有字段级自增可用。
 
-系统为这种场景提供了按文档串行的原子数组事务，把整个读改写过程放进活动 GM 端的队列执行；同一文档的操作严格串行，不同文档互不影响：
+使用系统提供的原子数组操作，可保留其他脚本对同一数组的并发修改：
 
 ```javascript
 await game.xjzl.socket.executeAsGM("updateDocumentAtomic", documentUuid, {
