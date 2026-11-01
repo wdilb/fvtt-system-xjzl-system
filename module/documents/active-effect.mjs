@@ -9,10 +9,12 @@ export class XJZLActiveEffect extends ActiveEffect {
 
   /**
    * 解析本效果的战斗计时基准；已删除的起始参战者仍保留原战斗锚点。
+   * V14 在父类构造期间准备时长，此时子类私有成员尚未初始化；计时助手须使用原型方法。
    * @param {object} [start=this.start] 已解析的 start 或包含 Combat ID 的源数据。
    * @returns {object|null} 进行中的战斗、起始参战者及位置；无适用战斗返回 null。
+   * @protected
    */
-  #getCombatClock(start = this.start) {
+  _getCombatClock(start = this.start) {
     const combatId = typeof start?.combat === "string" ? start.combat : start?.combat?.id ?? this._source.start?.combat;
     const combat = game.combats.get(combatId) ?? game.combat;
     if (!combat?.started || !combat.turns.length) return null;
@@ -34,13 +36,14 @@ export class XJZLActiveEffect extends ActiveEffect {
   /**
    * 按角色次数或固定大轮计算 rounds，turns 保留行动轮次语义；不读取世界时间。
    * @param {string} units rounds 或 turns。
-   * @param {object} clock getCombatClock 返回的计时基准。
+   * @param {object} clock _getCombatClock 返回的计时基准。
    * @param {number} round 当前轮次。
    * @param {number} turn 零基回合位置；轮末使用最后一个有效行动位置。
    * @param {object} [context] 核心事件计数快照；省略时读取客户端最新计数。
    * @returns {number} 已过回合或行动轮次数。
+   * @protected
    */
-  #getCombatElapsed(units, clock, round, turn, context) {
+  _getCombatElapsed(units, clock, round, turn, context) {
     if (units === "rounds") {
       if (getEffectDurationMode() === "combatant" && !clock.removed
         && ["turnStart", "turnEnd"].includes(this._source.duration.expiry)) {
@@ -67,7 +70,7 @@ export class XJZLActiveEffect extends ActiveEffect {
    * @returns {object} 含 remaining/secondsRemaining/label 的派生时长。
    */
   _prepareCombatBasedDuration(duration, context) {
-    const clock = this.#getCombatClock();
+    const clock = this._getCombatClock();
     // turns 的战斗外换算独立于全局 turnTime，避免每名参战者行动都额外推进世界时间。
     const conversion = duration.units === "rounds" ? (CONFIG.time.roundTime || 2) : 1;
     const seconds = duration.value * conversion;
@@ -79,7 +82,7 @@ export class XJZLActiveEffect extends ActiveEffect {
 
     const round = context?.round ?? clock.combat.round;
     const turn = context?.turn ?? clock.combat.turn;
-    const remaining = duration.value - this.#getCombatElapsed(duration.units, clock, round, turn, context);
+    const remaining = duration.value - this._getCombatElapsed(duration.units, clock, round, turn, context);
     const unit = duration.units === "rounds" ? "ROUNDS" : "TURNS";
     const plural = game.i18n.pluralRules.select(Math.abs(remaining));
     const label = game.i18n.format(`EFFECT.DURATION.${unit}${remaining < 0 ? "_AGO" : ""}.${plural}`,
@@ -96,7 +99,7 @@ export class XJZLActiveEffect extends ActiveEffect {
   isExpiryEvent(event, context) {
     const units = this._source.duration.units;
     if (units !== "rounds" && units !== "turns") return super.isExpiryEvent(event, context);
-    const clock = this.#getCombatClock();
+    const clock = this._getCombatClock();
     if (!clock) return super.isExpiryEvent(event, context);
     if (context?.combat && context.combat !== clock.combat) return false;
     if (event === "updateWorldTime") return false;
@@ -110,7 +113,7 @@ export class XJZLActiveEffect extends ActiveEffect {
           : event === "turnEnd" ? clock.combat.previous.combatantId : clock.combat.combatant?.id);
       if (eventId !== clock.combatant.id) return false;
       // turnEnd 的缓存可能已按终点刷新过，仍须用结束事件本身的计数确认到期。
-      return !Number.isFinite(this.duration.value) || this.#getCombatElapsed(units, clock,
+      return !Number.isFinite(this.duration.value) || this._getCombatElapsed(units, clock,
         context?.round ?? clock.combat.round, context?.turn ?? clock.combat.turn, context) >= this.duration.value;
     }
 
@@ -127,7 +130,7 @@ export class XJZLActiveEffect extends ActiveEffect {
     const turn = event === "roundEnd" ? combat.turns.length - 1 : (context?.turn ?? combat.turn);
     const current = context?.combatantId ? combat.combatants.get(context.combatantId) : combat.turns[turn];
     if (event !== "roundEnd" && (!current || (current.initiative ?? -Infinity) > initiative)) return false;
-    const elapsed = this.#getCombatElapsed(units, clock, round, turn, context);
+    const elapsed = this._getCombatElapsed(units, clock, round, turn, context);
     return !Number.isFinite(this.duration.value) || elapsed >= this.duration.value;
   }
 
@@ -141,7 +144,7 @@ export class XJZLActiveEffect extends ActiveEffect {
     for (const effect of ActiveEffect.registry) {
       if (!(effect instanceof XJZLActiveEffect)) continue;
       if (!["rounds", "turns"].includes(effect._source.duration.units)) continue;
-      if (effect.#getCombatClock()?.combat !== combat) continue;
+      if (effect._getCombatClock()?.combat !== combat) continue;
       const units = effect.duration.units;
       const remaining = effect.duration.remaining;
       const updated = effect.updateDuration(context);
@@ -161,7 +164,7 @@ export class XJZLActiveEffect extends ActiveEffect {
     for (const effect of ActiveEffect.registry) {
       if (!(effect instanceof XJZLActiveEffect) || effect._source.duration.units !== "rounds") continue;
       if (!["turnStart", "turnEnd"].includes(effect._source.duration.expiry)) continue;
-      const clock = effect.#getCombatClock();
+      const clock = effect._getCombatClock();
       if (!clock || clock.combat !== combat || clock.removed) continue;
       const saved = effect._source.flags?.["xjzl-system"]?.effectTurnStart;
       if (saved?.combatId === combat.id && saved.combatantId === clock.combatant.id) continue;
@@ -184,7 +187,7 @@ export class XJZLActiveEffect extends ActiveEffect {
 
   /** 返回给定 start 的当前角色回合计数快照；战斗外及已移除的来源不生成快照。 */
   #captureTurnCounter(start = this.start) {
-    const clock = this.#getCombatClock(start);
+    const clock = this._getCombatClock(start);
     if (!clock || clock.removed) return null;
     return { combatId: clock.combat.id, combatantId: clock.combatant.id,
       count: getEffectTurnCount(clock.combat, clock.combatant.id) };
