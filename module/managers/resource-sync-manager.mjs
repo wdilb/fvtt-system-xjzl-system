@@ -4,6 +4,12 @@
  * 只扫描世界中的 character/npc Actor；匹配到系统合集资源后，原地更新规则数据和
  * 可对应的物品特效，保留角色投入、装备状态、数量和 Item ID。角色独立 Active Effect
  * 与其他 Actor 字段不在本模块的写入范围内。
+ *
+ * 可选的 Token 段（includeTokens）在角色段之后处理所有场景中的非关联 Token：
+ * 只处理其 delta 中独立存放的物品（Token 侧被显式改动过的整物品快照）。未改动
+ * 物品不在 delta 中，更新原型角色卡后自动继承，因此不做合并视图比对，避免把
+ * 未分叉的 Token 整物品复制进场景数据。同一 Actor 放出的多个 Token 各自独立
+ * 处理，不按 Actor ID 去重。
  */
 
 const { DialogV2 } = foundry.applications.api;
@@ -37,9 +43,27 @@ const RUNTIME_KEYS = new Set([
 
 const SYNCABLE_TYPES = new Set(Object.keys(TYPE_PACKS));
 
+/** Token 侧已删除物品的墓碑标记：delta 用完整记录加该标记表达删除，同步时不复活。 */
+const TOMBSTONE_FLAG = "_tombstone";
+
 let activeRun = null;
 
 const t = key => game.i18n.localize(`XJZL.Settings.ResourceSync.${key}`);
+
+/**
+ * 按时间片让出主线程：距离上次让出不足一帧时直接返回。
+ * 逐项无条件 setTimeout(0) 会触发浏览器嵌套计时器 4ms 下限，万级条目仅等待就
+ * 累积数十秒；写入操作本身的 await 已天然让出事件循环，这里只兜底纯比较批次。
+ */
+const YIELD_INTERVAL_MS = 16;
+function makeYieldToUi() {
+  let lastYieldAt = performance.now();
+  return async function yieldToUi() {
+    if (performance.now() - lastYieldAt < YIELD_INTERVAL_MS) return;
+    lastYieldAt = performance.now();
+    await new Promise(resolve => setTimeout(resolve, 0));
+  };
+}
 
 function clone(value) {
   return foundry.utils.deepClone(value ?? {});
@@ -460,15 +484,18 @@ async function chooseDuplicate(key, candidates, choices) {
   return selected;
 }
 
-async function resolveSource(item, index, choices) {
+async function resolveSource(item, index, choices, sourceCache) {
   const key = buildIndexKey(item.type, item.name);
   const candidates = index.get(key) || [];
   if (candidates.length === 0) return { source: null, status: "unmatched", reason: t("Reasons.Unmatched") };
   const candidate = candidates.length === 1 ? candidates[0] : await chooseDuplicate(key, candidates, choices);
   if (!candidate) return { source: null, status: "skipped", reason: t("Reasons.Skipped") };
+  // 同一轮同步中同一合集来源只加载一次：角色与 Token 上大量同名物品共享一份来源。
+  if (sourceCache.has(candidate.uuid)) return { source: sourceCache.get(candidate.uuid), candidate };
   try {
     const source = await fromUuid(candidate.uuid);
     if (!source) return { source: null, status: "failed", reason: t("Reasons.ReadFailed").replace("{uuid}", candidate.uuid) };
+    sourceCache.set(candidate.uuid, source);
     return { source, candidate };
   } catch (error) {
     console.error(`XJZL | 读取合集资源失败 ${candidate.uuid}:`, error);
@@ -479,6 +506,8 @@ async function resolveSource(item, index, choices) {
 /**
  * 更新角色卡上的资源规则和 Active Effect；只有规则实际变化时才写入 system。
  * Foundry 在没有差异时允许 update() 返回 undefined，因此结果必须以文档状态核验，不能把返回值当作成功标记。
+ * @param {Item} item 世界角色或非关联 Token 合成 Actor 上的物品；Token 物品的写入
+ *   由 Foundry 路由进该 Token 的 delta。
  */
 async function replaceItemResource(item, source, desiredSystem, { updateSystem = true } = {}) {
   const snapshot = {
@@ -563,78 +592,247 @@ function finishItemResult(result, status, reason = "") {
   return result;
 }
 
+/**
+ * 将一个物品同步到合集最新规则，返回该项结果记录。
+ * 世界角色与场景 Token 共用；只更新规则与特效，保留修为投入、数量、装备状态和图片。
+ * @param {Item} item 同步类型物品
+ * @param {object} context - { sourceIndex, choices, sourceCache, report, backupLocation }
+ *   backupLocation 提供备份条目的定位字段（世界角色为 actorUuid/actorName，
+ *   Token 另有 sceneId/tokenId/tokenUuid）。
+ * @returns {Promise<object>} itemResult
+ */
+async function syncOneItem(item, context) {
+  const { sourceIndex, choices, sourceCache, report, backupLocation } = context;
+  const itemResult = makeItemResult(item);
+  const resolved = await resolveSource(item, sourceIndex, choices, sourceCache);
+  if (!resolved.source) {
+    finishItemResult(itemResult, resolved.status, resolved.reason);
+    return itemResult;
+  }
+  itemResult.sourcePack = resolved.candidate.packLabel;
+  const desiredSystem = buildDesiredSystem(item, resolved.source, itemResult);
+  if (itemResult.blocked || itemResult.partial) {
+    finishItemResult(itemResult, "skipped", t("Reasons.ProgressNotMigrated"));
+    return itemResult;
+  }
+  const systemChanged = !equalData(currentSystem(item, item.type), desiredSystem);
+  const effectsChanged = !effectsEqual(item, resolved.source);
+  if (!systemChanged && !effectsChanged) {
+    finishItemResult(itemResult, "unchanged");
+    return itemResult;
+  }
+  report.backup.push({
+    ...backupLocation,
+    itemId: item.id,
+    itemName: item.name,
+    itemType: item.type,
+    data: clone(item._source || item.toObject()),
+    effects: effectSnapshots(item)
+  });
+  const outcome = await replaceItemResource(item, resolved.source, desiredSystem, { updateSystem: systemChanged });
+  if (outcome.ok) {
+    if (outcome.effects?.removed > 0) {
+      itemResult.details.push(t("Details.RebuiltEffects").replace("{count}", outcome.effects.removed));
+    }
+    finishItemResult(itemResult, "updated");
+  }
+  else finishItemResult(itemResult, outcome.recovered ? "recovered" : "failed", outcome.recovered ? t("Reasons.Restored") : t("Reasons.FailedAndNotRestored"));
+  return itemResult;
+}
+
+/**
+ * 收集非关联 Token delta 中独立存放的同步类型物品条目。
+ * delta 只记录 Token 侧被显式改动过的条目（整物品快照）与删除墓碑；未改动部分不在
+ * 其中、更新原型角色卡后自动继承，因此不做合并视图比对。V14 中干净的非关联 Token
+ * 可以没有 delta 对象。墓碑（Token 侧已删除的物品）直接跳过，不复活。
+ * 必须读 tokenDoc._source.delta 而非 tokenDoc.delta：后者是惰性构造入口，首次访问
+ * 就会实例化 ActorDelta 并连带构造合成 Actor，大量无独立物品的 Token（只改过气血
+ * 或状态）会为此白付初始化成本；源数据是纯 JSON，这里只读不写。
+ */
+function collectTokenDeltaItems(tokenDoc) {
+  const entries = tokenDoc._source?.delta?.items;
+  if (!Array.isArray(entries)) return [];
+  return entries.filter(entry => entry?._id && !entry[TOMBSTONE_FLAG] && SYNCABLE_TYPES.has(entry.type));
+}
+
+/**
+ * 同步一个非关联 Token 上被独立改动过的物品，返回 Token 结果条目。
+ * items 为空表示没有需要处理的内容（无 delta、无同步类型物品），调用端据此决定
+ * 是否写入报告。同一 Actor 放出的多个 Token 各自独立处理，不按 Actor ID 去重。
+ * 空增量（绝大多数 Token）在触碰合成 Actor 之前就返回：合成 Actor 与其物品集合
+ * 的初始化成本只值得为确有独立物品的 Token 支付。
+ * @param {TokenDocument} tokenDoc 非关联 Token 文档
+ * @param {Scene} scene tokenDoc 所在场景
+ * @param {object} context - 与 syncOneItem 相同的上下文（backupLocation 由此函数构造）
+ * @param {Function} yieldToUi 时间片让出函数（run 内共享同一节流基准）
+ * @returns {Promise<object>} tokenResult
+ */
+async function syncOneToken(tokenDoc, scene, context, yieldToUi) {
+  const baseActor = tokenDoc.baseActor;
+  const tokenResult = {
+    sceneId: scene?.id || "",
+    sceneName: scene?.name || "",
+    tokenId: tokenDoc.id,
+    tokenUuid: tokenDoc.uuid,
+    tokenName: tokenDoc.name || "",
+    baseActorName: baseActor?.name || "",
+    items: []
+  };
+  const deltaItems = collectTokenDeltaItems(tokenDoc);
+  if (!baseActor) {
+    // 原型角色已删除：没有安全写入目标，只报告不处理。
+    tokenResult.items.push(finishItemResult({
+      itemId: "",
+      name: tokenDoc.name || tokenDoc.id,
+      type: "",
+      typeLabel: "—",
+      status: "",
+      statusLabel: "",
+      statusClass: "",
+      icon: "",
+      details: [],
+      partial: false,
+      blocked: false
+    }, "skipped", t("Reasons.MissingBaseActor")));
+    return tokenResult;
+  }
+  if (deltaItems.length === 0) return tokenResult;
+  const actor = tokenDoc.actor;
+  if (!actor) {
+    // 合成 Actor 构建失败：同样没有安全写入目标。
+    tokenResult.items.push(finishItemResult({
+      itemId: "",
+      name: tokenDoc.name || baseActor.name,
+      type: "",
+      typeLabel: "—",
+      status: "",
+      statusLabel: "",
+      statusClass: "",
+      icon: "",
+      details: [],
+      partial: false,
+      blocked: false
+    }, "skipped", t("Reasons.MissingBaseActor")));
+    return tokenResult;
+  }
+  const { sourceIndex, choices, sourceCache, report } = context;
+  for (const deltaEntry of deltaItems) {
+    const item = actor.items.get(deltaEntry._id);
+    // delta 记录存在但合成集合缺该物品：数据不完整，跳过以避免把部分数据当完整规则写入。
+    if (!item) continue;
+    const itemResult = await syncOneItem(item, {
+      sourceIndex, choices, sourceCache, report,
+      backupLocation: {
+        actorUuid: tokenDoc.uuid,
+        actorName: tokenResult.tokenName || baseActor.name,
+        sceneId: tokenResult.sceneId,
+        tokenId: tokenDoc.id,
+        tokenUuid: tokenDoc.uuid
+      }
+    });
+    tokenResult.items.push(itemResult);
+    await yieldToUi();
+  }
+  tokenResult.counts = tokenResult.items.reduce((counts, item) => {
+    counts[item.status] = (counts[item.status] || 0) + 1;
+    return counts;
+  }, {});
+  return tokenResult;
+}
+
 function countReport(report) {
   const counts = { updated: 0, unchanged: 0, unmatched: 0, skipped: 0, failed: 0, recovered: 0 };
   for (const actor of report.actors) for (const item of actor.items) counts[item.status] = (counts[item.status] || 0) + 1;
   report.counts = counts;
   report.totalItems = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  // Token 段独立计数：与角色段分开呈现，才能看出 Token 自身的改动量。
+  const tokenCounts = { updated: 0, unchanged: 0, unmatched: 0, skipped: 0, failed: 0, recovered: 0 };
+  for (const token of report.tokens) for (const item of token.items) tokenCounts[item.status] = (tokenCounts[item.status] || 0) + 1;
+  report.tokenCounts = tokenCounts;
+  report.totalTokenItems = Object.values(tokenCounts).reduce((sum, count) => sum + count, 0);
 }
 
-/** 扫描并同步全部世界角色卡，返回可供报告窗口展示和导出的完整结果。 */
-export async function runResourceSync() {
+/**
+ * 扫描并同步全部世界角色卡，可选包含所有场景中的非关联 Token，返回可供报告窗口
+ * 展示和导出的完整结果。
+ * @param {object} [options]
+ * @param {boolean} [options.includeTokens=false] 是否包含所有场景中的非关联 Token
+ *   （默认关闭，避免顺带覆盖历史场景中刻意调整过的同名资源）。
+ * @param {Function} [options.onProgress] 进度回调 ({label, percent}) => void；由调用端
+ *   负责展示，回调内部不得执行重活。
+ * @returns {Promise<object>} 报告数据
+ */
+export async function runResourceSync({ includeTokens = false, onProgress = null } = {}) {
   if (activeRun) return activeRun;
   activeRun = (async () => {
     const report = {
       startedAt: new Date().toISOString(),
       actors: [],
+      tokens: [],
       counts: {},
+      tokenCounts: {},
+      includeTokens: Boolean(includeTokens),
       tokenPolicy: t("TokenPolicy"),
       backup: []
     };
+    const progress = (label, current, total) =>
+      onProgress?.({ label, percent: total > 0 ? Math.round((current / total) * 100) : 100 });
+    const yieldToUi = makeYieldToUi();
     try {
       const sourceIndex = await buildSourceIndex();
+      const sourceCache = new Map();
       const choices = new Map();
+      const sharedContext = { sourceIndex, choices, sourceCache, report };
       const actors = game.actors.filter(actor => actor.type === "character" || actor.type === "npc");
       report.scannedActors = actors.length;
+      const totalItems = actors.reduce((sum, actor) => sum
+        + actor.items.reduce((count, item) => count + (SYNCABLE_TYPES.has(item.type) ? 1 : 0), 0), 0);
+      let itemSeq = 0;
       for (const actor of actors) {
         const actorResult = { actorId: actor.id, actorUuid: actor.uuid, name: actor.name, items: [] };
         for (const item of actor.items) {
           if (!SYNCABLE_TYPES.has(item.type)) continue;
-          const itemResult = makeItemResult(item);
-          const resolved = await resolveSource(item, sourceIndex, choices);
-          if (!resolved.source) {
-            finishItemResult(itemResult, resolved.status, resolved.reason);
-            actorResult.items.push(itemResult);
-            continue;
-          }
-          itemResult.sourcePack = resolved.candidate.packLabel;
-          const desiredSystem = buildDesiredSystem(item, resolved.source, itemResult);
-          if (itemResult.blocked || itemResult.partial) {
-            finishItemResult(itemResult, "skipped", t("Reasons.ProgressNotMigrated"));
-            actorResult.items.push(itemResult);
-            continue;
-          }
-          const systemChanged = !equalData(currentSystem(item, item.type), desiredSystem);
-          const effectsChanged = !effectsEqual(item, resolved.source);
-          if (!systemChanged && !effectsChanged) {
-            finishItemResult(itemResult, "unchanged");
-            actorResult.items.push(itemResult);
-            continue;
-          }
-          report.backup.push({
-            actorUuid: actor.uuid,
-            actorName: actor.name,
-            itemId: item.id,
-            itemName: item.name,
-            itemType: item.type,
-            data: clone(item._source || item.toObject()),
-            effects: effectSnapshots(item)
+          itemSeq += 1;
+          progress(t("ProgressActors")
+            .replace("{name}", actor.name)
+            .replace("{current}", itemSeq)
+            .replace("{total}", totalItems), itemSeq, totalItems);
+          const itemResult = await syncOneItem(item, {
+            ...sharedContext,
+            backupLocation: { actorUuid: actor.uuid, actorName: actor.name }
           });
-          const outcome = await replaceItemResource(item, resolved.source, desiredSystem, { updateSystem: systemChanged });
-          if (outcome.ok) {
-            if (outcome.effects?.removed > 0) {
-              itemResult.details.push(t("Details.RebuiltEffects").replace("{count}", outcome.effects.removed));
-            }
-            finishItemResult(itemResult, "updated");
-          }
-          else finishItemResult(itemResult, outcome.recovered ? "recovered" : "failed", outcome.recovered ? t("Reasons.Restored") : t("Reasons.FailedAndNotRestored"));
           actorResult.items.push(itemResult);
+          await yieldToUi();
         }
         actorResult.counts = actorResult.items.reduce((counts, item) => {
           counts[item.status] = (counts[item.status] || 0) + 1;
           return counts;
         }, {});
         if (actorResult.items.length > 0) report.actors.push(actorResult);
+      }
+      if (includeTokens) {
+        // 所有场景的非关联 Token 平铺收集：先取总数才能驱动进度条；场景与 Token
+        // 文档本就在内存中，此处没有额外 IO。
+        const unlinkedTokens = [];
+        for (const scene of game.scenes) {
+          for (const tokenDoc of scene.tokens) {
+            if (!tokenDoc.actorLink) unlinkedTokens.push({ scene, tokenDoc });
+          }
+        }
+        report.scannedTokens = unlinkedTokens.length;
+        let tokenSeq = 0;
+        for (const { scene, tokenDoc } of unlinkedTokens) {
+          tokenSeq += 1;
+          progress(t("ProgressTokens")
+            .replace("{scene}", scene?.name || "")
+            .replace("{token}", tokenDoc.name || "")
+            .replace("{current}", tokenSeq)
+            .replace("{total}", unlinkedTokens.length), tokenSeq, unlinkedTokens.length);
+          // 让出线程也覆盖空 Token：千级 Token 的纯遍历同样不应阻塞整帧。
+          await yieldToUi();
+          const tokenResult = await syncOneToken(tokenDoc, scene, sharedContext, yieldToUi);
+          if (tokenResult.items.length > 0) report.tokens.push(tokenResult);
+        }
       }
       report.finishedAt = new Date().toISOString();
       countReport(report);
@@ -658,4 +856,3 @@ export async function runResourceSync() {
 export function isResourceSyncRunning() {
   return Boolean(activeRun);
 }
-

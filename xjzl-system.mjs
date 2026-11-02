@@ -945,7 +945,51 @@ async function openDamageTool() {
   );
 }
 
-/** 扫描并更新世界角色资源，完成后打开可筛选、可导出的报告窗口。 */
+/** 打开同步进度窗口；窗口可被用户提前关闭，后续更新必须容忍元素不存在。 */
+async function showResourceSyncProgress() {
+  // DialogV2 要求至少一个按钮（_initializeApplicationOptions 强制）；
+  // “后台运行”同时满足该契约并给用户一条明确的关闭途径，同步继续不受影响。
+  const dialog = new foundry.applications.api.DialogV2({
+    id: "xjzl-resource-sync-progress",
+    window: {
+      title: game.i18n.localize("XJZL.Settings.ResourceSync.ProgressTitle"),
+      icon: "fas fa-arrows-rotate"
+    },
+    content: `<div class="xjzl-rsync-progress">
+      <p class="xjzl-rsync-progress-label">${game.i18n.localize("XJZL.Settings.ResourceSync.ProgressStarting")}</p>
+      <div class="xjzl-rsync-progress-track"><div class="xjzl-rsync-progress-fill" style="width: 0%"></div></div>
+    </div>`,
+    buttons: [
+      {
+        action: "background",
+        label: game.i18n.localize("XJZL.Settings.ResourceSync.ProgressBackground"),
+        icon: "fas fa-down-left-and-up-right-to-center"
+      }
+    ],
+    rejectClose: false
+  });
+  await dialog.render(true);
+  return dialog;
+}
+
+/** 把 runResourceSync 的进度回调映射到进度窗口 DOM；窗口被提前关闭时跳过更新。 */
+function makeProgressReporter(dialog) {
+  // 进度刷新节流到 100ms：高频 DOM 写入在长报告窗口上没有必要，视觉上也分辨不出。
+  let lastWriteAt = 0;
+  return ({ label, percent }) => {
+    const element = dialog.element;
+    if (!element?.isConnected) return;
+    const now = performance.now();
+    if (now - lastWriteAt < 100 && percent < 100) return;
+    lastWriteAt = now;
+    const labelEl = element.querySelector(".xjzl-rsync-progress-label");
+    const fill = element.querySelector(".xjzl-rsync-progress-fill");
+    if (labelEl) labelEl.textContent = label;
+    if (fill) fill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+  };
+}
+
+/** 扫描并更新世界角色资源（可选包含场景非关联 Token），完成后打开报告窗口。 */
 async function openResourceSync() {
   if (!game.user.isGM) return ui.notifications.warn(game.i18n.localize("XJZL.Settings.ResourceSync.GMOnly"));
   if (resourceSyncPending || isResourceSyncRunning()) {
@@ -955,28 +999,62 @@ async function openResourceSync() {
   const confirmPoints = ["ConfirmScope", "ConfirmEffects", "ConfirmSkip", "ConfirmOut"]
     .map(key => `<li>${game.i18n.localize(`XJZL.Settings.ResourceSync.${key}`)}</li>`)
     .join("");
-  const confirmed = await foundry.applications.api.DialogV2.confirm({
+  // Token 选项做成一次性复选框而非持久设置：是否包含历史场景 Token 属于单次决策，
+  // 持久化容易在后续轮次被无意沿用而覆盖刻意调整过的资源。
+  const action = await foundry.applications.api.DialogV2.wait({
     classes: ["dialog", "xjzl-rsync-confirm-dialog"],
     window: {
       title: game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmTitle"),
       icon: "fas fa-arrows-rotate"
     },
-    content: `<div class="xjzl-rsync-confirm"><p>${game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmIntro")}</p><ul>${confirmPoints}</ul></div>`,
+    content: `<div class="xjzl-rsync-confirm">
+      <p>${game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmIntro")}</p>
+      <ul>${confirmPoints}</ul>
+      <label class="xjzl-rsync-token-option">
+        <input type="checkbox" id="xjzl-rsync-include-tokens">
+        <span>${game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmIncludeTokens")}</span>
+      </label>
+      <p class="xjzl-rsync-token-hint">${game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmIncludeTokensHint")}</p>
+    </div>`,
+    buttons: [
+      {
+        action: "confirm",
+        label: game.i18n.localize("XJZL.Settings.ResourceSync.ConfirmRun"),
+        icon: "fas fa-arrows-rotate",
+        // callback 返回值经 ?? button.action 后成为 wait 的 resolve 值：确认返回对象
+        // 同时表达“确认执行”与“是否包含 Token”；取消/关闭返回 action 名或 null。
+        callback: (_event, _button, dialog) => ({
+          includeTokens: Boolean(dialog.element?.querySelector("#xjzl-rsync-include-tokens")?.checked)
+        })
+      },
+      {
+        action: "cancel",
+        label: game.i18n.localize("XJZL.Settings.ResourceSync.CancelRun"),
+        icon: "fas fa-xmark"
+      }
+    ],
+    default: "confirm",
     rejectClose: false
   });
-  if (!confirmed) return undefined;
+  // wait 的 resolve 值：确认按钮 callback 返回对象；取消按钮返回 action 名字符串
+  // （truthy！）；点击关闭返回 null。三者中只有对象表示确认执行。
+  if (!action || typeof action !== "object") return undefined;
   ui.notifications.info(game.i18n.localize("XJZL.Settings.ResourceSync.Starting"));
-  resourceSyncPending = runResourceSync();
+  let progress = null;
   try {
+    progress = await showResourceSyncProgress();
+    resourceSyncPending = runResourceSync({ includeTokens: action.includeTokens === true, onProgress: makeProgressReporter(progress) });
     const report = await resourceSyncPending;
     const app = new XJZLResourceSyncReport({ report });
     await app.render(true);
     return app;
   } catch (error) {
-    console.error("XJZL | 角色资源同步报告打开失败:", error);
+    console.error("XJZL | 角色资源同步失败:", error);
     ui.notifications.error(game.i18n.localize("XJZL.Settings.ResourceSync.Failed"));
     return undefined;
   } finally {
+    // 关闭失败只留警告：它是非关键清理路径，不应把窗口问题误报成同步失败，也不能静默吞掉。
+    await progress?.close().catch(error => console.warn("XJZL | 角色资源同步进度窗口关闭失败:", error));
     resourceSyncPending = null;
   }
 }
