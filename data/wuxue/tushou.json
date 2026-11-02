@@ -10598,7 +10598,7 @@
             "category": "wuxue",
             "sect": "jianghushili",
             "tier": 3,
-            "description": "<p>源于易术功法，以四季六气为旺衰指引，以六甲值符为吉凶判辨之坐标，以三元九运为招式转换。此功法势大磅礴，但是却需要气运为辅。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
+            "description": "<p>源于易术功法，以四季六气为旺衰指引，以六甲值符为吉凶判辨之坐标，以三元九运为招式转换。此功法势大磅礴，但是却需要气运为辅。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p><p>（注：六气按顺序分别为 厥阴风木、少阴君火、太阴湿土、少阳相火、阳明燥金、太阳寒水。六气只能存在一回合。）</p>",
             "requirements": "徒手",
             "moves": [
                 {
@@ -10610,8 +10610,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>一手平铺，一手打圆，以静养动，以动制静，开启架招。格挡成功后，随机获得一种“六气”状态。（投掷 D6 决定）</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "格挡获六气自动。",
+                    "description": "<p>次要动作，一手平铺，一手打圆，以静养动，以动制静，开启架招。格挡成功后，随机获得一种“六气”状态。（投掷 D6 决定）</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化：格挡成功后自动投掷 D6（含 3D 骰子动画）获得对应“六气”并发送卡片播报；六气存在一回合后自动消散。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -10626,9 +10626,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "随机获气",
+                            "label": "格挡得气",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst roll = Math.floor(Math.random() * 6) + 1;\nconst map = {1:\"厥阴风木\", 2:\"少阴君火\", 3:\"太阴湿土\", 4:\"少阳相火\", 5:\"阳明燥金\", 6:\"太阳寒水\"};\nconst name = map[roll];\nconst eff = thisItem.effects.getName(name).toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`格挡获得六气：${name}`);",
+                            "script": "// 起白印黑：格挡成功后投 D6 决定获得哪种“六气”（真实掷骰、3D 动画与卡片播报；六气只存在一回合）。\nif (!Macros.checkStance(actor, args)) return;\nconst lqRoll = await new Roll(\"1d6\").evaluate();\nif (game.dice3d) await game.dice3d.showForRoll(lqRoll, game.user, true);\nconst lqMap = [\"厥阴风木\", \"少阴君火\", \"太阴湿土\", \"少阳相火\", \"阳明燥金\", \"太阳寒水\"];\nconst lqName = lqMap[lqRoll.total - 1];\nconst lqTpl = thisItem.effects.getName(lqName);\nif (!lqTpl) return;\nconst lqData = lqTpl.toObject();\ndelete lqData._id;\nlqData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, lqData);\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #16a085; padding:4px 8px; background:rgba(22,160,133,0.1);\"><b>起白印黑 · 格挡得气</b><br>D6 掷出 <b>${lqRoll.total}</b>，获得“六气”【${lqName}】（存在一回合，可用【画碧染绿】或连招消耗）。</div></div>`\n});",
                             "active": true
                         }
                     ]
@@ -10641,10 +10641,10 @@
                     "damageType": "none",
                     "weaponType": "unarmed",
                     "range": "3米",
-                    "targetInfo": "单体",
+                    "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>将汇集的“六气”之一晕化于周遭天地之间，根据释放的气息不同产生不同效果，同一时间只能存在一种六气效果。</p><p>厥阴风木：你的回合结束时，周围 3 米所有友方角色立即恢复 20 点气血，持续@{1 + @up|一}回合。</p><p>少阴君火：周围 3 米所有友方角色造成外功伤害时，伤害提高 20 点，持续@{1 + @up|一}回合。</p><p>太阴湿土：周围 3 米所有友方角色获得 10 点内功防御，持续@{1 + @up|一}回合。</p><p>少阳相火：周围 3 米所有友方角色造成内功伤害时，伤害提高 20 点，持续@{1 + @up|一}回合。</p><p>阳明燥金：周围 3 米所有战斗变得华丽异常，所有角色神采值增加 20 点，持续@{1 + @up|一}回合。</p><p>太阳寒水：周围 3 米所有敌人内力窒碍，施展轻功额外消耗 10 点内力，持续@{1 + @up|一}回合。</p><p><strong>升级：</strong>持续时间+1 回合，内力消耗+4。</p>",
-                    "automationNote": "部分自动化：施展时选择一种“六气”，自动生成跟随自身的 3 米六气区域（同一时间只存在一种，新的自动替换旧的），持续 1+升级 回合。少阴君火/少阳相火的招式伤害+20、太阴湿土的内防+10、阳明燥金的神采+20 自动生效；厥阴风木在你的回合末自动为区域内友方回复 20 气血；太阳寒水的“轻功额外消耗 10 内力”需 GM 手动结算。脱战或到期时消散。",
+                    "description": "<p>次要动作，将汇集的“六气”之一晕化于周遭天地之间，根据释放的气息不同产生不同效果，同一时间只能存在一种六气效果。</p><p>厥阴风木：你的回合结束时，周围 3 米所有友方角色立即恢复 20 点气血，持续@{1 + @up|一}回合。</p><p>少阴君火：周围 3 米所有友方角色造成外功伤害时，伤害提高 20 点，持续@{1 + @up|一}回合。</p><p>太阴湿土：周围 3 米所有友方角色获得 10 点内功防御，持续@{1 + @up|一}回合。</p><p>少阳相火：周围 3 米所有友方角色造成内功伤害时，伤害提高 20 点，持续@{1 + @up|一}回合。</p><p>阳明燥金：周围 3 米所有战斗变得华丽异常，所有角色神采值增加 20 点，持续@{1 + @up|一}回合。</p><p>太阳寒水：周围 3 米所有敌人内力窒碍，施展轻功额外消耗 10 点内力，持续@{1 + @up|一}回合。</p><p><strong>升级：</strong>持续时间+1 回合，内力消耗+4。</p>",
+                    "automationNote": "完全自动化：施展时从身上已有的“六气”中选择一种并自动消耗（身上无六气时无法施展），自动生成跟随自身的 3 米六气区域，持续 1+升级 回合，同一时间只存在一种（新的自动替换旧的）。区域内效果全部自动生效：少阴君火/少阳相火提高友方对应伤害 20、太阴湿土内功防御+10、阳明燥金所有角色神采+20、太阳寒水敌人施展轻功额外消耗 10 内力；厥阴风木在你的回合结束时自动回复区域内友方 20 气血。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -10660,16 +10660,22 @@
                     },
                     "scripts": [
                         {
+                            "label": "选气消耗",
+                            "trigger": "preAttack",
+                            "script": "// 画碧染绿：施展需消耗身上的一种“六气”（消耗是施展前提，置于扣费前；无六气或取消时中止出招）。\nconst lqSlugs = { \"厥阴风木\": \"six_qi_1\", \"少阴君火\": \"six_qi_2\", \"太阴湿土\": \"six_qi_3\", \"少阳相火\": \"six_qi_4\", \"阳明燥金\": \"six_qi_5\", \"太阳寒水\": \"six_qi_6\" };\nconst lqOwned = Object.keys(lqSlugs).filter(q => actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqSlugs[q]));\nif (!lqOwned.length) {\n    args.abort = true;\n    args.abortReason = \"身上没有“六气”状态，无法施展【画碧染绿】。\";\n    return;\n}\n// 先核对内力余额再移除六气：preAttack 的文档写入不会因后续余额检查失败而回滚。\nif ((S.resources.mp.value || 0) < (args.costConfig.mp || 0)) {\n    args.abort = true;\n    args.abortReason = \"内力不足，无法施展【画碧染绿】。\";\n    return;\n}\nconst lqDesc = {\n    \"厥阴风木\": \"你的回合结束时区域内友方回复 20 气血\",\n    \"少阴君火\": \"区域内友方外功伤害+20\",\n    \"太阴湿土\": \"区域内友方内功防御+10\",\n    \"少阳相火\": \"区域内友方内功伤害+20\",\n    \"阳明燥金\": \"区域内所有角色神采+20\",\n    \"太阳寒水\": \"区域内敌人施展轻功额外消耗 10 内力\"\n};\nconst lqAnswer = await ask({\n    title: \"画碧染绿 · 消耗六气\",\n    content: \"<p>选择消耗身上的一种“六气”，将其晕化于周遭天地（持续 \" + (1 + Math.max(0, (move.computedLevel || 1) - 1)) + \" 回合）：</p>\",\n    buttons: [\n        { action: \"confirm\", label: \"确认消耗\", icon: \"fas fa-check\", default: true },\n        { action: \"cancel\", label: \"取消施展\", icon: \"fas fa-times\" }\n    ],\n    fields: [{ name: \"qi\", label: \"六气\", type: \"select\", options: lqOwned.map(q => ({ value: q, label: q + \"（\" + lqDesc[q] + \"）\" })) }]\n});\nif (!(lqAnswer.status === \"answered\" && lqAnswer.action === \"confirm\")) {\n    args.abort = true;\n    args.abortReason = \"已取消六气选择，本次出招中止。\";\n    return;\n}\nconst lqName = lqAnswer.values.qi;\nconst lqSlug = lqSlugs[lqName];\n// 等待答复后复核六气仍在身上，再实际消耗。\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqSlug)) {\n    args.abort = true;\n    args.abortReason = \"【\" + lqName + \"】已不在身上，本次出招中止。\";\n    return;\n}\nawait game.xjzl.api.effects.removeEffect(actor, lqSlug);\nif (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqSlug)) {\n    args.abort = true;\n    args.abortReason = \"六气消耗失败，本次出招中止。\";\n    return;\n}\n// 记录本场战斗已消耗的六气种类（九紫运来的施展前提，换场重置）。\nconst lqCid = game.combat?.id ?? null;\nconst lqRec = actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || {};\nconst lqUsed = new Set(lqRec.combatId === lqCid ? (lqRec.used || []) : []);\nlqUsed.add(lqName);\nawait actor.setFlag(\"xjzl-system\", \"wuxue_liuqi_used\", { combatId: lqCid, used: Array.from(lqUsed) });\nargs.scriptFlags.liuqiChoice = lqName;",
+                            "active": true
+                        },
+                        {
                             "label": "六气晕染",
                             "trigger": "attack",
-                            "active": true,
-                            "script": "// 六气：选择六气之一晕染周身 3 米（同一时间只能存在一种，同标签自动替换旧的）。\n// 阳明燥金作用于所有角色，太阳寒水作用于敌人，其余作用于友方（含己）。\nconst lqLvl = Math.max(1, move.computedLevel || 1);\nconst lqChoice = await foundry.applications.api.DialogV2.wait({\n    window: {title: \"画碧染绿·选择六气\"},\n    content: \"<p>选择本次晕染的“六气”（持续 \" + (1 + (lqLvl - 1)) + \" 回合）：</p>\",\n    buttons: [\n        {action: \"厥阴风木\", label: \"厥阴风木（你的回合末，周围 3 米友方回 20 气血）\"},\n        {action: \"少阴君火\", label: \"少阴君火（周围 3 米友方招式伤害+20）\"},\n        {action: \"太阴湿土\", label: \"太阴湿土（周围 3 米友方内功防御+10）\"},\n        {action: \"少阳相火\", label: \"少阳相火（周围 3 米友方招式伤害+20）\"},\n        {action: \"阳明燥金\", label: \"阳明燥金（周围 3 米所有角色神采+20）\"},\n        {action: \"太阳寒水\", label: \"太阳寒水（周围 3 米敌人轻功额外耗 10 内力，手动）\"}\n    ]\n});\nif (!lqChoice) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消六气选择，本次出招中止。\";\n    return;\n}\nconst lqFaction = lqChoice === \"阳明燥金\" ? \"all\" : (lqChoice === \"太阳寒水\" ? \"enemy\" : \"ally\");\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-liuqi-\" + actor.id,\n    displayName: \"六气·\" + lqChoice,\n    follow: true,\n    radius: 3,\n    faction: lqFaction,\n    includeSelf: true,\n    payloadItemUuid: item.uuid,\n    payloadEffectName: lqChoice,\n    durationRounds: 1 + (lqLvl - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n});\n// 记录已消耗过的六气种类（九紫运来的施展前提）。\nconst lqUsed = new Set(actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || []);\nlqUsed.add(lqChoice);\nawait actor.setFlag(\"xjzl-system\", \"wuxue_liuqi_used\", Array.from(lqUsed));\n"
+                            "script": "// 六气晕染：按 preAttack 消耗的六气生成跟随自身的 3 米区域；同标签自动替换，同一时间只存在一种六气效果。\nconst lqChoice = args.flags?.liuqiChoice;\nif (!lqChoice) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"六气选择记录缺失，本次出招中止。\";\n    return;\n}\nconst lqDur = 1 + (Math.max(1, move.computedLevel || 1) - 1);\nconst lqParams = {\n    label: \"wuxue-liuqi-\" + actor.id,\n    displayName: \"六气·\" + lqChoice,\n    follow: true,\n    radius: 3,\n    faction: lqChoice === \"阳明燥金\" ? \"all\" : (lqChoice === \"太阳寒水\" ? \"enemy\" : \"ally\"),\n    includeSelf: true,\n    durationRounds: lqDur,\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null,\n    cleanupOnExit: true\n};\n// 厥阴风木无 payload：回合末回复由本招 [六气回复] 脚本结算。\nif (lqChoice !== \"厥阴风木\") {\n    lqParams.payloadItemUuid = item.uuid;\n    lqParams.payloadEffectName = \"六气·\" + lqChoice;\n}\nawait game.xjzl.aura.create(actor, lqParams);\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #27ae60; padding:4px 8px; background:rgba(39,174,96,0.1);\"><b>画碧染绿 · ${lqChoice}</b><br>消耗【${lqChoice}】，六气晕染于周围 3 米（持续 ${lqDur} 回合）。</div></div>`\n});",
+                            "active": true
                         },
                         {
                             "label": "六气回复",
                             "trigger": "turnEnd",
-                            "active": true,
-                            "script": "// 厥阴风木：自身回合结束时，六气区域内友方（含己）恢复 20 气血；\n// 六丁六甲阵（九紫运来）存在时按翻倍口径独立结算 40（阵与风木可并存，各自按所在区域回复）。\nconst lqTok = combatant?.token;\nconst lqDisp = lqTok?.disposition; // TokenDocument 直接携带 disposition，无 .document 层。\nconst lqHealIn = async (lqRegion, lqAmount) => {\n    if (!lqRegion) return;\n    for (const lqT of lqRegion.tokens) {\n        if (!lqT.actor) continue;\n        if (lqT.disposition !== lqDisp) continue;\n        await lqT.actor.applyHealing({amount: lqAmount, type: \"hp\", healer: actor});\n    }\n};\nconst ljRegion2 = game.xjzl.aura.query(\"wuxue-liujia-\" + actor.id, {scene: combatant?.token?.parent, source: combatant?.token})[0];\nawait lqHealIn(ljRegion2, 40);\nconst lqRegion2 = game.xjzl.aura.query(\"wuxue-liuqi-\" + actor.id, {scene: combatant?.token?.parent, source: combatant?.token})[0];\nif (lqRegion2?.getFlag(\"xjzl-system\", \"aura\")?.params?.payloadEffectName === \"厥阴风木\") {\n    await lqHealIn(lqRegion2, 20);\n}\n"
+                            "script": "// 厥阴风木：自身回合结束时，六气区域内友方（含己）恢复 20 气血；\n// 六丁六甲阵（九紫运来）具备全部六气的翻倍效果，阵内友方独立结算 40 气血。\nconst lqTok = combatant?.token;\nconst lqScene = lqTok?.parent;\nconst lqDisp = lqTok?.disposition; // TokenDocument 直接携带 disposition，无 .document 层。\nconst lqHealIn = async (lqRegion, lqAmount) => {\n    if (!lqRegion) return;\n    for (const lqT of lqRegion.tokens) {\n        if (!lqT.actor) continue;\n        if (lqT.disposition !== lqDisp) continue; // 只治疗友方（含己），中立与敌方不计。\n        await lqT.actor.applyHealing({ amount: lqAmount, type: \"hp\", healer: actor });\n    }\n};\nconst ljRegion = game.xjzl.aura.query(\"wuxue-liujia-\" + actor.id, { scene: lqScene, source: lqTok })[0];\nawait lqHealIn(ljRegion, 40);\nconst lqRegion = game.xjzl.aura.query(\"wuxue-liuqi-\" + actor.id, { scene: lqScene, source: lqTok })[0];\nif (lqRegion?.getFlag(\"xjzl-system\", \"aura\")?.params?.displayName === \"六气·厥阴风木\") {\n    await lqHealIn(lqRegion, 20);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -10682,8 +10688,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>击敌手臂，产生吸力，将其臂膀擒入手中，绕至目标正前方空格，对其造成伤害，若击中开启架招的目标，你随机获得一层“六气”，若招式施展完毕后，存在“少阴君火”或“太阴湿土”，则可立即不消耗动作施展一次【惊赤流白】。然后消耗自身存在的“少阴君火”和“太阴湿土”状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击中架招获气自动。连招判定与消耗手动。",
+                    "description": "<p>主要动作，击敌手臂，产生吸力，将其臂膀擒入手中，绕至目标正前方空格，对其造成 0.6 内息点内功伤害，若击中开启架招的目标，你随机获得一层“六气”，若招式施展完毕后，存在“少阴君火”或“太阴湿土”，则可立即不消耗动作施展一次【惊赤流白】。然后消耗自身存在的“少阴君火”和“太阴湿土”状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击中开启架招的目标后自动投 D6 获得六气；施展完毕后若存在少阴君火/太阴湿土，自动弹窗询问是否消耗并发动连招，确认后自动消耗对应六气并发卡提醒可立即不消耗动作施展【惊赤流白】（招式本身仍需手动点选施展）。绕至目标正前方空格需手动移动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -10704,9 +10710,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "架招获气",
+                            "label": "架招得气",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.target.system.martial.stanceActive) {\n    const roll = Math.floor(Math.random() * 6) + 1;\n    const map = {1:\"厥阴风木\", 2:\"少阴君火\", 3:\"太阴湿土\", 4:\"少阳相火\", 5:\"阳明燥金\", 6:\"太阳寒水\"};\n    const name = map[roll];\n    const eff = thisItem.effects.getName(name).toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(`击中架招获得六气：${name}`);\n}",
+                            "script": "// 击中开启架招的目标后投 D6 获得一层“六气”（真实掷骰、3D 动画与卡片播报；六气只存在一回合）。\nif (!args.isHit || !args.target?.system?.martial?.stanceActive) return;\nconst lqRoll = await new Roll(\"1d6\").evaluate();\nif (game.dice3d) await game.dice3d.showForRoll(lqRoll, game.user, true);\nconst lqMap = [\"厥阴风木\", \"少阴君火\", \"太阴湿土\", \"少阳相火\", \"阳明燥金\", \"太阳寒水\"];\nconst lqName = lqMap[lqRoll.total - 1];\nconst lqTpl = thisItem.effects.getName(lqName);\nif (!lqTpl) return;\nconst lqData = lqTpl.toObject();\ndelete lqData._id;\nlqData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, lqData);\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #16a085; padding:4px 8px; background:rgba(22,160,133,0.1);\"><b>${args.move?.name || \"架招得气\"} · 架招得气</b><br>击中开启架招的目标，D6 掷出 <b>${lqRoll.total}</b>，获得“六气”【${lqName}】（存在一回合）。</div></div>`\n});",
+                            "active": true
+                        },
+                        {
+                            "label": "连招·惊赤流白",
+                            "trigger": "hit_once",
+                            "script": "// 连招：招式施展完毕后（不论是否命中），若身上存在触发之气（含本次随机获得的），询问是否消耗并发动连招。\n// 确认后消耗身上仍存在的全部触发之气（规则：消耗自身存在的对应六气状态），并记入六气消耗记录。\nconst lqPair = { \"少阴君火\": \"six_qi_2\", \"太阴湿土\": \"six_qi_3\"};\nconst lqNext = \"惊赤流白\";\nconst lqSelf = \"通黄绣白\";\nconst lqOwned = Object.keys(lqPair).filter(q => actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqPair[q]));\nif (!lqOwned.length) return;\nconst lqAnswer = await ask({\n    title: lqSelf + \" · 连招\",\n    content: `<p>身上存在【${lqOwned.join(\"、\")}】。消耗后可立即不消耗动作施展一次【${lqNext}】。</p>`,\n    buttons: [\n        { action: \"consume\", label: `消耗【${lqOwned.join(\"、\")}】并发动连招`, icon: \"fas fa-fire\", default: true },\n        { action: \"decline\", label: \"保留六气，不连招\", icon: \"fas fa-times\" }\n    ]\n});\nif (!(lqAnswer.status === \"answered\" && lqAnswer.action === \"consume\")) return;\n// 等待答复后复核：只移除仍然存在的触发之气，仅对实际移除者记录消耗。\nconst lqConsumed = [];\nfor (const lqQ of lqOwned) {\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqPair[lqQ])) continue;\n    await game.xjzl.api.effects.removeEffect(actor, lqPair[lqQ]);\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqPair[lqQ])) lqConsumed.push(lqQ);\n}\nif (!lqConsumed.length) {\n    ui.notifications.warn(\"【\" + lqSelf + \"】连招：触发之气已不在身上，本次未消耗。\");\n    return;\n}\nconst lqCid = game.combat?.id ?? null;\nconst lqRec = actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || {};\nconst lqUsed = new Set(lqRec.combatId === lqCid ? (lqRec.used || []) : []);\nfor (const lqQ of lqConsumed) lqUsed.add(lqQ);\nawait actor.setFlag(\"xjzl-system\", \"wuxue_liuqi_used\", { combatId: lqCid, used: Array.from(lqUsed) });\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #c0392b; padding:4px 8px; background:rgba(192,57,43,0.1);\"><b>${lqSelf} · 连招发动</b><br>消耗【${lqConsumed.join(\"、\")}】，可立即不消耗动作施展一次【${lqNext}】！</div></div>`\n});",
                             "active": true
                         }
                     ]
@@ -10720,8 +10732,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>转身回旋，绕至目标身后空格，双掌连攻目标脊背。对其造成伤害，若击中开启架招的目标，则随机获得一层“六气”，若招式施展完毕后，存在“少阳相火”或“太阳寒水”，则可立即不消耗动作施展一次【通黄绣白】。然后消耗自身存在的“少阳相火”和“太阳寒水”状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击中架招获气自动。连招判定与消耗手动。",
+                    "description": "<p>主要动作，转身回旋，绕至目标身后空格，双掌连攻目标脊背。对其造成 0.6 内息点内功伤害，若击中开启架招的目标，则随机获得一层“六气”，若招式施展完毕后，存在“少阳相火”或“太阳寒水”，则可立即不消耗动作施展一次【通黄绣白】。然后消耗自身存在的“少阳相火”和“太阳寒水”状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击中开启架招的目标后自动投 D6 获得六气；施展完毕后若存在少阳相火/太阳寒水，自动弹窗询问是否消耗并发动连招，确认后自动消耗对应六气并发卡提醒可立即不消耗动作施展【通黄绣白】（招式本身仍需手动点选施展）。绕至目标身后空格需手动移动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -10742,9 +10754,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "架招获气",
+                            "label": "架招得气",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.target.system.martial.stanceActive) {\n    const roll = Math.floor(Math.random() * 6) + 1;\n    const map = {1:\"厥阴风木\", 2:\"少阴君火\", 3:\"太阴湿土\", 4:\"少阳相火\", 5:\"阳明燥金\", 6:\"太阳寒水\"};\n    const name = map[roll];\n    const eff = thisItem.effects.getName(name).toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(`击中架招获得六气：${name}`);\n}",
+                            "script": "// 击中开启架招的目标后投 D6 获得一层“六气”（真实掷骰、3D 动画与卡片播报；六气只存在一回合）。\nif (!args.isHit || !args.target?.system?.martial?.stanceActive) return;\nconst lqRoll = await new Roll(\"1d6\").evaluate();\nif (game.dice3d) await game.dice3d.showForRoll(lqRoll, game.user, true);\nconst lqMap = [\"厥阴风木\", \"少阴君火\", \"太阴湿土\", \"少阳相火\", \"阳明燥金\", \"太阳寒水\"];\nconst lqName = lqMap[lqRoll.total - 1];\nconst lqTpl = thisItem.effects.getName(lqName);\nif (!lqTpl) return;\nconst lqData = lqTpl.toObject();\ndelete lqData._id;\nlqData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, lqData);\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #16a085; padding:4px 8px; background:rgba(22,160,133,0.1);\"><b>${args.move?.name || \"架招得气\"} · 架招得气</b><br>击中开启架招的目标，D6 掷出 <b>${lqRoll.total}</b>，获得“六气”【${lqName}】（存在一回合）。</div></div>`\n});",
+                            "active": true
+                        },
+                        {
+                            "label": "连招·通黄绣白",
+                            "trigger": "hit_once",
+                            "script": "// 连招：招式施展完毕后（不论是否命中），若身上存在触发之气（含本次随机获得的），询问是否消耗并发动连招。\n// 确认后消耗身上仍存在的全部触发之气（规则：消耗自身存在的对应六气状态），并记入六气消耗记录。\nconst lqPair = { \"少阳相火\": \"six_qi_4\", \"太阳寒水\": \"six_qi_6\"};\nconst lqNext = \"通黄绣白\";\nconst lqSelf = \"惊赤流白\";\nconst lqOwned = Object.keys(lqPair).filter(q => actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqPair[q]));\nif (!lqOwned.length) return;\nconst lqAnswer = await ask({\n    title: lqSelf + \" · 连招\",\n    content: `<p>身上存在【${lqOwned.join(\"、\")}】。消耗后可立即不消耗动作施展一次【${lqNext}】。</p>`,\n    buttons: [\n        { action: \"consume\", label: `消耗【${lqOwned.join(\"、\")}】并发动连招`, icon: \"fas fa-fire\", default: true },\n        { action: \"decline\", label: \"保留六气，不连招\", icon: \"fas fa-times\" }\n    ]\n});\nif (!(lqAnswer.status === \"answered\" && lqAnswer.action === \"consume\")) return;\n// 等待答复后复核：只移除仍然存在的触发之气，仅对实际移除者记录消耗。\nconst lqConsumed = [];\nfor (const lqQ of lqOwned) {\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqPair[lqQ])) continue;\n    await game.xjzl.api.effects.removeEffect(actor, lqPair[lqQ]);\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === lqPair[lqQ])) lqConsumed.push(lqQ);\n}\nif (!lqConsumed.length) {\n    ui.notifications.warn(\"【\" + lqSelf + \"】连招：触发之气已不在身上，本次未消耗。\");\n    return;\n}\nconst lqCid = game.combat?.id ?? null;\nconst lqRec = actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || {};\nconst lqUsed = new Set(lqRec.combatId === lqCid ? (lqRec.used || []) : []);\nfor (const lqQ of lqConsumed) lqUsed.add(lqQ);\nawait actor.setFlag(\"xjzl-system\", \"wuxue_liuqi_used\", { combatId: lqCid, used: Array.from(lqUsed) });\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #c0392b; padding:4px 8px; background:rgba(192,57,43,0.1);\"><b>${lqSelf} · 连招发动</b><br>消耗【${lqConsumed.join(\"、\")}】，可立即不消耗动作施展一次【${lqNext}】！</div></div>`\n});",
                             "active": true
                         }
                     ]
@@ -10760,8 +10778,8 @@
                     "range": "10米",
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
-                    "description": "<p>只有使用招式消耗过 6 种不同的“六气”状态才能施展，次要动作，在周围 10 米布下‘六丁六甲阵’，持续 @{3 + @up|3} 回合。</p><p><strong>六丁六甲阵：</strong>区域内具有所有【画碧染绿】中的六气效果，且范围变为六丁六甲阵的范围，相关效果数值翻倍。</p><p><strong>升级：</strong>持续回合+1，内力消耗+8，怒气消耗-1。</p>",
-                    "automationNote": "部分自动化：施展前提（曾以画碧染绿消耗过全部六种六气）自动校验。展开的 10 米“六丁六甲阵”持续 3+升级 回合并用于范围显示；厥阴风木的翻倍回复（回合末 40 气血）自动结算，其余五气的翻倍效果请按聊天卡提示手动赋予区域内角色。到期或脱战时消散。",
+                    "description": "<p>只有使用招式消耗过 6 种不同的“六气”状态才能施展，次要动作，在周围 10 米布下‘六丁六甲阵’，持续@{3 + @up|3} 回合。</p><p><strong>六丁六甲阵：</strong>区域内具有所有【画碧染绿】中的六气效果，且范围变为六丁六甲阵的范围，相关效果数值翻倍。</p><p>·六丁六甲阵形成在原地，不会跟随你移动，你只能拥有一个六丁六甲阵，如果你形成新的六丁六甲阵，之前的消失。</p><p><strong>升级：</strong>持续回合+1，内力消耗+8，怒气消耗-1。</p>",
+                    "automationNote": "完全自动化：施展前提（本场战斗中以招式消耗过全部六种六气，画碧染绿与连招消耗均计入，换场重置）自动校验；原地展开不跟随移动的 10 米六丁六甲阵，持续 3+升级 回合，再次施展自动替换旧阵。阵内效果全部翻倍且自动生效：友方外功/内功伤害+40、内功防御+20、神采+40，阵主回合结束时友方回复 40 气血；所有角色神采+40，敌人施展轻功额外消耗 20 内力。",
                     "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
@@ -10783,10 +10801,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "六丁六甲阵",
+                            "label": "阵图前提",
+                            "trigger": "preAttack",
+                            "script": "// 九紫运来：以招式消耗过全部六种六气是施展前提（按本场战斗累计，换场重置），置于扣费前校验。\nconst lqAll = [\"厥阴风木\", \"少阴君火\", \"太阴湿土\", \"少阳相火\", \"阳明燥金\", \"太阳寒水\"];\nconst lqCid = game.combat?.id ?? null;\nconst lqRec = actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || {};\nconst lqUsed = new Set(lqRec.combatId === lqCid ? (lqRec.used || []) : []);\nconst lqMissing = lqAll.filter(q => !lqUsed.has(q));\nif (lqMissing.length) {\n    args.abort = true;\n    args.abortReason = \"本场战斗尚未以招式消耗过：\" + lqMissing.join(\"、\") + \"，无法施展【九紫运来】。\";\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "布六丁六甲阵",
                             "trigger": "attack",
-                            "active": true,
-                            "script": "// 六丁六甲阵：前置为本角色曾以画碧染绿消耗过全部六种六气（自动记录）。\n// 阵内六气效果数值翻倍——厥阴风木的翻倍回复由[六气回复]脚本自动结算；\n// 其余五气无法由单一 payload 表达翻倍，需由 GM 手动赋予区域内角色。\nconst ljUsed2 = new Set(actor.getFlag(\"xjzl-system\", \"wuxue_liuqi_used\") || []);\nconst ljAll2 = [\"厥阴风木\", \"少阴君火\", \"太阴湿土\", \"少阳相火\", \"阳明燥金\", \"太阳寒水\"];\nconst ljMissing2 = ljAll2.filter(q => !ljUsed2.has(q));\nif (ljMissing2.length) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"尚未以画碧染绿消耗过：\" + ljMissing2.join(\"、\") + \"。\";\n    return;\n}\nconst ljLvl2 = Math.max(1, move.computedLevel || 1);\nawait game.xjzl.aura.create(actor, {\n    label: \"wuxue-liujia-\" + actor.id,\n    displayName: \"六丁六甲阵\",\n    follow: true,\n    radius: 10,\n    faction: \"all\",\n    includeSelf: true,\n    enterEnabled: false,\n    durationRounds: 3 + (ljLvl2 - 1),\n    lifecycle: \"combat\",\n    combatId: game.combat?.id ?? null\n});\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: \"<div class='xjzl-chat-card'><b>六丁六甲阵</b> 已展开（10 米，\" + (3 + (ljLvl2 - 1)) + \" 回合）：厥阴风木翻倍回复已自动；少阴君火/少阳相火招式伤害+40、太阴湿土内防+20、阳明燥金神采+40、太阳寒水轻功多耗 20 内力，请手动赋予区域内角色。</div>\"\n});\n"
+                            "script": "// 六丁六甲阵：原地展开（不跟随移动），具备全部六气且数值翻倍——\n// 友方增益（生气）与敌方减益（煞气）分两个同型区域承载；同标签自动替换，再次施阵时旧阵消失。\nconst lqLvl = Math.max(1, move.computedLevel || 1);\nconst lqDur = 3 + (lqLvl - 1);\nconst lqCombat = game.combat?.id ?? null;\nconst lqBase = {\n    displayName: \"六丁六甲阵\",\n    follow: false,\n    radius: 10,\n    durationRounds: lqDur,\n    lifecycle: \"combat\",\n    combatId: lqCombat,\n    cleanupOnExit: true,\n    payloadItemUuid: item.uuid\n};\n// 厥阴风木的翻倍回复（40 气血）由【画碧染绿】的 [六气回复] 脚本按阵区域结算。\nawait game.xjzl.aura.create(actor, { ...lqBase, label: \"wuxue-liujia-\" + actor.id, faction: \"ally\", includeSelf: true, payloadEffectName: \"六丁六甲阵·生气\" });\nawait game.xjzl.aura.create(actor, { ...lqBase, label: \"wuxue-liujia-sha-\" + actor.id, faction: \"enemy\", includeSelf: false, payloadEffectName: \"六丁六甲阵·煞气\" });\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #8e44ad; padding:4px 8px; background:rgba(142,68,173,0.1);\"><b>九紫运来 · 六丁六甲阵</b><br>原地布下 10 米六丁六甲阵（持续 ${lqDur} 回合）：阵内友方外功/内功伤害+40、内功防御+20、神采+40，阵主回合结束时回复 40 气血；阵内所有角色神采+40，敌人施展轻功额外消耗 20 内力。</div></div>`\n});",
+                            "active": true
                         }
                     ]
                 }
@@ -10795,7 +10819,7 @@
         "effects": [
             {
                 "name": "厥阴风木",
-                "description": "回合结束周围友方回血20。",
+                "description": "持有此六气（存在一回合）。以【画碧染绿】消耗后：你的回合结束时，周围 3 米友方立即恢复 20 点气血，持续一回合。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -10804,22 +10828,117 @@
                     }
                 },
                 "img": "icons/magic/nature/leaf-glow-green.webp",
-                "showIcon": 2
+                "showIcon": 2,
+                "duration": {
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                }
             },
             {
                 "name": "少阴君火",
-                "description": "少阴君火：周围 3 米友方造成外功伤害时，伤害提高 20 点。",
+                "description": "持有此六气（存在一回合）。以【画碧染绿】消耗后：周围 3 米友方造成外功伤害时，伤害提高 20 点，持续一回合。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "six_qi_2",
+                        "stackable": false
+                    }
+                },
+                "img": "icons/magic/fire/flame-burning-orange.webp",
+                "showIcon": 2,
+                "duration": {
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                }
+            },
+            {
+                "name": "太阴湿土",
+                "description": "持有此六气（存在一回合）。以【画碧染绿】消耗后：周围 3 米友方获得 10 点内功防御，持续一回合。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "six_qi_3",
+                        "stackable": false
+                    }
+                },
+                "img": "icons/magic/earth/rock-shatter-yellow.webp",
+                "showIcon": 2,
+                "duration": {
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                }
+            },
+            {
+                "name": "少阳相火",
+                "description": "持有此六气（存在一回合）。以【画碧染绿】消耗后：周围 3 米友方造成内功伤害时，伤害提高 20 点，持续一回合。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "six_qi_4",
+                        "stackable": false
+                    }
+                },
+                "img": "icons/magic/fire/explosion-fireball-red.webp",
+                "showIcon": 2,
+                "duration": {
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                }
+            },
+            {
+                "name": "阳明燥金",
+                "description": "持有此六气（存在一回合）。以【画碧染绿】消耗后：周围 3 米所有角色神采值增加 20 点，持续一回合。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "six_qi_5",
+                        "stackable": false
+                    }
+                },
+                "img": "icons/magic/light/beam-rays-gold.webp",
+                "showIcon": 2,
+                "duration": {
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                }
+            },
+            {
+                "name": "太阳寒水",
+                "description": "持有此六气（存在一回合）。以【画碧染绿】消耗后：周围 3 米所有敌人施展轻功额外消耗 10 点内力，持续一回合。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "six_qi_6",
+                        "stackable": false
+                    }
+                },
+                "img": "icons/magic/water/wave-ice-blue.webp",
+                "showIcon": 2,
+                "duration": {
+                    "value": 1,
+                    "units": "rounds",
+                    "expiry": "turnStart"
+                }
+            },
+            {
+                "name": "六气·少阴君火",
+                "description": "六气晕染·少阴君火：周围 3 米友方造成外功伤害时，伤害提高 20 点。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "six_qi_eff_2",
                         "stackable": false,
                         "scripts": [
                             {
                                 "label": "少阴君火·增伤",
                                 "trigger": "calc",
                                 "active": true,
-                                "script": "// 少阴君火：仅对外功伤害的招式生效（+20）。\nif ((args.move?.damageType ?? \"\") !== \"waigong\") return;\nargs.output.damage += 20;\nargs.output.bonusDesc.push(\"少阴君火 +20\");\n"
+                                "script": "// 少阴君火（六气晕染）：区域内友方造成外功伤害时，伤害提高 20 点。\nif ((args.move?.damageType ?? \"\") !== \"waigong\") return;\nargs.output.damage += 20;\nargs.output.bonusDesc.push(\"少阴君火 +20\");"
                             }
                         ]
                     }
@@ -10831,12 +10950,12 @@
                 }
             },
             {
-                "name": "太阴湿土",
-                "description": "周围友方内防+10。",
+                "name": "六气·太阴湿土",
+                "description": "六气晕染·太阴湿土：周围 3 米友方获得 10 点内功防御。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "six_qi_3",
+                        "slug": "six_qi_eff_3",
                         "stackable": false
                     }
                 },
@@ -10853,19 +10972,19 @@
                 }
             },
             {
-                "name": "少阳相火",
-                "description": "少阳相火：周围 3 米友方造成内功伤害时，伤害提高 20 点。",
+                "name": "六气·少阳相火",
+                "description": "六气晕染·少阳相火：周围 3 米友方造成内功伤害时，伤害提高 20 点。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "six_qi_4",
+                        "slug": "six_qi_eff_4",
                         "stackable": false,
                         "scripts": [
                             {
                                 "label": "少阳相火·增伤",
                                 "trigger": "calc",
                                 "active": true,
-                                "script": "// 少阳相火：仅对内功伤害的招式生效（+20）。\nif ((args.move?.damageType ?? \"\") !== \"neigong\") return;\nargs.output.damage += 20;\nargs.output.bonusDesc.push(\"少阳相火 +20\");\n"
+                                "script": "// 少阳相火（六气晕染）：区域内友方造成内功伤害时，伤害提高 20 点。\nif ((args.move?.damageType ?? \"\") !== \"neigong\") return;\nargs.output.damage += 20;\nargs.output.bonusDesc.push(\"少阳相火 +20\");"
                             }
                         ]
                     }
@@ -10877,12 +10996,12 @@
                 }
             },
             {
-                "name": "阳明燥金",
-                "description": "周围角色神采+20。",
+                "name": "六气·阳明燥金",
+                "description": "六气晕染·阳明燥金：周围 3 米所有角色神采值增加 20 点。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "six_qi_5",
+                        "slug": "six_qi_eff_5",
                         "stackable": false
                     }
                 },
@@ -10899,17 +11018,99 @@
                 }
             },
             {
-                "name": "太阳寒水",
-                "description": "周围敌人轻功耗内+10。",
+                "name": "六气·太阳寒水",
+                "description": "六气晕染·太阳寒水：周围 3 米所有敌人施展轻功额外消耗 10 点内力。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "six_qi_6",
-                        "stackable": false
+                        "slug": "six_qi_eff_6",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "太阳寒水·窒碍",
+                                "trigger": "preAttack",
+                                "active": true,
+                                "script": "// 太阳寒水（六气晕染）：区域内所有敌人施展轻功类武学时额外消耗 10 点内力。\nif (args.item?.system?.category !== \"qinggong\") return;\nargs.costConfig.mp += 10;\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #2980b9; padding:4px 8px; background:rgba(41,128,185,0.1);\"><b>太阳寒水 · 内力窒碍</b><br>施展轻功额外消耗 10 点内力。</div></div>`\n});"
+                            }
+                        ]
                     }
                 },
                 "img": "icons/magic/water/wave-ice-blue.webp",
-                "showIcon": 2
+                "showIcon": 2,
+                "system": {
+                    "changes": []
+                }
+            },
+            {
+                "name": "六丁六甲阵·生气",
+                "description": "六丁六甲阵（翻倍）：友方造成外功/内功伤害时伤害提高 40 点，内功防御+20，神采+40；阵主回合结束时友方回复 40 气血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "liujia_sheng",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "生气·少阴君火",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "// 少阴君火（六丁六甲阵·翻倍）：阵内友方造成外功伤害时，伤害提高 40 点。\nif ((args.move?.damageType ?? \"\") !== \"waigong\") return;\nargs.output.damage += 40;\nargs.output.bonusDesc.push(\"六丁六甲阵·少阴君火 +40\");"
+                            },
+                            {
+                                "label": "生气·少阳相火",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "// 少阳相火（六丁六甲阵·翻倍）：阵内友方造成内功伤害时，伤害提高 40 点。\nif ((args.move?.damageType ?? \"\") !== \"neigong\") return;\nargs.output.damage += 40;\nargs.output.bonusDesc.push(\"六丁六甲阵·少阳相火 +40\");"
+                            }
+                        ]
+                    }
+                },
+                "img": "icons/magic/light/beam-rays-gold.webp",
+                "showIcon": 2,
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.combat.def_neigong",
+                            "type": "add",
+                            "value": "20"
+                        },
+                        {
+                            "key": "system.stats.shencai",
+                            "type": "add",
+                            "value": "40"
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "六丁六甲阵·煞气",
+                "description": "六丁六甲阵（翻倍）：所有角色神采+40；敌人施展轻功额外消耗 20 点内力。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "liujia_sha",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "煞气·寒水窒碍",
+                                "trigger": "preAttack",
+                                "active": true,
+                                "script": "// 太阳寒水（六丁六甲阵·翻倍）：阵内所有敌人施展轻功类武学时额外消耗 20 点内力。\nif (args.item?.system?.category !== \"qinggong\") return;\nargs.costConfig.mp += 20;\nawait ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:4px;\"><div style=\"border-left:3px solid #2980b9; padding:4px 8px; background:rgba(41,128,185,0.1);\"><b>六丁六甲阵 · 寒水窒碍</b><br>施展轻功额外消耗 20 点内力。</div></div>`\n});"
+                            }
+                        ]
+                    }
+                },
+                "img": "icons/magic/fire/explosion-fireball-red.webp",
+                "showIcon": 2,
+                "system": {
+                    "changes": [
+                        {
+                            "key": "system.stats.shencai",
+                            "type": "add",
+                            "value": "40"
+                        }
+                    ]
+                }
             }
         ]
     },
