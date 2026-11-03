@@ -2658,7 +2658,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>气感阴阳，虚空旋引，对周边敌人造成伤害，并将敌人拖拽至身边未被占据的空格将他们击倒。</p><p>·命中无架招目标时，还会为其添加“点穴”，持续一回合（冲穴难度 @{20 + @up * 2|20}）。</p><p><strong>升级：</strong>招式伤害+20，冲穴难度+2，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "无架招点穴自动。拖拽击倒手动。",
+                    "automationNote": "命中无架招目标自动添加点穴（持续一回合）并发送冲穴难度说明卡；冲穴解除需目标手动检定。拖拽、击倒手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -2691,7 +2691,7 @@
                         {
                             "label": "点穴",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"neixi\",\n        dc: 20 + (Math.max(1, move.computedLevel || 1) - 1) * 2,\n        label: \"抵抗点穴\",\n        onFail: \"dianxue\"\n    });\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 规则中的难度是事后冲穴解除的难度，不是点穴本身的豁免，命中无架招目标直接施加\n    const dc = 20 + (Math.max(1, move.computedLevel || 1) - 1) * 2;\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"dianxue\", duration: { value: 1, units: \"rounds\", expiry: \"turnStart\" } });\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #8e44ad; background:rgba(142,68,173,0.1);\"><b>点穴：</b>${args.target.name} 被点中穴道，陷入定身（持续一回合）。<br>目标可通过冲穴解除，冲穴难度 <b>${dc}</b>（手动检定）。</div></div>`\n    });\n}",
                             "active": true
                         }
                     ]
