@@ -27,7 +27,7 @@ export class XJZLCharacterResourcePickerApp extends HandlebarsApplicationMixin(A
     id: "xjzl-character-resource-picker",
     tag: "div",
     classes: ["theme-dark", "character-resource-picker-app"],
-    position: { width: 900, height: 650 },
+    position: { width: 1120, height: 760 },
     window: {
       title: "XJZL.CharacterGenerator.ResourcePickerTitle",
       icon: "fas fa-filter",

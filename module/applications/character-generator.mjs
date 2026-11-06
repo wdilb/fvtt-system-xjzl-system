@@ -92,7 +92,7 @@ export class XJZLCharacterGeneratorApp extends HandlebarsApplicationMixin(Applic
     id: "xjzl-character-generator",
     tag: "form",
     classes: ["theme-dark", "character-generator-app"],
-    position: { width: 1180, height: 820 },
+    position: { width: 1360, height: 860 },
     window: { title: "XJZL.CharacterGenerator.Title", icon: "fas fa-dice-d20", resizable: true },
     form: { submitOnChange: false, closeOnSubmit: false },
     actions: {
@@ -463,6 +463,35 @@ export class XJZLCharacterGeneratorApp extends HandlebarsApplicationMixin(Applic
     super._onRender(context, options);
     const createButton = this.element.querySelector('[data-action="createAll"]');
     if (createButton) createButton.disabled = this.busy || this.dirty || !this.result?.valid;
+    // 流程轨是配置区的阅读位置指示器：按滚动容器中已越过激活线的分组切换，底部强制落到最后一组，避免静态高亮与实际位置脱节。
+    const syncRouteHighlight = () => {
+      const configPane = this.element?.querySelector(".generator-config");
+      if (!configPane) return;
+      const routeItems = [...this.element.querySelectorAll(".generator-route-item")];
+      const sections = [...configPane.querySelectorAll("[data-route-step]")];
+      const paneTop = configPane.getBoundingClientRect().top;
+      const activationLine = paneTop + Math.min(116, configPane.clientHeight * 0.2);
+      let activeStep = 1;
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= activationLine) {
+          activeStep = Math.max(activeStep, Number(section.dataset.routeStep) || 1);
+        }
+      }
+      if (configPane.scrollTop + configPane.clientHeight >= configPane.scrollHeight - 8) {
+        activeStep = Number(sections.at(-1)?.dataset.routeStep) || activeStep;
+      }
+      routeItems.forEach((item, index) => item.classList.toggle("is-active", index + 1 === activeStep));
+    };
+    const bindRouteScroll = () => {
+      const configPane = this.element?.querySelector(".generator-config");
+      if (!configPane) return;
+      if (!configPane.hasAttribute("data-route-bound")) {
+        configPane.addEventListener("scroll", syncRouteHighlight, { passive: true });
+        configPane.setAttribute("data-route-bound", "true");
+      }
+      syncRouteHighlight();
+    };
+    bindRouteScroll();
     if (this.element.hasAttribute("data-generator-bound")) return;
     const markDirty = event => {
       if (this.busy) return;
