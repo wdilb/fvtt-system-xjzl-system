@@ -61,6 +61,7 @@ import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
 import { EffectSelectionDialog } from "./module/applications/effect-selection-dialog.mjs";
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
+import { XJZLCharacterGeneratorApp } from "./module/applications/character-generator.mjs";
 import { setupSocket } from "./module/socket.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
@@ -754,6 +755,10 @@ Hooks.once("ready", async function () {
 
   // 合集浏览器实例供目录入口和宏复用。
   game.xjzl.compendiumBrowser = compendiumBrowser;
+  // 生成器复用同一个浏览器实例，保证范围快照、来源缓存和普通浏览入口一致。
+  game.xjzl.characterGenerator = {
+    open: options => XJZLCharacterGeneratorApp.open({ browser: compendiumBrowser, ...options })
+  };
   // Socket 引用供系统内需要 GM 权限的客户端请求使用。
   game.xjzl.socket = xjzlSocket;
   // 保留 encounters 作为兼容 API，仅暴露战局 HUD 的稳定打开与关联入口。
@@ -763,7 +768,8 @@ Hooks.once("ready", async function () {
   };
   // 对外保留原有可扩展应用类入口。
   game.xjzl.applications = {
-    XJZLCompendiumBrowser
+    XJZLCompendiumBrowser,
+    XJZLCharacterGeneratorApp
   };
 
   // 伤害工具宏只依赖稳定的纯数据入口，不暴露窗口实例或内部状态。
@@ -1237,7 +1243,22 @@ Hooks.on("renderCompendiumDirectory", (app, html, data) => {
  * 作用：对玩家隐藏 "container" 类型的 Actor，避免侧边栏剧透
  */
 Hooks.on("renderActorDirectory", (app, html, data) => {
-  // 1. GM 始终可见所有，直接跳过
+  const element = html instanceof HTMLElement ? html : html[0];
+  const headerActions = element?.querySelector(".header-actions");
+  if (game.user.isGM && headerActions && !element.querySelector(".xjzl-character-generator-btn")) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "xjzl-character-generator-btn";
+    button.style.cssText = "min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;";
+    button.innerHTML = `<i class="fas fa-dice-d20"></i> ${game.i18n.localize("XJZL.CharacterGenerator.Open")}`;
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      game.xjzl?.characterGenerator?.open();
+    });
+    headerActions.after(button);
+  }
+
+  // GM 始终可见所有，且已经拥有随机人物入口。
   if (game.user.isGM) return;
 
   // 2. 筛选需要隐藏的 Actor ID
@@ -1985,6 +2006,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/compendiumbrowser/card-list.hbs", // 合集浏览器卡片列表（含增量追加）
     "systems/xjzl-system/templates/apps/compendiumbrowser/random-dialog.hbs", // 合集浏览器随机抽取对话框
     "systems/xjzl-system/templates/apps/compendiumbrowser/draw-reveal.hbs", // 合集浏览器抽取演出
+    "systems/xjzl-system/templates/apps/character-generator.hbs", // 随机人物生成器
+    "systems/xjzl-system/templates/apps/character-resource-picker.hbs", // 随机人物生成器资源选择器
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览
     "systems/xjzl-system/templates/apps/tone-tracker.hbs",//音阶计数器
     "systems/xjzl-system/templates/apps/action-tracker.hbs",//动作计数器

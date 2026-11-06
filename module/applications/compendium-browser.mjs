@@ -53,6 +53,9 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         /** @type {boolean} 数据是否加载完毕 */
         this.isLoaded = false;
 
+        // 外部应用（如随机人物生成器）可暂时把浏览器切换为资源选择模式；为空时保持旧行为。
+        this.selectionContext = null;
+
         /** @type {Object} UI 交互状态（筛选/搜索/分页按 Tab 独立，排序/视图全局持久化） */
         this.browserState = {
             activeTab: "weapon",
@@ -114,6 +117,18 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         state.visibleCount = INITIAL_PAGE;
     }
 
+    /**
+     * 返回不受后续浏览器操作影响的资源范围快照；生成器只消费这份普通数据。
+     * @param {string} tab - 浏览器分类。
+     * @param {{filters?:object,query?:string}} range - 搜索与筛选条件。
+     * @returns {Array<object>} 稳定顺序的索引条目副本。
+     */
+    getResourceRangeSnapshot(tab, range = {}) {
+        const filters = this._normalizeFilters(range.filters || {});
+        const items = this._filterItems(this.cachedData[tab] || [], filters, range.query || "");
+        return items.map(item => foundry.utils.deepClone(item));
+    }
+
     static DEFAULT_OPTIONS = {
         tag: "div",
         id: "xjzl-compendium-browser",
@@ -129,6 +144,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             refresh: XJZLCompendiumBrowser.prototype.refreshData,
             changeTab: XJZLCompendiumBrowser.prototype._onChangeTab,
             openSheet: XJZLCompendiumBrowser.prototype._onOpenSheet,
+            selectResource: XJZLCompendiumBrowser.prototype._onSelectResource,
+            applyRange: XJZLCompendiumBrowser.prototype._onApplyRange,
             resetFilters: XJZLCompendiumBrowser.prototype._onResetFilters,
             randomize: XJZLCompendiumBrowser.prototype._onRandomizeClick,
             // 导出宏与抽取共用入口和配置弹窗，具体动作在弹窗内选择
@@ -284,6 +301,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                     // 预先将UUID和搜索名称缓存，避免搜索循环中重复计算
                     if (tempCache[entry.type]) {
                         entry.uuid = entry.uuid || `Compendium.${pack.collection}.${entry._id}`;
+                        // 生成器按合集包批量取完整文档；保留来源包比逐条 fromUuid 更快，也不改变浏览器索引接口。
+                        entry.packCollection = pack.collection;
                         // 预计算组合搜索串：名称 + 来源包名 + 关键字段，武学/内功额外涵盖招式名与属性，
                         // 让"搜索名称"可以同时命中门派、属性、伤害类型等词，且只在加载时算一次。
                         const searchParts = [entry.name, pack.metadata.label];
@@ -421,7 +440,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         if (key === "Enter" || key === " ") {
             event.preventDefault();
-            this._onOpenSheet(null, card);
+            if (this.selectionContext) this._onSelectResource(null, card);
+            else this._onOpenSheet(null, card);
             return;
         }
         if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) return;
@@ -486,6 +506,48 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         event?.stopPropagation(); // 键盘触达时无 event
         const item = await fromUuid(target.dataset.uuid);
         if (item) item.sheet.render(true);
+    }
+
+    /**
+     * 选择模式下把卡片来源交还给外部应用；普通浏览器卡片仍走打开 Sheet 的旧接口。
+     */
+    async _onSelectResource(event, target) {
+        event?.stopPropagation();
+        const context = this.selectionContext;
+        if (!context) return this._onOpenSheet(event, target);
+        const item = await fromUuid(target.dataset.uuid);
+        if (!item) {
+            ui.notifications.warn(game.i18n.localize("XJZL.CharacterGenerator.SelectFailed"));
+            return;
+        }
+        await context.onSelect?.({
+            mode: "resource",
+            tab: this.browserState.activeTab,
+            uuid: item.uuid,
+            item: { ...(item.toObject?.() || item), uuid: item.uuid }
+        });
+        this.selectionContext = null;
+        await this.close();
+    }
+
+    /**
+     * 选择模式下应用当前 Tab 的搜索/筛选范围，不改变生成请求已冻结的快照。
+     */
+    async _onApplyRange(event) {
+        event?.preventDefault();
+        const context = this.selectionContext;
+        if (!context) return;
+        const state = this._currentTabState;
+        await context.onSelect?.({
+            mode: "range",
+            tab: this.browserState.activeTab,
+            range: {
+                filters: Object.fromEntries(Object.entries(state.filters).map(([key, values]) => [key, [...values]])),
+                query: state.searchQuery
+            }
+        });
+        this.selectionContext = null;
+        await this.close();
     }
 
     _onFilterChange(event) {
@@ -634,6 +696,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     async close(options) {
         this._sentinelObserver?.disconnect();
         this._sentinelObserver = null;
+        this.selectionContext = null;
         return super.close(options);
     }
 
@@ -662,7 +725,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const items = displayItems.map(item => this._buildCardData(item));
         const cardListHtml = await renderTemplate(
             "systems/xjzl-system/templates/apps/compendiumbrowser/card-list.hbs",
-            { items, viewMode: this.browserState.viewMode }
+            { items, viewMode: this.browserState.viewMode, selectionMode: Boolean(this.selectionContext) }
         );
 
         // 5. 构建筛选器 UI 数据（含各选项命中计数）
@@ -695,7 +758,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             sortBy: this.browserState.sortBy,
             viewMode: this.browserState.viewMode,
             searchQuery: state.searchQuery,
-            filterList: filterList
+            filterList: filterList,
+            selectionMode: Boolean(this.selectionContext)
         };
     }
 
@@ -872,6 +936,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             tooltip: tooltip.filter(Boolean).join(" · "),
             // 拖拽负载按文档类别区分：野兽来自 Actor 合集包，拖入画布才能按 Actor 生成 Token
             dragType: item.type === "creature" ? "Actor" : "Item",
+            selectionAction: this.selectionContext ? "selectResource" : "openSheet",
             // 卡片稀有度属性：物品用品质，武学/内功用品阶，野兽用品级（映射 1-3 复用品阶色阶）
             qualityAttr: sys.quality,
             tierAttr: item.type === "creature" ? CREATURE_GRADE_RANK[sys.type] : sys.tier
