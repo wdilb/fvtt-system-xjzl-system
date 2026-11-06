@@ -191,6 +191,7 @@ export function normalizeGenerationConfig(input = {}) {
     actorType: source.actorType === "character" ? "character" : "npc",
     synergyProbability: Math.min(100, Math.max(0, synergyProbability)),
     matchStandard,
+    matchAllRandomWuxue: source.matchAllRandomWuxue === true,
     neigong: {
       runUuid: neigong.runUuid || null,
       runTier,

@@ -29,6 +29,7 @@ const CONFLICT_FIELD_LABELS = {
   "wuxue.additionalRandomMax": "其他武学随机数量上限",
   "wuxue.wuxue": "主修武学",
   "wuxue.fixed": "指定主修武学",
+  "wuxue.wuxingLimit": "悟性贡献上限",
   "actor.prepareData": "角色准备",
   "generation": "生成回溯",
   "neigong.additionalCount": "指定附修内功数量",
@@ -131,9 +132,14 @@ export class XJZLCharacterGeneratorApp extends HandlebarsApplicationMixin(Applic
     const conflicts = draft.flatMap(entry => (entry.conflicts || []).map(conflict => ({
       ...conflict,
       draftName: entry.name,
-      fieldLabel: CONFLICT_FIELD_LABELS[conflict.field] || conflict.field,
+      fieldLabel: conflict.fieldLabel || CONFLICT_FIELD_LABELS[conflict.field] || conflict.field,
       expectedText: formatConflictValue(conflict.expected),
       actualText: formatConflictValue(conflict.actual)
+    })));
+    const warnings = draft.flatMap(entry => (entry.warnings || []).map(warning => ({
+      ...warning, draftName: entry.name,
+      fieldLabel: warning.fieldLabel || CONFLICT_FIELD_LABELS[warning.field] || warning.field,
+      expectedText: formatConflictValue(warning.expected), actualText: formatConflictValue(warning.actual)
     })));
     const fixedPreview = this.config.wuxue.fixedPreview;
     const primarySpecified = Boolean(this.config.wuxue.primary?.uuid || this.config.wuxue.fixed?.wuxue?.length);
@@ -142,6 +148,7 @@ export class XJZLCharacterGeneratorApp extends HandlebarsApplicationMixin(Applic
       config: this.config,
       draft,
       conflicts,
+      warnings,
       createResults: this.createResults,
       busy: this.busy,
       progressText: this.progressText,
@@ -200,6 +207,7 @@ export class XJZLCharacterGeneratorApp extends HandlebarsApplicationMixin(Applic
     current.quantity = value("quantity");
     current.synergyProbability = value("synergyProbability");
     current.matchStandard = value("matchStandard");
+    current.matchAllRandomWuxue = checked("matchAllRandomWuxue");
     current.neigong.runTier = value("runTier") || null;
     current.neigong.runStage = value("runStage");
     current.neigong.runElement = value("runElement");

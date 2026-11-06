@@ -1322,7 +1322,7 @@ test("角色评估读取准备后的招式派生字段而不是 toObject 来源�
   }
 });
 
-test("悟性限制保留固定武学贡献基线，配套使用运行内功加成并识别 calculation.scalings", async () => {
+test("固定武学不能抬高悟性上限，配套使用运行内功加成并识别 calculation.scalings", async () => {
   const previousGame = globalThis.game;
   const previousConfig = globalThis.CONFIG;
   class FakeActor {
@@ -1391,7 +1391,8 @@ test("悟性限制保留固定武学贡献基线，配套使用运行内功加�
   };
   try {
     const evaluation = await evaluateGenerationDraft(draft);
-    assert.equal(evaluation.constraints.wuxing, true);
+    assert.equal(evaluation.constraints.wuxing, false);
+    assert.equal(evaluation.derived.wuxingLimit, 0);
     assert.equal(evaluation.derived.fixedWuxingContribution.total, 1);
 
     const randomStageDraft = structuredClone(draft);
@@ -1680,6 +1681,7 @@ test("生成器保留原始表单数值交给管理器校验，而不是提前�
       quantity: { value: "1.5" },
       synergyProbability: { value: "100" },
       matchStandard: { value: "standard" },
+      matchAllRandomWuxue: { checked: true },
       runTier: { value: "" },
       runStage: { value: "" },
       runElement: { value: "auto" },
@@ -1722,6 +1724,7 @@ test("生成器保留原始表单数值交给管理器校验，而不是提前�
     assert.equal(raw.wuxue.additionalRandomMin, "4");
     assert.equal(raw.wuxue.additionalRandomMax, "2");
     assert.equal(normalized.quantity, 1);
+    assert.equal(normalized.matchAllRandomWuxue, true);
     assert.equal(normalized.wuxue.additionalRandomMin, 4);
     assert.equal(normalized.wuxue.additionalRandomMax, 4);
     assert.equal(app._lastRawForm.quantity, "1.5");

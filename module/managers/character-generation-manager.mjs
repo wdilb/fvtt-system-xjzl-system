@@ -21,9 +21,10 @@ import {
   resourceIdentity,
   solveMeridians
 } from "../utils/character-generation.mjs";
+import { generationMatchDecision, planGenerationWuxue } from "../utils/character-generation-planner.mjs";
 
-// 预览默认有限回溯预算；匹配冲突不能让一次 GM 点击长时间重复执行完整 Actor 评估，
-// 达到预算后返回明确冲突，仍允许 GM 调整配置或再次生成。
+// 旧模型和武器配套保留有限回溯；新模型的悟性与内功配套在纯构筑器内约束选择。
+// 搜索预算耗尽只说明尚未找到组合，不能声称用户的配置无解。
 const GENERATION_MAX_ATTEMPTS = 8;
 const RUNTIME_KEYS = new Set([
   "stage", "current", "progressData", "computedTier", "computedLevel", "maxLevel",
@@ -424,7 +425,7 @@ function fixedWuxueIdentities(config = {}) {
 }
 
 /**
- * 计算固定武学的悟性基线 F；随机内容只能受 max(F,T) 约束，不能反向否定 GM 已指定的资源。
+ * 计算固定武学贡献供预览说明；固定内容仍须遵守用户明确填写的悟性上限。
  * @param {object} config - 生成配置。
  * @param {object[]} items - 已完成招式派生的武学文档/快照。
  * @returns {object} 与 calculateWuxingContribution 相同的贡献摘要。
@@ -460,9 +461,8 @@ function calculateFixedWuxing(config, items = []) {
   return calculateWuxingContribution(items.map(matchesFixed).filter(Boolean));
 }
 
-function allowedWuxingLimit(config, fixedWuxing) {
-  const configured = config.wuxue?.wuxingLimit;
-  return configured == null ? null : Math.max(configured, fixedWuxing?.total || 0);
+function allowedWuxingLimit(config) {
+  return config.wuxue?.wuxingLimit ?? null;
 }
 
 /**
@@ -724,7 +724,7 @@ export async function evaluateGenerationDraft(draft) {
   // 悟性必须读取已完成准备的内存 Document，才能与角色面板实际结果一致。
   const wuxing = calculateWuxingContribution(wuxue);
   const fixedWuxing = calculateFixedWuxing(draft.config, wuxue);
-  const wuxingLimit = allowedWuxingLimit(draft.config, fixedWuxing);
+  const wuxingLimit = allowedWuxingLimit(draft.config);
   const constraints = {
     healing: !draft.config.wuxue.healingRequired || healing.count >= draft.config.wuxue.healingCount,
     wuxing: wuxingLimit == null || wuxing.total <= wuxingLimit,
@@ -818,7 +818,8 @@ export class XJZLCharacterGenerationManager {
     return Object.freeze({ config: clone(config), pools, conflicts, sourceCacheSize: this.sourceCache.size });
   }
 
-  _selectNeigongs(snapshot, config, rng, decisionRolls = new Map()) {
+  /** 按配置保留附修槽位；runChoice 仅供联合构筑遍历随机运行候选，不改变用户的锁定语义。 */
+  _selectNeigongs(snapshot, config, rng, decisionRolls = new Map(), runChoice = {}) {
     const candidates = snapshot.pools.neigong;
     const conflicts = [...snapshot.conflicts];
     const configuredGroups = config.neigong.additionalGroups || [];
@@ -878,7 +879,8 @@ export class XJZLCharacterGenerationManager {
       const preservesLaterSlot = !randomRun || canPreserveAdditional(item);
       return matchesTier && matchesElement && preservesLaterSlot;
     });
-    const runSelection = selectUnique(runPool, 1, config.neigong.runUuid ? [config.neigong.runUuid] : [], item => true, rng, "neigong.runUuid");
+    const runUuid = config.neigong.runUuid || runChoice.uuid;
+    const runSelection = selectUnique(runPool, 1, runUuid ? [runUuid] : [], item => true, rng, "neigong.runUuid");
     conflicts.push(...runSelection.conflicts);
     const selected = [];
     const used = new Set();
@@ -886,7 +888,7 @@ export class XJZLCharacterGenerationManager {
     const run = runSelection.result[0];
     if (run) {
       const runClone = clone(run);
-      const stage = config.neigong.runStage || choose(rng, [1, 2, 3]);
+      const stage = config.neigong.runStage || runChoice.stage || choose(rng, [1, 2, 3]);
       applyNeigongStage(runClone, stage, config.neigong.runStage != null);
       runClone.system.active = true;
       runClone._id = randomId();
@@ -1219,265 +1221,29 @@ export class XJZLCharacterGenerationManager {
    * @param {object} snapshot - 当前请求的资源快照。
    * @param {object} config - 规范化生成配置。
    * @param {Function} rng - 注入的随机函数。
+   * @param {object} context - 已确定的运行内功和稳定配套投骰，供新模型联合约束选择。
    * @returns {{selected: object[],primary?:object|null,conflicts:object[]}} 选中来源和结构化冲突。
    */
-  _selectWuxue(snapshot, config, rng) {
-    if (config.wuxue.model === "primary") return this._selectPrimaryWuxue(snapshot, config, rng);
+  _selectWuxue(snapshot, config, rng, context = {}) {
+    if (config.wuxue.model === "primary") return this._selectPrimaryWuxue(snapshot, config, rng, context);
     return this._selectLegacyWuxue(snapshot, config, rng);
   }
 
   /**
-   * 生成“主修一套 + 其他武学配额”的新模型；主修境界不会污染其他武学的数量选择，治疗硬条件
-   * 只锁定实际需要的治疗招式，不改变用户选择的整套境界分配策略。
+   * 按主修、配额、治疗、匹配和悟性约束联合构筑；只在最低需求已满足的合法选项中随机成长。
    * @param {object} snapshot - 当前请求的资源快照。
    * @param {object} config - 规范化生成配置。
    * @param {Function} rng - 注入的随机函数。
+   * @param {object} context - 运行内功与稳定配套判定。
    * @returns {{selected: object[],primary:object|null,conflicts:object[]}} 生成结果。
    */
-  _selectPrimaryWuxue(snapshot, config, rng) {
-    const pool = snapshot.pools.wuxue || [];
-    const conflicts = [];
-    const selected = [];
-    const used = new Set();
-    const fixed = config.wuxue.fixed || {};
-    const primaryConfig = config.wuxue.primary || {};
-    const fixedPrimaryIds = fixedForCategory(fixed, "wuxue");
-    const primaryUuid = primaryConfig.uuid || fixedPrimaryIds[0] || null;
-    const fixedMoves = fixed?.moves?.[primaryUuid] || {};
-    const healingPool = new Set(pool.filter(hasHealingPotential).map(sourceId));
-    const matchedHealing = new Set();
-    const healingIds = config.wuxue.healingUuids || [];
-    let healingSlots = config.wuxue.healingRequired ? config.wuxue.healingCount : 0;
-    const additionalTierCounts = config.wuxue.additionalTierCounts || {};
-    const randomAdditionalCount = randomInteger(
-      rng, config.wuxue.additionalRandomMin, config.wuxue.additionalRandomMax
-    );
-    const categoryRequests = [
-      ...[1, 2, 3].map(tier => ({
-        category: "wuxue", tier, count: additionalTierCounts[String(tier)] || 0,
-        field: `wuxue.additionalTierCounts.${tier}`, fixed: false
-      })),
-      { category: "wuxue", tier: null, count: randomAdditionalCount, field: "wuxue.additionalRandomMax", fixed: false },
-      { category: "sanshou", tier: null, count: config.wuxue.sanshouCount, field: "wuxue.sanshouCount", fixed: true },
-      { category: "qinggong", tier: null, count: config.wuxue.qinggongCount, field: "wuxue.qinggongCount", fixed: true },
-      { category: "zhenfa", tier: null, count: config.wuxue.zhenfaCount, field: "wuxue.zhenfaCount", fixed: true }
-    ];
-    // 以分类、品阶和实际候选交集估算后续槽位能承接的治疗门数；先扣除主修和
-    // 已指定的非治疗资源，避免把“槽位存在”误当成“该槽位仍可随机承接治疗”。
-    const reservedHealingCandidates = new Set();
-    const occupiedLaterCandidates = new Set(primaryUuid ? [String(primaryUuid)] : []);
-    let laterHealingCapacity = 0;
-    for (const request of [...categoryRequests].sort((left, right) => Number(right.tier != null) - Number(left.tier != null))) {
-      let remaining = Math.max(0, integer(request.count, 0));
-      const fixedIds = request.fixed ? fixedForCategory(fixed, request.category) : [];
-      const fixedSources = fixedIds
-        .map(uuid => pool.find(item => sourceId(item) === uuid))
-        .filter(item => item
-          && itemCategory(item) === request.category
-          && (request.tier == null || integer(item.system?.tier, 1) === request.tier)
-          && !occupiedLaterCandidates.has(String(sourceId(item))));
-      for (const item of fixedSources.slice(0, remaining)) {
-        occupiedLaterCandidates.add(String(sourceId(item)));
-        remaining -= 1;
-        if (hasHealingPotential(item)) {
-          reservedHealingCandidates.add(String(sourceId(item)));
-          laterHealingCapacity += 1;
-        }
-      }
-      const candidates = pool.filter(item => itemCategory(item) === request.category
-        && hasHealingPotential(item)
-        && (request.tier == null || integer(item.system?.tier, 1) === request.tier)
-        && !occupiedLaterCandidates.has(String(sourceId(item)))
-        && !reservedHealingCandidates.has(String(sourceId(item))));
-      const capacity = Math.min(remaining, candidates.length);
-      for (const item of candidates.slice(0, capacity)) {
-        reservedHealingCandidates.add(String(sourceId(item)));
-        occupiedLaterCandidates.add(String(sourceId(item)));
-      }
-      laterHealingCapacity += capacity;
-    }
-    const preferPrimaryHealing = healingSlots > laterHealingCapacity;
-
-    if (fixedPrimaryIds.length > 1) {
-      conflicts.push({ type: "condition", field: "wuxue.primary", reason: "主修武学只能指定一套", expected: 1, actual: fixedPrimaryIds.length, resources: fixedPrimaryIds });
-    }
-    for (const uuid of healingIds) {
-      if (!healingPool.has(uuid)) {
-        conflicts.push({ type: "source", field: "wuxue.healingUuids", reason: "指定治疗武学不在当前范围或没有正式治疗招式", expected: uuid, actual: null, resources: [uuid] });
-      }
-    }
-
-    const addSelected = (source, category, requestedTarget, locked = {}, forcedHealing = false) => {
-      if (!source) return null;
-      const item = clone(source);
+  _selectPrimaryWuxue(snapshot, config, rng, context = {}) {
+    const result = planGenerationWuxue(snapshot, config, rng, context);
+    for (const item of result.selected) {
       item._id = randomId();
-      const maximum = Math.max(1, ...((item.system.moves || [])
-        .filter(isFormalMove).map(move => maxMoveStage(item, move))));
-      const target = category === "qinggong" || category === "zhenfa"
-        ? 1
-        : Math.max(1, Math.min(4, integer(requestedTarget, choose(rng, wuxueStageChoices(item)) || maximum)));
-      let allocationLocked = { ...locked };
-      let assigned = allocateMoveStages(item, {
-        targetStage: target,
-        strategy: config.wuxue.allocation,
-        locked: allocationLocked,
-        rng
-      });
-      if (forcedHealing && countLearnedHealing([assigned.item]).count === 0) {
-        // 治疗要求先让用户的分配策略尝试；只有策略没有学会治疗招式时，才把一招提升到
-        // 目标以内的最高可达境界。这样它满足“至少已学”，不会被固定在领悟，也不会把整套升满。
-        const healingMove = (item.system.moves || []).find(move => isFormalMove(move)
-          && move.type === "qi" && move.actionType === "heal" && !(move.id in allocationLocked));
-        const healingChoices = healingMove ? moveStageChoices(item, healingMove, target) : [];
-        const healingStage = healingChoices.length ? Math.max(...healingChoices) : 0;
-        if (healingMove && healingStage > 0) {
-          allocationLocked = { ...allocationLocked, [healingMove.id]: healingStage };
-          assigned = allocateMoveStages(item, {
-            targetStage: target,
-            strategy: config.wuxue.allocation,
-            locked: allocationLocked,
-            rng
-          });
-        }
-      }
-      item.system = assigned.item.system;
-      item._generationTargetStage = target;
-      item._generationCore = assigned.core;
-      item._generationConflicts = assigned.conflicts;
-      item.system.category = itemCategory(item);
       item.system.active = false;
-      selected.push(item);
-      used.add(resourceIdentity(item));
-      conflicts.push(...assigned.conflicts.map(conflict => category === "wuxue" && conflict.field === "wuxue.mainStage"
-        ? { ...conflict, field: primaryUuid === sourceId(source) ? "wuxue.primary.stage" : conflict.field }
-        : conflict));
-      if (healingPool.has(sourceId(source)) && countLearnedHealing([item]).count > 0) {
-        matchedHealing.add(sourceId(source));
-        healingSlots = Math.max(0, healingSlots - 1);
-      }
-      return item;
-    };
-
-    const primaryCandidates = pool.filter(item => itemCategory(item) === "wuxue"
-      && hasFormalMove(item)
-      && (primaryConfig.tier == null || integer(item.system?.tier, 1) === primaryConfig.tier));
-    const primaryEligible = primaryConfig.stage == null
-      ? primaryCandidates
-      : primaryCandidates.filter(item => wuxueStageCapacity(item) >= primaryConfig.stage);
-    const primaryHealingCandidates = primaryEligible.filter(hasHealingPotential);
-    const primaryPool = preferPrimaryHealing && primaryHealingCandidates.length
-      ? primaryHealingCandidates : primaryEligible;
-    const fixedPrimary = primaryUuid ? byIdentity(primaryCandidates, primaryUuid) : null;
-    const fixedPrimaryEligible = fixedPrimary && primaryEligible.some(item => resourceIdentity(item) === resourceIdentity(fixedPrimary));
-    if (fixedPrimary && !fixedPrimaryEligible && primaryConfig.stage != null) {
-      conflicts.push({
-        type: "condition", field: "wuxue.primary.stage", reason: "指定主修武学无法达到主修最高境界",
-        expected: primaryConfig.stage, actual: wuxueStageCapacity(fixedPrimary), resources: [primaryUuid]
-      });
     }
-    const primaryFixedIds = primaryUuid && (!fixedPrimary || fixedPrimaryEligible)
-      ? [primaryUuid]
-      : preferPrimaryHealing ? healingIds.filter(uuid => primaryPool.some(item => sourceId(item) === uuid)) : [];
-    const primarySelection = selectUnique(
-      primaryPool, 1, primaryFixedIds, item => true, rng, "wuxue.primary"
-    );
-    conflicts.push(...primarySelection.conflicts);
-    if (primaryConfig.stage != null && primaryEligible.length < 1) {
-      conflicts.push({
-        type: "condition", field: "wuxue.primary.stage",
-        reason: `当前范围共有 ${primaryCandidates.length} 套，只有 ${primaryEligible.length} 套可达到主修最高境界`,
-        expected: 1, actual: primaryEligible.length, resources: primaryEligible.map(resourceIdentity)
-      });
-    }
-    const primarySource = primarySelection.result[0] || null;
-    const primary = primarySource
-      ? addSelected(
-        primarySource,
-        "wuxue",
-        primaryConfig.stage ?? (choose(rng, wuxueStageChoices(primarySource)) || wuxueStageCapacity(primarySource)),
-        fixedMoves,
-        healingSlots > 0 && hasHealingPotential(primarySource)
-      )
-      : null;
-    if (primary && healingPool.has(sourceId(primarySource)) && matchedHealing.has(sourceId(primarySource))) {
-      for (const uuid of healingIds) if (uuid === sourceId(primarySource)) matchedHealing.add(uuid);
-    }
-
-    // 先把指定治疗资源分配到具体数量槽位，再逐槽位抽取；否则同一套地级槽位会看到
-    // 全部指定治疗 UUID，selectUnique 会先以“固定超量”报错，即使后面的随机槽位本可接住余项。
-    const healingAssignments = new Map();
-    const remainingSlots = categoryRequests.map(request => Math.max(0, integer(request.count, 0)));
-    const healingSources = healingIds
-      .map(uuid => ({ uuid, source: pool.find(item => sourceId(item) === uuid) }))
-      .filter(entry => entry.source && !used.has(resourceIdentity(entry.source)))
-      .sort((left, right) => {
-        const requestCount = entry => categoryRequests.filter((request, index) => remainingSlots[index] > 0
-          && itemCategory(entry.source) === request.category
-          && (request.tier == null || integer(entry.source.system?.tier, 1) === request.tier)).length;
-        return requestCount(left) - requestCount(right);
-      });
-    for (const { uuid, source } of healingSources) {
-      const eligible = categoryRequests.map((request, index) => ({ request, index }))
-        .filter(({ request, index }) => remainingSlots[index] > 0
-          && itemCategory(source) === request.category
-          && (request.tier == null || integer(source.system?.tier, 1) === request.tier));
-      // 精确品阶槽位优先承接指定资源，通配随机槽位留给无法落入精确槽位的余项。
-      eligible.sort((left, right) => Number(right.request.tier != null) - Number(left.request.tier != null));
-      const slot = eligible[0];
-      if (!slot) continue;
-      const assigned = healingAssignments.get(slot.index) || [];
-      assigned.push(uuid);
-      healingAssignments.set(slot.index, assigned);
-      remainingSlots[slot.index] -= 1;
-    }
-
-    for (const [requestIndex, request] of categoryRequests.entries()) {
-      const { category, tier, count, field } = request;
-      const categoryCandidates = pool.filter(item => itemCategory(item) === category
-        && hasFormalMove(item)
-        && (tier == null || integer(item.system?.tier, 1) === tier)
-        && !used.has(resourceIdentity(item)));
-      const requestedFixedIds = request.fixed ? fixedForCategory(fixed, category) : [];
-      const fixedIds = requestedFixedIds.filter(uuid => categoryCandidates.some(item => sourceId(item) === uuid));
-      for (const uuid of requestedFixedIds.filter(uuid => !fixedIds.includes(uuid))) {
-        conflicts.push({ type: "source", field, reason: "指定辅助武学不在当前资源范围或分类/品阶不符", expected: uuid, actual: null, resources: [uuid] });
-      }
-      const selectableIds = [...fixedIds];
-      // 指定治疗武学属于“指定资源”，但不能占用数量为 0 的固定品阶槽位；
-      // 这种情况下应留给后面的随机武学槽位，避免先报“固定配额超量”再误判失败。
-      const specifiedHealing = count > 0
-        ? (healingAssignments.get(requestIndex) || []).filter(uuid => categoryCandidates.some(item => sourceId(item) === uuid))
-        : [];
-      for (const uuid of specifiedHealing) {
-        if (!selectableIds.includes(uuid)) selectableIds.push(uuid);
-      }
-      let availableHealing = categoryCandidates.filter(hasHealingPotential)
-        .filter(item => !selectableIds.includes(sourceId(item)));
-      while (healingSlots > 0 && selectableIds.length < count && availableHealing.length) {
-        const candidate = choose(rng, availableHealing);
-        selectableIds.push(sourceId(candidate));
-        availableHealing = availableHealing.filter(item => item !== candidate);
-      }
-      const chosen = selectUnique(categoryCandidates, count, selectableIds, item => true, rng, field);
-      conflicts.push(...chosen.conflicts);
-      for (const source of chosen.result) {
-        const forcedHealing = selectableIds.includes(sourceId(source))
-          && (healingIds.includes(sourceId(source)) || hasHealingPotential(source))
-          && healingSlots > 0;
-        addSelected(source, category, choose(rng, wuxueStageChoices(source)) || wuxueStageCapacity(source), {}, forcedHealing);
-        if (healingPool.has(sourceId(source)) && healingIds.includes(sourceId(source))) matchedHealing.add(sourceId(source));
-      }
-    }
-
-    for (const uuid of healingIds) {
-      if (healingPool.has(uuid) && !matchedHealing.has(uuid)) {
-        conflicts.push({ type: "condition", field: "wuxue.healingUuids", reason: "指定治疗武学不符合当前武学数量或资源范围条件", expected: uuid, actual: "未占用有效武学槽位", resources: [uuid] });
-      }
-    }
-    if (config.wuxue.healingRequired && healingSlots > 0) {
-      conflicts.push({ type: "condition", field: "wuxue.healingCount", reason: "实际已学治疗武学数量不足", expected: config.wuxue.healingCount, actual: config.wuxue.healingCount - healingSlots });
-    }
-    return { selected, primary, conflicts };
+    return result;
   }
 
   /**
@@ -1763,12 +1529,43 @@ export class XJZLCharacterGenerationManager {
     return conflicts;
   }
 
+  /** 构筑纯内存草案；新模型在合法资源和悟性预算内选取，不依赖整个人物重抽碰运气。 */
   _buildDraft(snapshot, index, rng, decisionRolls = new Map()) {
     const config = snapshot.config;
+    if (snapshot.conflicts?.length) {
+      return { draftId: randomId(), requestId: config.requestId, configVersion: CHARACTER_GENERATION_VERSION,
+        name: `${config.namePrefix}${config.quantity > 1 ? index + 1 : ""}`, config: clone(config),
+        conflicts: clone(snapshot.conflicts), warnings: [], decisions: [], items: [], status: "conflict" };
+    }
     const initialNeigong = this._selectNeigongs(snapshot, config, rng, decisionRolls);
-    const meridians = this._solveMeridians(initialNeigong.selected, snapshot.pools.neigong, config, rng);
-    const neigong = this._coordinateRunNeigong(initialNeigong, config, rng, decisionRolls);
-    const wuxue = this._selectWuxue(snapshot, config, rng);
+    let meridians = this._solveMeridians(initialNeigong.selected, snapshot.pools.neigong, config, rng);
+    let neigong = this._coordinateRunNeigong(initialNeigong, config, rng, decisionRolls);
+    let wuxue = this._selectWuxue(snapshot, config, rng, { runNeigong: neigong.run, decisionRolls });
+    // 主修固定、双方随机或运行境界未固定时，不能因首次抽中的内功状态无匹配对象就判失败。
+    // 穷举剩余运行来源/可达阶段；附修、经脉和品阶限制仍由原选择器完整校验。
+    if (config.wuxue.model === "primary" && (!config.neigong.runUuid || config.neigong.runStage == null)
+      && !neigong.conflicts.length && !meridians.conflicts.length && wuxue.conflicts.length
+      && !planGenerationWuxue(snapshot, config, rng, { decisionRolls }).conflicts.length) {
+      const alternatives = snapshot.pools.neigong.filter(source => (!config.neigong.runUuid || sourceId(source) === config.neigong.runUuid)
+        && (config.neigong.runTier == null || source.system?.tier === config.neigong.runTier)
+        && (config.neigong.runElement === "auto" || source.system?.element === config.neigong.runElement))
+        .flatMap(source => (config.neigong.runStage ? [config.neigong.runStage] : [1, 2, 3])
+        .map(stage => ({ uuid: sourceId(source), stage })));
+      while (alternatives.length) {
+        const choice = choose(rng, alternatives);
+        alternatives.splice(alternatives.indexOf(choice), 1);
+        const selection = this._selectNeigongs(snapshot, config, rng, decisionRolls, choice);
+        if (selection.conflicts.length) continue;
+        const solved = this._solveMeridians(selection.selected, snapshot.pools.neigong, config, rng);
+        if (solved.conflicts.length) continue;
+        const planned = this._selectWuxue(snapshot, config, rng, { runNeigong: selection.run, decisionRolls });
+        if (planned.conflicts.length) continue;
+        meridians = solved;
+        neigong = selection;
+        wuxue = planned;
+        break;
+      }
+    }
     const conflicts = [...neigong.conflicts, ...meridians.conflicts, ...wuxue.conflicts];
     const primary = wuxue.primary ? assignmentSummary(wuxue.primary) : null;
     const additionalWuxue = wuxue.primary
@@ -1790,7 +1587,7 @@ export class XJZLCharacterGenerationManager {
       wuxueTierCounts: Object.fromEntries([1, 2, 3].map(tier => [String(tier), wuxue.selected.filter(item => itemCategory(item) === "wuxue" && integer(item.system?.tier, 1) === tier).length])),
       additionalWuxueCount: additionalWuxue.filter(item => itemCategory(item) === "wuxue").length,
       additionalWuxueTierCounts: Object.fromEntries([1, 2, 3].map(tier => [String(tier), additionalWuxue.filter(item => itemCategory(item) === "wuxue" && integer(item.system?.tier, 1) === tier).length])),
-      decisions: [], status: conflicts.length ? "conflict" : "ready"
+      decisions: [], warnings: [], status: conflicts.length ? "conflict" : "ready"
     };
     // 物品统一从已冻结来源复制，写入新的内嵌 ID；草案源数据和派生摘要分开保存。
     draft.items.push(...neigong.selected.map(item => {
@@ -1817,7 +1614,7 @@ export class XJZLCharacterGenerationManager {
     draft.wuxing = {
       ...calculateWuxingContribution(wuxue.selected),
       fixedBaseline: fixedWuxing.total,
-      allowedLimit: allowedWuxingLimit(config, fixedWuxing)
+      allowedLimit: allowedWuxingLimit(config)
     };
     draft.healing = countLearnedHealing(wuxue.selected);
     for (const item of draft.items) {
@@ -1828,23 +1625,24 @@ export class XJZLCharacterGenerationManager {
       conflicts.push({ type: "condition", field: "wuxue.healingCount", reason: "实际已学治疗套路不足", expected: config.wuxue.healingCount, actual: draft.healing.count });
     }
     if (draft.wuxing.allowedLimit != null && draft.wuxing.total > draft.wuxing.allowedLimit) {
-      conflicts.push({ type: "condition", field: "wuxue.wuxingLimit", reason: "实际招式悟性贡献超过上限（固定内容基线优先保留）", expected: draft.wuxing.allowedLimit, actual: draft.wuxing.total });
+      conflicts.push({ type: "condition", field: "wuxue.wuxingLimit", reason: "指定境界与实际招式贡献无法满足悟性上限", expected: draft.wuxing.allowedLimit, actual: draft.wuxing.total });
     }
     for (const item of draft.wuxue) {
+      const isPrimary = draft.primary ? item.itemId === draft.primary.itemId : item === draft.wuxue[0];
+      const specified = fixedWuxueIdentities(config).has(item.uuid);
+      const pinnedPair = Boolean(isPrimary && specified && config.neigong.runUuid);
+      if (!isPrimary && (!config.matchAllRandomWuxue || specified)) continue;
       const core = item.coreMove;
       const decision = {
         slot: item.itemId,
         slotKey: relationDecisionKey({ slotKey: `wuxue:${item.slotKey || item.itemId}` }, "compatibility"),
-        relation: "compatibility", evaluated: Boolean(core && draft.runNeigong), result: "unevaluated"
+        relation: "compatibility", evaluated: Boolean(core && draft.runNeigong), result: "unevaluated", pinnedPair
       };
       if (core && draft.runNeigong) {
         const runData = draft.items.find(candidate => candidate._id === draft.runNeigongId);
         const match = evaluateMoveCompatibility(runData, core, { matchStandard: config.matchStandard, actorStats: {} });
         decision.result = match.status; decision.compatibility = match.compatibility; decision.scaling = match.scaling; decision.reason = match.reason;
-        decision.compatibilityRoll = getDecisionRoll(decisionRolls, relationDecisionKey(decision, "compatibility"), rng);
-        decision.scalingRoll = getDecisionRoll(decisionRolls, relationDecisionKey(decision, "scaling"), rng);
-        decision.compatibilityApplied = decision.compatibilityRoll < number(config.synergyProbability, 0) / 100;
-        decision.scalingApplied = decision.scalingRoll < number(config.synergyProbability, 0) / 100;
+        Object.assign(decision, generationMatchDecision(config, item.slotKey, decisionRolls, rng));
       }
       draft.decisions.push(decision);
     }
@@ -1862,6 +1660,7 @@ export class XJZLCharacterGenerationManager {
    */
   async _evaluateDraft(draft, rng, decisionRolls = new Map()) {
     const config = draft.config;
+    draft.warnings ??= [];
     const beforeAllocation = await evaluateGenerationDraft(draft);
     if (!beforeAllocation.prepared) {
       draft.conflicts.push({ type: "evaluation", field: "actor.prepareData", reason: "装备/内嵌文档准备未完整完成，已阻止分配属性", expected: "prepared=true", actual: beforeAllocation.errors });
@@ -1917,15 +1716,20 @@ export class XJZLCharacterGenerationManager {
         ?? GENERATION_MATCH_THRESHOLDS.standard.compatibility;
       const scalingThreshold = GENERATION_MATCH_THRESHOLDS[config.matchStandard]?.scaling
         ?? GENERATION_MATCH_THRESHOLDS.standard.scaling;
-      if (decision.compatibilityApplied && match.compatibility != null && match.compatibility < threshold) {
-        draft.conflicts.push({ type: "condition", field: `wuxue.${decision.slot}.compatibility`, reason: "配套概率命中但代表招式相性未达到匹配门槛", expected: config.matchStandard, actual: match.compatibility, resources: [resourceIdentity(runData), resourceIdentity(draft.items.find(candidate => candidate._id === decision.slot))] });
+      const destination = decision.pinnedPair ? draft.warnings : draft.conflicts;
+      const resource = draft.items.find(candidate => candidate._id === decision.slot);
+      if ((decision.compatibilityApplied || decision.pinnedPair) && match.compatibility != null && match.compatibility < threshold) {
+        destination.push({ type: decision.pinnedPair ? "warning" : "condition", field: `wuxue.${decision.slot}.compatibility`, fieldLabel: `${summary?.name || resource?.name || "主修武学"} · 相性`, reason: decision.pinnedPair ? "运行内功和主修均已指定，保留指定组合；代表招式相性低于匹配门槛" : "代表招式相性未达到匹配门槛", expected: threshold, actual: match.compatibility, resources: [resourceIdentity(runData), resourceIdentity(resource)] });
       }
-      if (decision.scalingApplied && match.scaling != null && match.scaling < scalingThreshold) {
-        draft.conflicts.push({ type: "condition", field: `wuxue.${decision.slot}.scaling`, reason: "配套概率命中但代表招式属性适配未达到匹配门槛", expected: config.matchStandard, actual: match.scaling, resources: [resourceIdentity(runData), resourceIdentity(draft.items.find(candidate => candidate._id === decision.slot))] });
+      if ((decision.scalingApplied || decision.pinnedPair) && match.scaling != null && match.scaling < scalingThreshold) {
+        destination.push({ type: decision.pinnedPair ? "warning" : "condition", field: `wuxue.${decision.slot}.scaling`, fieldLabel: `${summary?.name || resource?.name || "主修武学"} · 属性适配`, reason: decision.pinnedPair ? "运行内功和主修均已指定，保留指定组合；代表招式属性适配低于匹配门槛" : "代表招式属性适配未达到匹配门槛", expected: scalingThreshold, actual: match.scaling, resources: [resourceIdentity(runData), resourceIdentity(resource)] });
       }
     }
     const assignedPoints = Object.values(draft.stats.assigned || {}).reduce((sum, value) => sum + number(value), 0);
     const constraints = { ...evaluation.constraints, points: assignedPoints <= availablePoints };
+    if (!constraints.wuxing && !draft.conflicts.some(conflict => conflict.field === "wuxue.wuxingLimit")) {
+      draft.conflicts.push({ type: "condition", field: "wuxue.wuxingLimit", reason: "实际角色派生的招式贡献超过配置上限", expected: config.wuxue.wuxingLimit, actual: evaluation.derived?.wuxingContribution?.total });
+    }
     if (!constraints.points) {
       draft.conflicts.push({ type: "condition", field: "stats.freePoints", reason: "属性分配超过装备、经脉和被动修正后的实际点池", expected: availablePoints, actual: assignedPoints });
     }
@@ -1944,7 +1748,7 @@ export class XJZLCharacterGenerationManager {
   }
 
   /**
-   * 生成一批只存在于内存的草案；评估失败不会被当作普通候选不匹配重试。
+   * 生成一批只存在于内存的草案；新模型的构筑冲突直接展示，旧模型/武器关系保留有限回溯。
    * @param {object} snapshot - snapshot() 返回的冻结请求。
    * @param {object} [options] - seed/rng/attempts。
    * @returns {Promise<object>} 草案、评估结果与摘要。
@@ -1958,9 +1762,21 @@ export class XJZLCharacterGenerationManager {
       let last = null;
       const decisionRolls = new Map();
       const attempts = Math.max(1, Math.min(GENERATION_MAX_ATTEMPTS, integer(options.attempts, GENERATION_MAX_ATTEMPTS)));
+      let tried = 0;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
+        tried += 1;
         const candidate = this._buildDraft(snapshot, index, rng, decisionRolls);
         last = candidate;
+        const weaponRetry = candidate.conflicts.length > 0 && candidate.conflicts.every(conflict =>
+          conflict.field === "equipment.weaponCompatibility" && !config.wuxue?.primary?.uuid
+          && fixedForCategory(config.wuxue?.fixed || {}, "wuxue").length === 0);
+        if (config.wuxue?.model === "primary" && candidate.conflicts.length && !weaponRetry) {
+          // 构筑器已在约束内搜索；已证明的配置冲突直接展示，不再整批重抽或伪造预算警告。
+          candidate.evaluation = { valid: false, prepared: false, constraints: {}, errors: [] };
+          candidate.status = "conflict";
+          draft = candidate;
+          break;
+        }
         // 资源范围、数量、品阶和目标境界属于构筑前硬条件；继续重复抽取只会重复构造同一类
         // 冲突，尤其是“范围内只有 N 套能达到目标境界”时会把预览无谓拖慢。只有完成纯构筑
         // 后的配套关系不匹配才进入有限回溯。
@@ -1979,15 +1795,15 @@ export class XJZLCharacterGenerationManager {
         // 不可能被后续 Actor 属性评估挽回，先在纯计算边界淘汰，避免无意义地构造完整 Actor。
         const compatibilityThreshold = GENERATION_MATCH_THRESHOLDS[config.matchStandard]?.compatibility
           ?? GENERATION_MATCH_THRESHOLDS.standard.compatibility;
-        const impossibleCompatibility = config.synergyProbability >= 100
+        const impossibleCompatibility = config.wuxue?.model !== "primary" && config.synergyProbability >= 100
           && candidate.decisions.some(decision => decision.compatibility != null
             && decision.compatibility < compatibilityThreshold
-            && (decision.compatibilityApplied ?? true));
+            && (decision.compatibilityApplied ?? true) && !decision.pinnedPair);
         if (impossibleCompatibility) continue;
         const evaluated = await this._evaluateDraft(candidate, rng, decisionRolls);
         last = evaluated;
         const hasRetryableMismatch = evaluated.conflicts.some(isRetryableConflict);
-        if (!hasRetryableMismatch || !evaluated.conflicts.every(isRetryableConflict)) {
+        if (config.wuxue?.model === "primary" || !hasRetryableMismatch || !evaluated.conflicts.every(isRetryableConflict)) {
           draft = evaluated;
           break;
         }
@@ -1999,14 +1815,14 @@ export class XJZLCharacterGenerationManager {
         || (conflict.field === "equipment.weaponCompatibility"
           && !config.wuxue.primary?.uuid
           && fixedForCategory(config.wuxue.fixed || {}, "wuxue").length === 0));
-      if (retryableMismatch) {
-        draft.conflicts.push({ type: "budget", field: "generation", reason: "候选匹配未在有限尝试内满足配套概率", expected: attempts, actual: attempts });
+      if (retryableMismatch && tried === attempts && config.wuxue?.model !== "primary") {
+        draft.conflicts.push({ type: "budget", field: "generation", reason: "本次搜索达到预算，尚不能确定配置是否有解", expected: attempts, actual: tried });
         if (draft.evaluation) draft.evaluation.valid = false;
         draft.status = "conflict";
       }
       if (!draft.evaluation) {
-        if (draft.conflicts.length && draft.conflicts.every(conflict => conflict.type === "condition")) {
-          draft.conflicts.push({ type: "budget", field: "generation", reason: "本次未找到满足全部条件的组合", expected: attempts, actual: attempts });
+        if (tried === attempts && draft.conflicts.length && draft.conflicts.every(conflict => conflict.type === "condition")) {
+          draft.conflicts.push({ type: "budget", field: "generation", reason: "本次搜索达到预算，尚不能确定配置是否有解", expected: attempts, actual: tried });
         }
         draft = await this._evaluateDraft(draft, rng, decisionRolls);
       }
@@ -2061,9 +1877,7 @@ export class XJZLCharacterGenerationManager {
         const healing = countLearnedHealing(Array.from(actor.itemTypes?.wuxue || []));
         const createdWuxing = calculateWuxingContribution(createdItems
           .filter(item => item.type === "wuxue" || item.type === "sanshou"));
-        const createdFixedWuxing = calculateFixedWuxing(draft.config, createdItems
-          .filter(item => item.type === "wuxue" || item.type === "sanshou"));
-        const createdWuxingLimit = allowedWuxingLimit(draft.config, createdFixedWuxing);
+        const createdWuxingLimit = allowedWuxingLimit(draft.config);
         const freePoints = number(actor.system?.stats?.freePoints?.total, -1);
         const initialized = number(actor.system?.resources?.hp?.value) === hpMax
           && number(actor.system?.resources?.mp?.value) === mpMax
