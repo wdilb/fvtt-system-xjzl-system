@@ -228,6 +228,7 @@ export class ChatCardManager {
         let targets = [];
         const historyUuids = flags.targets || [];
         const actionType = flags.actionType || "attack"; // 获取我们在 Item.roll 里存的类型
+        const hasResolvedTargetSelection = flags.targetSelectionResolved === true;
 
         // 防御请求(rollDefendFeint)不需要目标
         if (action === "rollDefendFeint") {
@@ -250,10 +251,13 @@ export class ChatCardManager {
             // A. 优先使用历史记录
             targets = historyUuids.map(uuid => fromUuidSync(uuid)).filter(a => a);
             // 注意：如果历史目标被删了，这里 targets 可能会变空
+            if (hasResolvedTargetSelection && targets.length !== historyUuids.length) {
+                return ui.notifications.warn(game.i18n.localize("XJZL.TargetSelection.TargetInvalid"));
+            }
         }
 
-        // B. 如果没有历史目标 (或历史目标失效)，尝试使用当前选中
-        if (targets.length === 0) {
+        // B. 旧卡仍可回退当前选中；新卡的目标快照即使为空也不能读取后来改变的原生瞄准。
+        if (!hasResolvedTargetSelection && targets.length === 0) {
             targets = Array.from(game.user.targets).map(t => t.document).filter(t => t);
         }
 

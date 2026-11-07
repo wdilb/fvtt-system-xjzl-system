@@ -78,6 +78,7 @@ const EXTRA_FILES = [
 /**
  * 辅助函数：处理招式列表 (Moves Processing)
  * 将 JSON 中的简略数据转换为符合 WuxueDataModel 的完整结构
+ * 目标开关只透传显式布尔值，缺省值留给模型按招式类型派生。
  */
 const processMoves = (rawMoves, bookReqs = "", defaultTier = null) => {
     if (!Array.isArray(rawMoves)) return [];
@@ -180,6 +181,9 @@ const processMoves = (rawMoves, bookReqs = "", defaultTier = null) => {
             })) : []
         };
 
+        if (typeof m.skipTargetSelection === "boolean") {
+            moveData.skipTargetSelection = m.skipTargetSelection;
+        }
         return moveData;
     });
 };

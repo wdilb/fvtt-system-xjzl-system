@@ -23,6 +23,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             // 招式操作
             addMove: XJZLWuxueSheet.prototype._onAddMove,
             deleteMove: XJZLWuxueSheet.prototype._onDeleteMove,
+            resetTargetSelection: XJZLWuxueSheet.prototype._onResetTargetSelection,
 
             // 嵌套数组操作 (属性加成)
             addScaling: XJZLWuxueSheet.prototype._onAddScaling,
@@ -136,6 +137,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         for (const [index, sourceMove] of (context.system.moves || []).entries()) {
             const preparedMove = preparedMovesById.get(sourceMove.id) ?? preparedMoves[index];
             if (!preparedMove) continue;
+            sourceMove._skipTargetSelectionDefault = typeof sourceMove.skipTargetSelection !== "boolean";
 
             for (const key of [
                 "computedTier",
@@ -144,7 +146,8 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 "effectiveStage",
                 "progress",
                 "currentCost",
-                "baseFeint"
+                "baseFeint",
+                "skipTargetSelection"
             ]) {
                 sourceMove[key] = preparedMove[key];
             }
@@ -286,6 +289,22 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         }
 
         return context;
+    }
+
+    /**
+     * 提取表单数据，只有直接修改目标开关才将类型默认值保存为显式配置。
+     * 自动保存其他字段（尤其招式类型）时，缺省开关必须继续跟随类型。
+     */
+    _processFormData(event, form, formData) {
+        const data = super._processFormData(event, form, formData);
+        const sourceMoves = this.document.system.toObject(true).moves || [];
+        for (const [index, move] of Object.entries(data.system?.moves || {})) {
+            const fieldName = `system.moves.${index}.skipTargetSelection`;
+            if (typeof sourceMoves[index]?.skipTargetSelection !== "boolean" && event?.target?.name !== fieldName) {
+                delete move.skipTargetSelection;
+            }
+        }
+        return data;
     }
 
     /**
@@ -458,6 +477,16 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         await this.document.update({
             "system.moves": [...moves, newMove]
         });
+    }
+
+    /** 清除当前招式的显式目标开关，恢复按类型决定的默认值；不修改其他招式。 */
+    async _onResetTargetSelection(event, target) {
+        const moveId = target.dataset.moveId;
+        const moves = this.document.system.toObject(true).moves || [];
+        const move = moves.find(entry => entry.id === moveId);
+        if (!move) return;
+        delete move.skipTargetSelection;
+        await this.document.update({ "system.moves": moves });
     }
 
     async _onDeleteMove(event, target) {

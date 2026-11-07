@@ -91,6 +91,9 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       description: new fields.HTMLField(),
       range: new fields.StringField({ initial: "1米", label: "XJZL.Wuxue.Moves.Range" }),
       targetInfo: new fields.StringField({ initial: "单体", label: "XJZL.Wuxue.Moves.Target" }),
+      // 必须保留缺省状态；初始化时补 false 会让架招的类型默认值失效。
+      // 源数据明确值优先，派生时才按架招 true、其余 false 计算显示与执行值。
+      skipTargetSelection: new fields.BooleanField({ required: false, initial: undefined, label: "XJZL.Wuxue.Moves.SkipTargetSelection" }),
       actionCost: new fields.StringField({ initial: "主要动作", label: "XJZL.Wuxue.Moves.ActionCost" }),
       // === 招式学习需求 ===
       requirements: new fields.HTMLField({
@@ -218,6 +221,10 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
     const bookTier = this.tier ?? 1;
     // 2. 遍历每个招式，计算状态
     for (const [moveIndex, move] of this.moves.entries()) {
+      const sourceMove = this._source.moves?.[moveIndex] ?? {};
+      // 只在源数据缺少该字段时提供类型默认值；显式 false/true 都必须保留。
+      move.skipTargetSelection = sourceMove.skipTargetSelection ?? (move.type === "stance");
+
       // 如果招式自己设定了 tier (不为null)，就用招式的；否则用书本的
       // 这行代码把计算结果存入 move 对象内存中，供后续逻辑使用
       move.computedTier = move.tier ?? bookTier;
@@ -341,7 +348,6 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         maxLevel: Math.max(1, move.maxLevel)
       };
       const formulaOptions = { label: `${this.parent?.name ?? "武学"}／${move.name}` };
-      const sourceMove = this._source.moves?.[moveIndex] ?? {};
       const sourceRange = sourceMove.range ?? move.range;
       const sourceActionCost = sourceMove.actionCost ?? move.actionCost;
       const sourceDescription = sourceMove.description ?? move.description;

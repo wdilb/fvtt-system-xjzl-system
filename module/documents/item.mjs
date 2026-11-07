@@ -9,6 +9,7 @@ import { queueUltimateEffect } from "../managers/ultimate-fx-manager.mjs";
 import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { XJZLActiveEffect } from "./active-effect.mjs";
 import { assertNoSyncScriptWrite } from "../utils/sync-script-guard.mjs";
+import { TargetManager } from "../managers/target-manager.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 
@@ -1840,9 +1841,6 @@ export class XJZLItem extends Item {
         else initialEffectiveMode = "buff"; //兜底
       }
 
-      // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
-      // 保留 targets 仅用于记录 Chat Message 的 flags，不传给脚本
-      const targets = options.targets || Array.from(game.user.targets);
       // === 玩家配置弹窗 (Dialog) ===
       let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0, isFree: false, isDesperate: false, alwaysHit: false };
       // 架招不需要弹窗，Buff类气招如果没选目标也不弹窗
@@ -1909,9 +1907,24 @@ export class XJZLItem extends Item {
       if (Hooks.call("xjzl.preRollMove", this, move, options, actor) === false) return;
 
       // =====================================================
-      // 2. 准备上下文与目标
+      // 2. 选择目标并同步原生瞄准
       // =====================================================
-      //这一块的逻辑移动到了前面，因为我们现在允许修改招式类型，必须放到招式封锁前面才行
+      // 目标选择必须晚于配置与阻断检查、早于任何资源/脚本副作用。
+      // 显式 targets 和 skipDialog 保留既有程序调用语义；人工选择的结果才写回当前用户瞄准。
+      const targetResolution = await TargetManager.resolveActionTargets({
+        actor,
+        move,
+        options,
+        display: {
+          name: move.name,
+          range: move.range,
+          targetInfo: move.targetInfo,
+          description: move.description
+        }
+      });
+      if (!targetResolution) return;
+      const targets = targetResolution.targets;
+      const targetSelectionResolved = targetResolution.resolved === true;
 
       // =====================================================
       // 3. 资源消耗检查 (Resource Check)
@@ -2677,6 +2690,10 @@ export class XJZLItem extends Item {
             // 记录 UUID 列表，方便 GM 点击“一键应用”时自动寻找目标
             // 并不代表 ATTACK 脚本处理了这些目标，仅仅是 UI 层的记录
             targets: targets.map(t => t.document.uuid),
+            ...(targetSelectionResolved ? {
+              targetSelectionResolved: true,
+              targetSelectionExplicitEmpty: targets.length === 0
+            } : {}),
             // 存储预判结果 Map
             // 这里的 Key 是 Token ID，Value 是预判的状态
             // 这样在 Apply Damage 时，直接通过 Token ID 查表即可

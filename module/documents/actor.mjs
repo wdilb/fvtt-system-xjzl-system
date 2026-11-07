@@ -10,6 +10,7 @@ import { isScriptAbortError, INTERACTION_DECISION, resolveInteractionDecision, X
 import { queueHitEffect } from "../managers/combat-fx-manager.mjs";
 import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
+import { TargetManager } from "../managers/target-manager.mjs";
 import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { DEFAULT_CONTAINER_IMAGES } from "../data/actor/container.mjs";
 import {
@@ -3681,6 +3682,21 @@ export class XJZLActor extends Actor {
       automationNote: isCreatureAttack ? (options.creatureAbility?.automationNote || "") : ""
     };
 
+    // 目标选择必须先于趁虚而入扣费，取消或权限失效时不能留下资源副作用。
+    const targetResolution = await TargetManager.resolveActionTargets({
+      actor: this,
+      options,
+      display: {
+        name: virtualMove.name,
+        range: options.range || "",
+        targetInfo: options.targetInfo || "",
+        description: virtualMove.description
+      }
+    });
+    if (!targetResolution) return;
+    const targets = targetResolution.targets;
+    const targetSelectionResolved = targetResolution.resolved === true;
+
     // 资源处理 (趁虚而入特供)
     const resourceUpdates = {};
     let moraleSpent = 0;
@@ -3828,7 +3844,6 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 7. 目标命中检定 (Hit Check)
     // =====================================================
-    const targets = options.targets || Array.from(game.user.targets);
     const targetContexts = new Map();
     const selfLevel = attackContext.flags.level + config.manualAttackLevel;
 
@@ -4124,6 +4139,10 @@ export class XJZLActor extends Actor {
           },
           rollJSON: rollJSON,
           targets: targets.map(t => t.document.uuid),
+          ...(targetSelectionResolved ? {
+            targetSelectionResolved: true,
+            targetSelectionExplicitEmpty: targets.length === 0
+          } : {}),
           targetsResultMap: Object.keys(targetsResults).reduce((acc, tokenId) => {
             const res = targetsResults[tokenId];
             const safeKey = tokenId.replaceAll(".", "_");
@@ -4193,7 +4212,8 @@ export class XJZLActor extends Actor {
   /**
    * 使用野兽特性：攻击、命中与豁免/对抗检定的一体化流程（单一事实源）。
    * 角色卡按钮与 Token HUD 等所有发起入口都应调用本方法，保证融合语义一致：
-   * 1. 读取 game.user.targets 作为目标（无目标提示并中止）；
+   * 1. 普通调用进入统一目标选择；显式 options.targets、skipTargetSelection 与 skipDialog
+   *    分别保留程序调用、无需 Token 招式和无人值守调用的既有语义；
    * 2. 无攻击/检定但配置 directEffects 时直接对玩家选定目标施加状态；否则弹出
    *    野兽特性专用面板（_promptCreatureAbilityPanel），按配置显示攻击段 /
    *    命中段 / 检定段的临场参数（DC、加值、优劣势等）；取消即整体中止；
@@ -4202,9 +4222,10 @@ export class XJZLActor extends Actor {
    * 4. 检定发起对象：requireHit=仅命中的目标，否则全部瞄准目标；
    * 5. 纯检定先发送原文与人工步骤，再逐目标发起请求卡，复用请求卡结算管线。
    * @param {Number} index 特性在 system.abilities 中的下标
+   * @param {Object} options 目标与无人值守选项；options.targets 可为明确空数组
    * @returns {Promise<void>}
    */
-  async useCreatureAbility(index) {
+  async useCreatureAbility(index, options = {}) {
     const ability = this.system.abilities?.[index];
     if (!ability) return;
     const check = ability.check?.enabled ? ability.check : null;
@@ -4237,7 +4258,53 @@ export class XJZLActor extends Actor {
       return ui.notifications.warn(`${this.name} 处于晕眩状态，无法行动！`);
     }
 
-    const targets = Array.from(game.user.targets);
+    // 有数值参数的特性先完成配置，再进入统一目标选择；面板中的目标仅作预览，
+    // 不会把当前原生瞄准带入新的选择会话。
+    const previewTargets = options.skipDialog === true
+      ? TargetManager.getCurrentTargets()
+      : [];
+    let panel = null;
+    if (ability.isAttack || check) {
+      panel = options.skipDialog === true
+        ? {
+            attack: ability.isAttack ? {
+              damageType: ability.damageType || "waigong",
+              bonusAttack: 0,
+              bonusDamage: 0,
+              manualAttackLevel: 0,
+              alwaysHit: false
+            } : null,
+            hit: !ability.isAttack && check?.requireHit === true ? { bonus: 0, level: 0 } : null,
+            check: check
+              ? (check.mode === "contest"
+                ? {
+                    defAttr: check.contest?.defAttr,
+                    attBonus: check.contest?.attBonus ?? 0,
+                    defBonus: check.contest?.defBonus ?? 0
+                  }
+                : {
+                    dc: check.save?.dc ?? 0,
+                    level: check.save?.level ?? 0,
+                    bonus: check.save?.bonus ?? 0
+                  })
+              : null
+          }
+        : await this._promptCreatureAbilityPanel(ability, previewTargets);
+      if (!panel) return;
+    }
+
+    const targetResolution = await TargetManager.resolveActionTargets({
+      actor: this,
+      options,
+      display: {
+        name: ability.name || game.i18n.localize("XJZL.Creature.Check.DefaultLabel"),
+        range: ability.range || "",
+        targetInfo: ability.targetInfo || "",
+        description: ability.description || automationNote
+      }
+    });
+    if (!targetResolution) return;
+    const targets = targetResolution.targets;
     if (targets.length === 0 && (ability.isAttack || check || directEffects.length > 0)) {
       return ui.notifications.warn(game.i18n.localize("XJZL.Creature.Check.NoTarget"));
     }
@@ -4270,10 +4337,6 @@ export class XJZLActor extends Actor {
       }
       return;
     }
-
-    // 1. 野兽特性专用面板：统一收集攻击段/命中段/检定段的临场参数（取消即中止）
-    const panel = await this._promptCreatureAbilityPanel(ability, targets);
-    if (!panel) return;
 
     const label = ability.name || game.i18n.localize("XJZL.Creature.Check.DefaultLabel");
 
