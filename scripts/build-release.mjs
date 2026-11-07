@@ -142,13 +142,15 @@ export async function verifyRuntimePaths(directory, manifest, cssReferences) {
   }
 }
 
-/** 用流式 ZIP 避免大素材占满内存；归档根目录直接放 system.json，供 Foundry 安装。 */
-export async function createArchive(directory, filename, files) {
+/** 用流式 ZIP 避免大素材占满内存；archiveRoot 用于让解压后的目录直接落到 systems/ 下。 */
+export async function createArchive(directory, filename, files, archiveRoot = "") {
+  if (archiveRoot && !/^[a-z0-9-]+$/.test(archiveRoot)) throw new Error(`非法 ZIP 根目录：${archiveRoot}`);
   const archive = new yazl.ZipFile();
   archive.on("error", error => archive.outputStream.destroy(error));
   const completion = pipeline(archive.outputStream, createWriteStream(filename, { flags: "wx" }));
   for (const file of files) {
-    archive.addFile(packagePath(directory, file), file, {
+    const entry = archiveRoot ? `${archiveRoot}/${file}` : file;
+    archive.addFile(packagePath(directory, file), entry, {
       mtime: new Date("2000-01-01T00:00:00Z"), mode: 0o100644
     });
   }
@@ -219,10 +221,11 @@ export async function buildRelease(root = ROOT) {
   }
   const hashes = new Map();
   for (const file of await listFiles(directory)) hashes.set(file, await fingerprint(packagePath(directory, file)));
+  const archiveHashes = new Map([...hashes].map(([file, hash]) => [`${manifest.id}/${file}`, hash]));
   const archive = path.join(destination, `${manifest.id}.zip`);
   const partialArchive = `${archive}.partial`;
-  await createArchive(directory, partialArchive, [...hashes.keys()]);
-  await verifyArchive(partialArchive, hashes);
+  await createArchive(directory, partialArchive, [...hashes.keys()], manifest.id);
+  await verifyArchive(partialArchive, archiveHashes);
   await rename(partialArchive, archive);
   await copyFile(path.join(directory, "system.json"), path.join(destination, "system.json"));
   const report = { id: manifest.id, version: manifest.version, files: hashes.size,

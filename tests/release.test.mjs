@@ -114,15 +114,15 @@ test("发布目录缺少静态模板时拒绝，不能依赖开发目录中的�
   }, []), /missing\.hbs/);
 });
 
-test("ZIP 根目录、中文文件名与二进制内容完整；篡改指纹或损坏 ZIP 均拒绝", async () => {
+test("ZIP 包含系统目录、中文文件名与二进制内容完整；篡改指纹或损坏 ZIP 均拒绝", async () => {
   const directory = await fixture({ "system.json": '{"id":"xjzl-system"}', "assets/中文.png": Buffer.from([0, 255, 17, 0]) });
   const files = await listFiles(directory);
   const expected = new Map();
-  for (const file of files) expected.set(file, await fingerprint(path.join(directory, file)));
+  for (const file of files) expected.set(`xjzl-system/${file}`, await fingerprint(path.join(directory, file)));
   const archive = path.join(directory, "test.zip");
-  await createArchive(directory, archive, files);
+  await createArchive(directory, archive, files, "xjzl-system");
   await verifyArchive(archive, expected);
-  await assert.rejects(verifyArchive(archive, new Map([...expected, ["system.json", "bad-hash"]])), /校验失败/);
+  await assert.rejects(verifyArchive(archive, new Map([...expected, ["xjzl-system/system.json", "bad-hash"]])), /校验失败/);
   const broken = path.join(directory, "broken.zip");
   await writeFile(broken, (await readFile(archive)).subarray(0, 64));
   await assert.rejects(verifyArchive(broken, expected));
