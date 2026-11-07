@@ -130,6 +130,16 @@ Manifest URL 指向 `master` 分支，Foundry 可以据此检查更新。安装�
 
 </details>
 
+## 开发与发布
+
+源码可直接放入 Foundry VTT 的 `systems` 目录运行，无需构建。只有制作发布安装包时才需要 Node.js 22 或更高版本；首次使用或依赖锁文件变化后运行 `npm ci`。Windows 可双击根目录的 `release.cmd`，也可在项目根目录运行：
+
+```powershell
+npm run release
+```
+
+安装包生成于 `dist/xjzl-system-<版本>-<随机后缀>/xjzl-system.zip`。发布前更新 `system.json` 的版本和下载地址，关闭 Foundry 后打包，并用生成的安装目录完成实际运行验收。
+
 ## 快速开始
 
 1. 使用本系统创建一个 Foundry 世界，并确认 `socketlib` 已启用。
