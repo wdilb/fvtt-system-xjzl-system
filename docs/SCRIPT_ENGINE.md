@@ -66,7 +66,7 @@
 
 ### `args` 与同名顶层变量
 
-触发开始时已有的 `args` 字段也会展开成同名顶层变量。例如 `args.target` 存在时，脚本也能读取顶层 `target`。
+阶段上下文通常也提供同名顶层变量。例如 `args.target` 存在时，脚本也能读取顶层 `target`。武器快照统一通过 `args.weapon` 读取。
 
 但是：
 
@@ -186,6 +186,16 @@ if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;
 
 除特别标注为“可写”的字段外，本节所有参数均按只读处理。
 
+### 出招武器快照
+
+`attack`、`check`、`preDamage`、`hit`、`hit_once` 提供只读的 `args.weapon`，结构为 `{ id, name, type, subtype, damage, block, quality }`。无匹配武器时为 `null`。
+
+- 普攻和趁虚而入取第一个已装备武器。武学招式取第一个已装备且大类与 `args.move.weaponType` 相同的武器。
+- `type` 是武器大类 key，`subtype` 是 `CONFIG.XJZL.weaponSubtypes[type]` 中的中文值，空串表示无子类型。
+- 后续结算（含手动结算与其他客户端结算）读取出招时的快照，更换装备不会改变该次记录。
+
+效果取决于实际使用的武器时，读取 `args.weapon?.subtype`。效果取决于招式分类时，读取 `args.move?.weaponSubtype`，例如 `calc` 中的笔法、腿法加伤。
+
 ### `passive`（同步）
 
 **时机：**角色完成第一轮派生计算后；所有 `passive` 完成后，系统再执行一次 `system.recalculate()`。
@@ -215,7 +225,7 @@ S.combat.damages.skill.mod += bonus;
 | `baseData` | `Object` | 只读 | 计算前的参考快照；修改它不会直接改变结果。 |
 | `baseData.base` | `number` | 只读 | 基础伤害。 |
 | `baseData.weapon` | `number` | 只读 | 武器伤害。 |
-| `baseData.isWeaponMatch` | `boolean` | 只读 | 当前武器是否匹配招式。 |
+| `baseData.isWeaponMatch` | `boolean` | 只读 | 常规有系数招式是否装备同大类武器。普攻与局部固定值计算为 `true`。 |
 | `baseData.level` | `number` | 条件提供 | 招式面板的招式等级。 |
 | `baseData.rank` | `number` | 条件提供 | 普攻面板的武器等级加成。 |
 | `output.damage` | `number` | **可写** | 当前面板伤害。 |
@@ -262,6 +272,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `move` / `item` / `attacker` | `Object` / `Item` / `Actor` | 只读 | 当前招式、所属武学和出招者。 |
+| `weapon` | `Object` / `null` | 只读 | [出招武器快照](#出招武器快照)。 |
 | `actionType` | `string` | 只读 | 动作类型，例如 `attack`、`heal` 或 `buff`。 |
 | `allowDamageModifiers` | `boolean` | 只读 | 本招式在 `preAttack` 声明的值；人物普攻固定为 `true`。详见[攻击侧数值修正](#攻击侧数值修正)。 |
 | `damageType` / `type` | `string` | 只读 | 原始伤害类型；两者同义。 |
@@ -290,6 +301,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `target` | `Actor` | 只读 | 当前目标。 |
 | `attacker` | `Actor` | 只读 | 出招者。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `weapon` | `Object` / `null` | 只读 | [出招武器快照](#出招武器快照)。 |
 | `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；掷骰时与手动补算新目标时均提供。 |
 | `flags.grantLevel` / `flags.grantFeintLevel` | `number` | **可写** | 仅针对当前目标的命中/虚招优劣势计数。 |
 | `flags.targetKanpoLevel` | `number` | **可写** | 当前动作给予目标本次看破检定的优劣势计数；会随攻击卡固化，正数为优势，负数为劣势。 |
@@ -310,6 +322,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `targets` | `Actor[]` | 只读 | 本次实际结算的全部目标（自动与手动结算均提供）；需要跨目标统计（如按持有某状态的个数增伤）时使用。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `weapon` | `Object` / `null` | 只读 | [出招武器快照](#出招武器快照)。 |
 | `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张攻击卡独立。 |
 | `element` | `string` | 只读 | 招式原始属性。 |
 | `outcome.isHit` / `.isCrit` / `.isBroken` | `boolean` | 只读 | 攻击方已确定的命中、暴击和破架结果。 |
@@ -479,6 +492,7 @@ await actor.applyHealing({
 |---|---|---|---|
 | `target` / `attacker` | `Actor` | 只读 | 当前目标和出招者。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `weapon` | `Object` / `null` | 只读 | [出招武器快照](#出招武器快照)。 |
 | `actionType` | `string` | 只读 | `attack`、`heal` 或 `buff`。 |
 | `damageType` / `type` | `string` | 只读 | 攻击保留招式原始伤害类型；治疗/Buff 为 `none`。 |
 | `element` | `string` | 只读 | 招式原始属性。 |
@@ -521,6 +535,7 @@ await actor.applyHealing({
 | `targets` | `Object[]` | 只读 | 全部目标的汇总结果，元素结构见下文。 |
 | `hitCount` | `number` | 只读 | 命中目标数；治疗/Buff 视为全部命中。 |
 | `attacker` / `item` / `move` | `Actor` / `Item` / `Object` | 只读 | 出招者、所属武学和当前招式。 |
+| `weapon` | `Object` / `null` | 只读 | [出招武器快照](#出招武器快照)。 |
 | `actionType` | `string` | 只读 | `attack`、`heal` 或 `buff`。 |
 | `damageType` / `type` | `string` | 只读 | 攻击保留原始伤害类型；治疗/Buff 为 `none`。 |
 | `element` | `string` | 只读 | 招式原始属性。 |

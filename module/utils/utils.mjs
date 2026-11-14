@@ -41,6 +41,46 @@ export function normalizeWeaponSubtype(type, subtype) {
   return subtype && XJZL.weaponSubtypes[type]?.includes(subtype) ? subtype : "";
 }
 
+/**
+ * 构造攻击侧脚本上下文的武器快照（args.weapon）：只读纯数据对象，可序列化，
+ * 随攻击卡 flag 保存，供卡片结算阶段（含手动与跨客户端）复用出招时的武器状态。
+ * 徒手或无武器时返回 null。字段值域与武器 DataModel 对齐，subtype 为
+ * CONFIG.XJZL.weaponSubtypes 中的规则书中文名，空串表示无子类型。
+ * @param {Item|null} weapon 已装备武器 Item，可为空
+ * @returns {Object|null} { id, name, type, subtype, damage, block, quality } 或 null
+ */
+export function buildWeaponSnapshot(weapon) {
+  if (!weapon?.system) return null;
+  return {
+    id: weapon.id ?? null,
+    name: weapon.name ?? "",
+    type: weapon.system.type ?? "",
+    subtype: weapon.system.subtype ?? "",
+    damage: weapon.system.damage ?? 0,
+    block: weapon.system.block ?? 0,
+    quality: weapon.system.quality ?? 0
+  };
+}
+
+/**
+ * 向攻击侧阶段上下文注入只读武器快照 args.weapon（契约见 docs/SCRIPT_ENGINE.md）。
+ * 必须用不可枚举属性注入：脚本沙盒会展开上下文的可枚举字段作为脚本同名顶层变量，
+ * 顶层 `weapon` 会与既有脚本中的 `const weapon` 声明冲突导致编译失败；不可枚举可
+ * 避开展开，脚本统一通过 args.weapon 读取。value 不可写，保持快照只读语义。
+ * @param {Object} context 攻击侧触发器上下文对象
+ * @param {Object|null} snapshot buildWeaponSnapshot 的结果；卡片未携带时传 null
+ * @returns {Object} 原上下文对象
+ */
+export function injectWeaponArg(context, snapshot) {
+  Object.defineProperty(context, "weapon", {
+    value: snapshot ?? null,
+    enumerable: false,
+    writable: false,
+    configurable: true
+  });
+  return context;
+}
+
 /* -------------------------------------------- */
 /*  残疾表系统 (Disability Logic)               */
 /* -------------------------------------------- */

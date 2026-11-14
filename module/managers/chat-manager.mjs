@@ -4,7 +4,7 @@
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import * as MacrosModule from "../utils/macros.mjs";
-import { rollDisabilityTable } from "../utils/utils.mjs";
+import { rollDisabilityTable, injectWeaponArg } from "../utils/utils.mjs";
 import { ActiveEffectManager } from "./active-effect-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -483,6 +483,8 @@ export class ChatCardManager {
             }; //换成优劣势计数
 
             if (!isCreatureAttack) {
+                // 出招时武器快照（随卡片持久化，只读），不可枚举注入避免顶层 weapon 与脚本冲突
+                injectWeaponArg(checkContext, flags.weapon ?? null);
                 await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
             }
 
@@ -1616,6 +1618,8 @@ export class ChatCardManager {
                     get: () => allowDamageModifiers,
                     enumerable: true
                 });
+                // 出招时武器快照（随卡片持久化，只读），不可枚举注入避免顶层 weapon 与脚本冲突
+                injectWeaponArg(preDamageContext, flags.weapon ?? null);
 
                 // 执行脚本
                 await attacker.runScripts(SCRIPT_TRIGGERS.PRE_DAMAGE, preDamageContext, move);
@@ -1798,6 +1802,8 @@ export class ChatCardManager {
             };
 
             // 无论命中与否都执行，脚本内自己判断 if (args.isHit)
+            // 出招时武器快照（随卡片持久化，只读），不可枚举注入避免顶层 weapon 与脚本冲突
+            injectWeaponArg(hitContext, flags.weapon ?? null);
             if (!isCreatureAttack) await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
         }
 
@@ -1890,6 +1896,8 @@ export class ChatCardManager {
             // 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
             scriptFlags: flags.scriptFlags || {}
         };
+        // 出招时武器快照（随卡片持久化，只读），不可枚举注入避免顶层 weapon 与脚本冲突
+        injectWeaponArg(globalContext, flags.weapon ?? null);
 
         if (!isCreatureAttack) await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
     }
@@ -2351,6 +2359,8 @@ export class ChatCardManager {
                     get: () => allowDamageModifiers,
                     enumerable: true
                 });
+                // 与自动结算一致：出招时武器快照（只读），不可枚举注入避免顶层 weapon 与脚本冲突
+                injectWeaponArg(preDamageContext, flags.weapon ?? null);
                 await attacker.runScripts(SCRIPT_TRIGGERS.PRE_DAMAGE, preDamageContext, move);
             }
 
@@ -2494,6 +2504,8 @@ export class ChatCardManager {
                 isBuff: false,
                 isManual: true // 给脚本一个标记，万一脚本需要区分
             };
+            // 与自动结算一致：出招时武器快照（只读），不可枚举注入避免顶层 weapon 与脚本冲突
+            injectWeaponArg(hitContext, flags.weapon ?? null);
             await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
         }
 
@@ -2530,6 +2542,8 @@ export class ChatCardManager {
             isManual: true,
             scriptFlags: flags.scriptFlags || {}
         };
+        // 与自动结算一致：出招时武器快照（只读），不可枚举注入避免顶层 weapon 与脚本冲突
+        injectWeaponArg(globalContext, flags.weapon ?? null);
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
     }
 
@@ -3476,6 +3490,8 @@ export class ChatCardManager {
             };
 
             //  D.无论有没有数值，都执行 HIT 脚本
+            // 与攻击卡一致：出招时武器快照（只读），不可枚举注入避免顶层 weapon 与脚本冲突
+            injectWeaponArg(hitContext, flags.weapon ?? null);
             await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
         }
 
@@ -3500,6 +3516,8 @@ export class ChatCardManager {
             // 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
             scriptFlags: flags.scriptFlags || {}
         };
+        // 与攻击卡一致：出招时武器快照（只读），不可枚举注入避免顶层 weapon 与脚本冲突
+        injectWeaponArg(globalContext, flags.weapon ?? null);
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
         // =====================================================
         // 4. 发送汇总卡片

@@ -9,6 +9,7 @@ import { queueUltimateEffect } from "../managers/ultimate-fx-manager.mjs";
 import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 import { XJZLActiveEffect } from "./active-effect.mjs";
 import { assertNoSyncScriptWrite } from "../utils/sync-script-guard.mjs";
+import { buildWeaponSnapshot, injectWeaponArg } from "../utils/utils.mjs";
 import { TargetManager } from "../managers/target-manager.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
@@ -2125,6 +2126,16 @@ export class XJZLItem extends Item {
         await AuraManager.dismissBySource({sourceActorUuid: actor.uuid, lifecycle: "stance"});
       }
 
+      // 攻击侧脚本 args.weapon 快照：与武器伤害匹配同一解析——第一个已装备且大类
+      // 匹配招式 weaponType 的武器；招式无武器大类或未装备匹配武器时为 null（徒手语义）。
+      const attackWeapon = move.weaponType && move.weaponType !== "none"
+        ? actor.itemTypes.weapon.find(w =>
+            w.system.equipped === true &&
+            w.system.type === move.weaponType
+          )
+        : null;
+      const weaponSnapshot = buildWeaponSnapshot(attackWeapon);
+
       const attackContext = {
         move: move,
         item: this,
@@ -2165,6 +2176,9 @@ export class XJZLItem extends Item {
         get: () => allowDamageModifiers,
         enumerable: true
       });
+      // 只读武器快照：脚本按 args.weapon?.subtype 做子类型判断。
+      // 不可枚举注入，避免沙盒顶层 weapon 与既有脚本的 const weapon 冲突。
+      injectWeaponArg(attackContext, weaponSnapshot);
       await actor.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, move);
 
       // 检查阻断
@@ -2296,6 +2310,8 @@ export class XJZLItem extends Item {
           };
 
           // 即使是治疗，也跑一遍 CHECK 脚本 (脚本自己决定要不要对友方生效)
+          // 与 attack 阶段同一份武器快照，不可枚举注入（契约见 utils.mjs injectWeaponArg）。
+          injectWeaponArg(checkContext, weaponSnapshot);
           await actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
           // 最终状态 = 攻击者自身被动 OR 脚本临时赋予
@@ -2664,6 +2680,8 @@ export class XJZLItem extends Item {
             // 应用伤害时由 chat-manager 以 args.scriptFlags 只读暴露给 hit/hit_once 脚本；
             // 每张卡片持有独立快照，多张待结算卡片互不干扰，未结算也不会残留 Actor 状态。
             scriptFlags: foundry.utils.deepClone(attackContext.flags),
+            // 出招时武器快照：应用伤害时由 chat-manager 以 args.weapon 只读暴露给结算脚本
+            weapon: weaponSnapshot,
             forceHit: isGlobalForceHit, // 存入全局必中状态
             alwaysHit: attackContext.flags.alwaysHit || false,
             // 2. 数值结果

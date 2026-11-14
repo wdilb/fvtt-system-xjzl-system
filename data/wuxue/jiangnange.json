@@ -1876,7 +1876,7 @@
                     "range": "自身",
                     "actionCost": "无",
                     "description": "<p>众人皆醉我独醒，举世皆俗我独清。身处红尘不沾世俗，凡夫俗子难为知音，曲高和寡，遗世独立。</p><p><strong>【清雅】</strong>你的[演奏]、[棋术]、[书写]、[作画]每有一种达到 5 级，你的神采+5。</p><p><strong>【高雅】</strong>你施展笔/乐器/棋类武学时，命中和招式伤害提升【神采/10】的数值。</p><p><strong>升级：</strong>清雅中需求的四艺等级-1；高雅中，命中伤害额外+5。</p>",
-                    "automationNote": "【清雅】全局自动生效；【高雅】自动为笔/乐器/棋类/奇门武学加成。注：因武器子类型数据未完整录入，系统按武器大类识别，匕首类武学（含匕首-尺等非笔武器）也会获得加成，如需精确排除请手动停用该特效。",
+                    "automationNote": "【清雅】全局自动生效；【高雅】按出招武器自动判断：笔需匕首-笔、棋类需暗器-弹丸，乐器不限子类型；其他武器（含匕首-尺、奇门）不生效。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1899,7 +1899,7 @@
             {
                 "name": "高雅 (散手被动)",
                 "transfer": true,
-                "description": "施展笔/乐器/棋类武学时获得加成。不使用此类武器时请禁用此状态。",
+                "description": "施展笔/乐器/棋类武学时获得加成（按出招武器判断：笔需匕首-笔，棋类需暗器-弹丸，乐器不限子类型）。使用其他武器时不生效。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "gaoya_passive",
@@ -1908,7 +1908,7 @@
                                 "label": "高雅：命中与伤害加成",
                                 "trigger": "attack",
                                 "active": true,
-                                "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack') || args.move.type === \"stance\" || args.move.type === \"qi\") return;\n\n// 武器子类型数据未完整录入，无法精确区分“匕首-笔”，匕首类整体放行，边界在 automationNote 中说明\nconst validTypes = ['dagger', 'special', 'instrument', 'hidden'];\nif (!validTypes.includes(args.move.weaponType)) return;\n\nconst originItem =(thisEffect.parent && thisEffect.parent.type === \"wuxue\") ? thisEffect.parent : actor.items.find(i => i.name === \"大雅之堂\");\nif (!originItem) return;\n\nconst dyzt = originItem.system.moves.find(m => m.name === \"大雅之堂\");\nconst lvl = Math.max(1, dyzt?.computedLevel || 1);\n\nconst currentShencai = S.stats.shencai.total || 0;\nconst baseBonus = Math.floor(currentShencai / 10);\nconst extraBonus = (lvl - 1) * 5;\nconst totalBonus = baseBonus + extraBonus;\n\nargs.flags.bonusHit += totalBonus;\nargs.flags.damageResult.damage += totalBonus;\nargs.flags.damageResult.breakdown += `\\n+ 高雅加成: ${totalBonus}`;"
+                                "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack') || args.move.type === \"stance\" || args.move.type === \"qi\") return;\n\n// 规则：施展笔/乐器/棋类武学时命中和伤害提升神采/10。按出招武器快照精确判断：\n// 笔=匕首-笔；棋类=暗器-弹丸；乐器按大类放行（规则未点名子类型）。匕首-尺、奇门等不再放行。\nconst w = args.weapon;\nconst isBi = !!w && w.type === 'dagger' && w.subtype === '笔';\nconst isQi = !!w && w.type === 'hidden' && w.subtype === '弹丸';\nconst isYue = !!w && w.type === 'instrument';\nif (!isBi && !isQi && !isYue) return;\n\nconst originItem = (thisEffect.parent && thisEffect.parent.type === \"wuxue\") ? thisEffect.parent : actor.items.find(i => i.name === \"大雅之堂\");\nif (!originItem) return;\n\nconst dyzt = originItem.system.moves.find(m => m.name === \"大雅之堂\");\nconst lvl = Math.max(1, dyzt?.computedLevel || 1);\n\nconst currentShencai = S.stats.shencai.total || 0;\nconst baseBonus = Math.floor(currentShencai / 10);\nconst extraBonus = (lvl - 1) * 5;\nconst totalBonus = baseBonus + extraBonus;\n\nargs.flags.bonusHit += totalBonus;\nargs.flags.damageResult.damage += totalBonus;\nargs.flags.damageResult.breakdown += `\\n+ 高雅加成: ${totalBonus}`;"
                             }
                         ]
                     }

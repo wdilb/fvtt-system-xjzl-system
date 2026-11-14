@@ -12,6 +12,7 @@ import { AuraManager } from "../region/xjzl-aura-manager.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { TargetManager } from "../managers/target-manager.mjs";
 import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
+import { buildWeaponSnapshot, injectWeaponArg } from "../utils/utils.mjs";
 import { DEFAULT_CONTAINER_IMAGES } from "../data/actor/container.mjs";
 import {
   enterSyncScriptContext,
@@ -3641,6 +3642,8 @@ export class XJZLActor extends Actor {
     const weapon = this.itemTypes.weapon.find(i => i.system.equipped);
     const weaponType = weapon ? weapon.system.type : "unarmed";
     const weaponName = weapon ? weapon.name : "徒手";
+    // 攻击侧脚本 args.weapon 快照：出招时定型并随攻击卡保存，结算阶段不受后续装备变化影响
+    const weaponSnapshot = buildWeaponSnapshot(weapon);
     // 野兽攻击的伤害值由特性直接提供；人物普攻取武器基础伤害
     const baseDamage = options.baseDamage ?? (weapon ? (weapon.system.damage || 0) : 0); // 徒手基础伤害通常为0
 
@@ -3819,6 +3822,9 @@ export class XJZLActor extends Actor {
       get: () => true,
       enumerable: true
     });
+    // 只读武器快照：徒手为 null；脚本按 args.weapon?.subtype 做子类型判断。
+    // 不可枚举注入，避免沙盒顶层 weapon 与既有脚本的 const weapon 冲突。
+    injectWeaponArg(attackContext, weaponSnapshot);
     if (!isCreatureAttack) await this.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, virtualMove);
     // 获取全局必中状态
     const isGlobalForceHit = attackContext.flags.forceHit || false;
@@ -3881,6 +3887,8 @@ export class XJZLActor extends Actor {
       };
 
       // 野兽攻击隔离人物脚本；人物普攻仍触发原有 CHECK 脚本。
+      // 与 attack 阶段同一份武器快照，不可枚举注入（契约见 utils.mjs injectWeaponArg）。
+      injectWeaponArg(checkContext, weaponSnapshot);
       if (!isCreatureAttack) await this.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, virtualMove);
 
       const tStatus = targetActor.xjzlStatuses || {};
@@ -4120,6 +4128,7 @@ export class XJZLActor extends Actor {
           costConsumed: costConsumed, // 记录消耗
           allowDamageModifiers: isCreatureAttack ? false : true, // 野兽固定伤害不读取人物增伤脚本
           scriptFlags: attackFlagsSnapshot, // 出招阶段自定义 flags 快照，供结算脚本只读
+          weapon: weaponSnapshot, // 出招时武器快照，供结算阶段 args.weapon 复用
           damage: calcResult.damage,
           feint: 0,
           calc: calcResult,
