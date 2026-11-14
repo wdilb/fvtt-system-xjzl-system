@@ -1,5 +1,5 @@
 import { XJZL } from "../config.mjs";
-import { localizeConfig } from "../utils/utils.mjs";
+import { localizeConfig, getWeaponSubtypeChoices, normalizeWeaponSubtype } from "../utils/utils.mjs";
 import { TRIGGER_CHOICES } from "../data/common.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -56,6 +56,8 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         context.choices = {
             // 武器类型
             weaponTypes: localizeConfig(XJZL.weaponTypes),
+            // 子武器类型：选项随当前大类联动，只含空项与对应分组枚举值
+            weaponSubtypes: getWeaponSubtypeChoices(this.document.system.type),
             // 防具部位
             armorTypes: localizeConfig(XJZL.armorTypes),
             // 奇珍的穴位比较特殊，通常不需要下拉选择，而是拖拽进去时自动填，或者我们给一个简单的文本框即可
@@ -91,6 +93,26 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         );
 
         return context;
+    }
+
+    /* -------------------------------------------- */
+    /*  表单提交                                    */
+    /* -------------------------------------------- */
+
+    /**
+     * 大类与子类型可能在同一次自动保存中变更（改大类触发 submitOnChange 时，
+     * 子类型下拉携带的仍是旧分组的选中值）；提交前按新大类归一，
+     * 避免出现「blade + 单剑」这类无效组合落库。
+     * updateData 须透传给 super（手动 submit({ updateData }) 的附加更新，
+     * 在 super 内合并进提交数据），归一作用于合并后的最终值。
+     */
+    _prepareSubmitData(event, form, formData, updateData) {
+        const data = super._prepareSubmitData(event, form, formData, updateData);
+        // 防具/奇珍 schema 无 subtype 字段，缺值时自然跳过
+        if (data.system?.subtype) {
+            data.system.subtype = normalizeWeaponSubtype(data.system.type, data.system.subtype);
+        }
+        return data;
     }
 
     /* -------------------------------------------- */

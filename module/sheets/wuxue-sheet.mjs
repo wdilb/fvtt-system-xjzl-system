@@ -2,7 +2,7 @@
  * 武学物品表单
  */
 import { XJZL } from "../config.mjs";
-import { localizeConfig } from "../utils/utils.mjs"; // 引入工具函数
+import { localizeConfig, getWeaponSubtypeChoices, normalizeWeaponSubtype } from "../utils/utils.mjs"; // 引入工具函数
 import { TRIGGER_CHOICES } from "../data/common.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -252,6 +252,9 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 move._uiClass = `type-${move.type || 'real'}`;
                 // 招式类型已经由颜色与文字区分，图标统一为剑势，减少视觉噪音。
                 move._uiIcon = "fa-sword";
+                // 子类型下拉按招式自身 weaponType 联动，只含空项与对应分组枚举值；
+                // 存量旧值不渲染为选项，保存时随选中值自然归一。
+                move._uiSubtypeChoices = getWeaponSubtypeChoices(move.weaponType);
 
                 // 判断模式
                 const mode = move.progression?.mode || "standard";
@@ -309,11 +312,22 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
     /**
      * 处理表单提交数据
-     * 核心逻辑：拦截 "temp.thresholds" 代理字段，将字符串转换为数字数组，并写入 system 数据
+     * 核心逻辑：拦截 "temp.thresholds" 代理字段，将字符串转换为数字数组，并写入 system 数据。
+     * updateData 须透传给 super（手动 submit({ updateData }) 的附加更新，
+     * 在 super 内合并进提交数据），子类型归一作用于合并后的最终值。
      */
-    _prepareSubmitData(event, form, formData) {
+    _prepareSubmitData(event, form, formData, updateData) {
         // 1. 获取基础数据
-        const data = super._prepareSubmitData(event, form, formData);
+        const data = super._prepareSubmitData(event, form, formData, updateData);
+
+        // 1.5 大类联动归一：weaponType 与 weaponSubtype 可能在同一次提交中变更
+        // （改大类触发 submitOnChange 时，子类型下拉携带的仍是旧分组的选中值）；
+        // 按提交后的 weaponType 逐招式归一，无效组合落库前清空。
+        for (const move of Object.values(data.system?.moves || {})) {
+            if (move.weaponSubtype) {
+                move.weaponSubtype = normalizeWeaponSubtype(move.weaponType, move.weaponSubtype);
+            }
+        }
 
         // 2. 直接遍历 FormData 查找临时字段 (比操作 data 对象更稳健)
         for (const [key, value] of formData.entries()) {

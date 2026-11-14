@@ -313,7 +313,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                         if (Array.isArray(sys.moves)) {
                             for (const move of sys.moves) {
                                 if (move?.name) searchParts.push(move.name);
-                                for (const key of ["element", "damageType", "weaponType"]) {
+                                for (const key of ["element", "damageType", "weaponType", "weaponSubtype"]) {
                                     if (move[key]) searchParts.push(move[key]);
                                 }
                             }

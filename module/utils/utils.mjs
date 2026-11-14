@@ -1,5 +1,7 @@
 /* module/utils.mjs */
 
+import { XJZL } from "../config.mjs";
+
 /**
  * 将配置对象的值进行本地化
  * 输入: { key: "LOC.Key" }
@@ -11,6 +13,32 @@ export function localizeConfig(config) {
     localized[key] = game.i18n.localize(labelKey);
   }
   return localized;
+}
+
+/**
+ * 构造子武器类型下拉选项：首项为空串（无子类型），其后为指定武器大类分组的枚举值。
+ * 存储值即规则书中文名，直接作为显示文本；type 不在 XJZL.weaponSubtypes
+ * 分组内（含防具/奇珍等非武器类型）时只返回空项。
+ * @param {String} type 武器大类 key，可为空或未知值
+ * @returns {Object<String, String>} { 存储值: 显示文本 }
+ */
+export function getWeaponSubtypeChoices(type) {
+  return {
+    "": game.i18n.localize("XJZL.Weapon.SubtypeNone"),
+    ...Object.fromEntries((XJZL.weaponSubtypes[type] || []).map(value => [value, value]))
+  };
+}
+
+/**
+ * 归一子武器类型：值不属于指定大类分组的枚举时返回空串。
+ * 用于表单提交兜底——大类与子类型可能在同一次自动保存中变更，下拉携带的仍是
+ * 旧分组的选中值；无分组的大类（含未知 key 与 none）只允许空串。
+ * @param {String} type 武器大类 key，可为空或未知值
+ * @param {String} subtype 当前子类型值，可为空
+ * @returns {String} 合法子类型值或空串
+ */
+export function normalizeWeaponSubtype(type, subtype) {
+  return subtype && XJZL.weaponSubtypes[type]?.includes(subtype) ? subtype : "";
 }
 
 /* -------------------------------------------- */
