@@ -25,7 +25,8 @@ export class XJZLWeaponData extends foundry.abstract.TypeDataModel {
       // === 核心属性 ===
       // 对应 config.mjs 中的 XJZL.weaponTypes
       type: new fields.StringField({ initial: "sword", label: "XJZL.Wuxue.Moves.WeaponType" }), //武器类型
-      subtype: new fields.StringField({ label: "XJZL.Wuxue.Moves.WeaponSubtype" }), // 子类型 (如: 重剑)
+      // 子类型取值见 CONFIG.XJZL.weaponSubtypes（按当前大类分组）；空串表示无子类型
+      subtype: new fields.StringField({ label: "XJZL.Wuxue.Moves.WeaponSubtype" }),
 
       damage: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Equipment.Damage" }), // 基础伤害
       block: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Equipment.Block" }),   // 格挡值

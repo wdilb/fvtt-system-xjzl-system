@@ -84,7 +84,8 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // 武器限制 (移动到招式层级)
       // 对应 Character.system.combat.weaponRanks 中的 key (sword, blade...)
       weaponType: new fields.StringField({ initial: "none", label: "XJZL.Wuxue.Moves.WeaponType" }),
-      // 文本描述限制 (如 "仅限重剑")，仅做显示，不自动化
+      // 子武器类型枚举，取值见 CONFIG.XJZL.weaponSubtypes（按招式 weaponType 分组），
+      // 用于显示与子类型相关自动化；复合武器需求只填主项，空串表示无子类型
       weaponSubtype: new fields.StringField({ label: "XJZL.Wuxue.Moves.WeaponSubtype" }),
 
       // --- 3. 描述与显示 ---
