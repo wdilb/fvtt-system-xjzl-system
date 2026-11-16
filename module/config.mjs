@@ -1484,7 +1484,32 @@ try {
     description: "XJZL.Status.ZibiDesc",
     img: "systems/xjzl-system/assets/icons/ae/自闭.png",
     showIcon: 2, // V14 默认 CONDITIONAL 只显示临时特效图标，通用状态须常显
-    flags: { "xjzl-system": { slug: "zibi", stackable: false } },
+    flags: {
+      "xjzl-system": {
+        slug: "zibi",
+        stackable: false,
+        // 被击必暴 + 命中后解除：preDefense（命中后、暴击倍率计算前，防御者侧）由脚本引擎执行
+        scripts: [
+          {
+            label: "自闭：被击必暴并解除",
+            trigger: "preDefense",
+            active: true,
+            script: [
+              "// 自闭：失去五感，被击必暴。仅对带招式/物品来源的真实攻击生效，",
+              "// 流血等 dot 与通用伤害工具（不传 move/item）不会误触发或消耗自闭。",
+              "if (!args.move && !args.item) return;",
+              "// 野兽攻击永不暴击：不得覆盖攻击侧 neverCrit 抑制，只解除自闭。",
+              "if (args.attacker?.type !== \"creature\") {",
+              "  args.config.isCrit = true;",
+              "  args.config.applyCritDamage = true;",
+              "}",
+              "// 命中即解除自闭（含野兽攻击）；removeEffect 内部处理权限代理、飘字与聊天卡。",
+              "await game.xjzl.api.effects.removeEffect(actor, \"zibi\", 1);"
+            ].join("\n")
+          }
+        ]
+      }
+    },
     system: {
       changes: []
     }
