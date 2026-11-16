@@ -3663,7 +3663,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>持剑横扫，甩出片状剑雨，对周围敌人造成伤害。击破任意一人架招后，你获得“听雨”状态，持续到战斗脱离。</p><p><strong>听雨：</strong>施展剑法招式命中+10。</p><p>·你可以移除听雨，然后不消耗动作和内力直接施展【清秋画雨】，但还是需要消耗美酒或气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "消耗酒/血手动。击破获BUFF自动。连招手动。",
+                    "automationNote": "出招自动消耗 10 气血并发卡记录；改用美酒需手动消耗物品并回复气血。击破获BUFF自动。连招手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3687,6 +3687,12 @@
                             "trigger": "hit",
                             "script": "if (args.isBroken) {\n    const effData = {\n        name: \"听雨\",\n        img: \"icons/magic/water/rain-cloud-blue.webp\",\n        description: \"施展剑法招式命中+10\",\n        flags: {\n            \"xjzl-system\": {\n                slug: \"tingyu\",\n                stackable: false,\n                scripts: [{\n                    label: \"剑法命中\",\n                    trigger: \"attack\",\n                    active: true,\n                    script: \"if (args.move.weaponType === \\\"sword\\\") {\\n    args.flags.bonusHit += 10;\\n}\"\n                }]\n            }\n        }\n    };\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
                             "active": true
+                        },
+                        {
+                            "label": "御血代价",
+                            "trigger": "attack",
+                            "script": "// 落雨剑法规则代价：每次出招消耗一壶美酒或 10 气血。不写入 costs：\n// 免消耗施展（连招等）会连 costs 一起豁免，而酒/血代价规则上不可免，故在脚本中结算。\n// 酒/血代价任何情形都不可免除（「落雨」与连招仅免内力），脚本始终结算。\nconst result = await actor.applyHealing({ healer: actor, amount: -10, type: \"hp\", showScrolling: true, item: args.item, move: args.move });\nconst lost = Number.isFinite(Number(result?.actualHeal)) ? Math.abs(Number(result.actualHeal)) : 10;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p><i class=\"fas fa-tint\"></i> <b>落雨剑法·御血对敌</b>：${actor.name} 施展【${move.name}】，消耗 <b>${lost}</b> 点气血。</p><p style=\"font-size:0.9em; color:#888;\">如以酒养剑：请手动消耗一壶美酒并回复本次气血。</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor })\n});",
+                            "active": true
                         }
                     ]
                 },
@@ -3700,7 +3706,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>旋剑劈斩，斩出线状剑雨。对目标造成伤害。若击中的角色在这场战斗中没有被《落雨剑法》招式命中过，你获得“画雨”状态，持续到战斗脱离。</p><p><strong>画雨：</strong>施展剑法招式暴击骰-1。</p><p>·你可以移除画雨，然后不消耗动作和内力直接施展【连天碧雨】，但还是需要消耗美酒或气血。</p><p><strong>升级：</strong>招式伤害+10，画雨暴击骰再-1，消耗+2。</p>",
-                    "automationNote": "消耗酒/血手动。首中检测手动。连招手动。",
+                    "automationNote": "出招自动消耗 10 气血并发卡记录；改用美酒需手动消耗物品并回复气血。首中检测手动。连招手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3724,6 +3730,12 @@
                             "trigger": "hit",
                             "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const critMod = 1 + (lvl - 1); // 每级暴击骰-1（存正数，check 阶段加到暴击阈值修正）\n    const effData = {\n        name: \"画雨\",\n        img: \"icons/magic/nature/leaves-orange.webp\",\n        description: `施展剑法招式暴击骰-${critMod}`,\n        flags: {\n            \"xjzl-system\": {\n                slug: \"huayu\",\n                stackable: false,\n                huayuCrit: critMod,\n                scripts: [{\n                    label: \"剑法暴击骰\",\n                    trigger: \"check\",\n                    active: true,\n                    script: \"if (args.move.weaponType === \\\"sword\\\") {\\n    const mod = thisEffect.getFlag(\\\"xjzl-system\\\", \\\"huayuCrit\\\") || 1;\\n    args.flags.critThresholdMod += mod;\\n}\"\n                }]\n            }\n        }\n    };\n    // 提示玩家确认是否首中\n    ui.notifications.info(\"若此为首中该目标，请手动应用 [画雨] 状态。\");\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
                             "active": true
+                        },
+                        {
+                            "label": "御血代价",
+                            "trigger": "attack",
+                            "script": "// 落雨剑法规则代价：每次出招消耗一壶美酒或 10 气血。不写入 costs：\n// 免消耗施展（连招等）会连 costs 一起豁免，而酒/血代价规则上不可免，故在脚本中结算。\n// 酒/血代价任何情形都不可免除（「落雨」与连招仅免内力），脚本始终结算。\nconst result = await actor.applyHealing({ healer: actor, amount: -10, type: \"hp\", showScrolling: true, item: args.item, move: args.move });\nconst lost = Number.isFinite(Number(result?.actualHeal)) ? Math.abs(Number(result.actualHeal)) : 10;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p><i class=\"fas fa-tint\"></i> <b>落雨剑法·御血对敌</b>：${actor.name} 施展【${move.name}】，消耗 <b>${lost}</b> 点气血。</p><p style=\"font-size:0.9em; color:#888;\">如以酒养剑：请手动消耗一壶美酒并回复本次气血。</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor })\n});",
+                            "active": true
                         }
                     ]
                 },
@@ -3736,8 +3748,8 @@
                     "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>以剑刺击，剑雨如弓击射而出。对一个敌人造成伤害。若击中的角色上回合未消耗过移动速度，你获得“落雨”状态，持续到战斗脱离。</p><p><strong>落雨：</strong>施展剑法不再消耗美酒或气血。</p><p>·你可以移除落雨，然后不消耗动作和内力直接施展【凄风冷雨】，但还是需要消耗美酒或气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "消耗酒/血手动。移动检测手动。获BUFF自动。连招手动。",
+                    "description": "<p>以剑刺击，剑雨如弓击射而出。对一个敌人造成伤害。若击中的角色上回合未消耗过移动速度，你获得“落雨”状态，持续到战斗脱离。</p><p><strong>落雨：</strong>施展剑法不再消耗内力。</p><p>·你可以移除落雨，然后不消耗动作和内力直接施展【凄风冷雨】，但还是需要消耗美酒或气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "出招自动消耗 10 气血并发卡记录；改用美酒需手动消耗物品并回复气血。「落雨」免内力需手动处理（勾选无消耗）。移动检测手动。获BUFF自动。连招手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3759,7 +3771,13 @@
                         {
                             "label": "获得落雨",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const effData = {\n        name: \"落雨\",\n        img: \"icons/magic/water/bubbles-air-water-blue.webp\",\n        description: \"剑法免酒/血\",\n        flags: { \"xjzl-system\": { slug: \"luoyu\", stackable: false } }\n    };\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                            "script": "if (args.isHit) {\n    const effData = {\n        name: \"落雨\",\n        img: \"icons/magic/water/bubbles-air-water-blue.webp\",\n        description: \"剑法免酒/血\",\n        description: \"剑法免内力\",\n        flags: { \"xjzl-system\": { slug: \"luoyu\", stackable: false } }\n    };\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "御血代价",
+                            "trigger": "attack",
+                            "script": "// 落雨剑法规则代价：每次出招消耗一壶美酒或 10 气血。不写入 costs：\n// 免消耗施展（连招等）会连 costs 一起豁免，而酒/血代价规则上不可免，故在脚本中结算。\n// 酒/血代价任何情形都不可免除（「落雨」与连招仅免内力），脚本始终结算。\nconst result = await actor.applyHealing({ healer: actor, amount: -10, type: \"hp\", showScrolling: true, item: args.item, move: args.move });\nconst lost = Number.isFinite(Number(result?.actualHeal)) ? Math.abs(Number(result.actualHeal)) : 10;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p><i class=\"fas fa-tint\"></i> <b>落雨剑法·御血对敌</b>：${actor.name} 施展【${move.name}】，消耗 <b>${lost}</b> 点气血。</p><p style=\"font-size:0.9em; color:#888;\">如以酒养剑：请手动消耗一壶美酒并回复本次气血。</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor })\n});",
                             "active": true
                         }
                     ]
