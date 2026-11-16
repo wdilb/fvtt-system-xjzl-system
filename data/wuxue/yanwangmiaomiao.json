@@ -126,7 +126,7 @@
                     "targetInfo": "单体",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，选择范围内最多一个存在“夺命”的目标，减少其“夺命”一回合的持续时间，每选择一名目标，你获得 1 点怒气。</p><p><strong>升级：</strong>你可以再多选择一个目标减少夺命，消耗+2。</p>",
-                    "automationNote": "纯手动。请手动调整目标Buff持续时间和自身怒气。",
+                    "automationNote": "完全自动化：对存在[夺命]的目标自动减少 1 回合持续并回复 1 点怒气；无[夺命]的目标无效果。升级后可在目标选择时多选一名目标，逐目标结算。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -138,7 +138,14 @@
                             6
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "削减夺命并回复怒气",
+                            "trigger": "hit",
+                            "script": "// 吸魂取命：逐目标结算，仅对存在[夺命]的目标生效。\nif (!args.target) return;\nconst duoming = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duoming\");\nif (!duoming) {\n    ui.notifications.info(`${args.target.name} 身上没有[夺命]，吸魂取命无效果。`);\n    return;\n}\n// 只减 duration.value 的剩余回合数：到期仍按施加时保存的角色计数锚点判断，\n// 不改 flags.xjzl-system.effectTurnStart 与 start，仅让到期提前一回合。\nconst leftRounds = Number(duoming.duration?.value);\nif (duoming.duration?.units !== \"rounds\" || !Number.isFinite(leftRounds)) {\n    ui.notifications.warn(`${args.target.name} 的[夺命]没有可减少的回合时长。`);\n    return;\n}\nconst nextRounds = Math.max(0, leftRounds - 1);\ntry {\n    // 嵌入式 AE 不在脚本权限代理范围内，经 GM 委托更新，避免非 owner 结算失败。\n    await game.xjzl.socket.executeAsGM(\"updateDocument\", duoming.uuid, { \"duration.value\": nextRounds });\n} catch (error) {\n    console.error(\"XJZL | 吸魂取命减少夺命时长失败:\", error);\n    ui.notifications.error(`减少 ${args.target.name} 的[夺命]时长失败，未回复怒气。`);\n    return;\n}\n// 每成功减少一名目标的[夺命]，回复 1 点怒气。\nawait actor.applyHealing({ healer: actor, amount: 1, type: \"rage\", showScrolling: true, item: args.item, move: args.move, source: \"move\" });\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p><i class=\"fas fa-skull\"></i> <b>吸魂取命</b>：${args.target.name} 的[夺命]持续减少 <b>1 回合</b>（剩 ${nextRounds} 回合），${actor.name} 获得 <b>1</b> 点怒气。</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor })\n});",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "地狱轮回",
