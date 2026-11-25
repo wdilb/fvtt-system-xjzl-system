@@ -54,7 +54,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，刀影连环，斩击目标造成伤害。命中无架招目标可获得一层“刀势”，至多三层，持续到脱战或更换其他武器武学套路。</p><p><strong>刀势：</strong>每层使刀法命中+10。</p><p>·若在骑马时施展，命中有架招目标也获得刀势。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无架招获刀势自动。骑马判断需手动（若骑马请无视目标架招状态手动添加AE）。",
+                    "automationNote": "命中自动获得刀势；骑乘时命中有架招目标也可获得。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -76,7 +76,7 @@
                         {
                             "label": "获得刀势",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 骑马状态无法自动判断，只判断基础条件\n    if (!args.target.system.martial.stanceActive) {\n        const eff = thisItem.effects.getName(\"刀势\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    } else {\n        ui.notifications.info(\"目标有架招。若你处于 [骑马] 状态，请手动添加 [刀势] 层数。\");\n    }\n}",
+                            "script": "if (args.isHit) {\n    const isMounted = actor.statuses.has(\"riding\");\n    if (!args.target.system.martial.stanceActive || isMounted) {\n        const eff = thisItem.effects.getName(\"刀势\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    } else {\n        ui.notifications.info(\"目标有架招且你未处于 [骑乘] 状态，无法获得刀势。\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -92,7 +92,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，利刃如风啸，绞杀目标造成伤害。击破架招后，你可以移除一层刀势，不消耗速度移动至多 3 米，然后不消耗动作施展【狂影无痕】，你每回合只能这么做一次。</p><p>·若在骑马时施展，击破架招后只要有足够层数的刀势，你可以不断地施展【狂影无痕】。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破后移除刀势自动。免费移动与重置出招次数手动。",
+                    "automationNote": "击破架招自动移除 1 层刀势。免费移动与连击由玩家手动处理；骑乘时不受每回合一次限制。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -131,7 +131,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，平举双刀，向前突破，贯穿敌人，对目标造成伤害。</p><p>·若在骑马时施展，此招可移动释放，对移动路径上周围 2 米范围内的敌人造成伤害。（不会重复造成伤害），且释放移动期间不会被《趁虚而入》。</p><p>·你可以移除“侵杀”，让此次招式伤害提升等同于你杀孽值的伤害。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "出招时询问是否消耗侵杀，若消耗则自动计算杀孽加伤。骑马移动攻击手动。",
+                    "automationNote": "出招时询问是否消耗侵杀，若消耗则自动计算杀孽加伤。骑乘时可移动释放，路径目标请自行圈选；不被《趁虚而入》由 GM 把握。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,

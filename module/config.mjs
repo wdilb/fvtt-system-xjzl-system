@@ -1155,6 +1155,17 @@ XJZL.statusEffects = [
     }
   },
   {
+    id: "riding",
+    name: "XJZL.Status.Riding", // 骑乘
+    description: "XJZL.Status.RidingDesc",
+    img: "systems/xjzl-system/assets/icons/ae/骑乘.png",
+    showIcon: 2, // V14 默认 CONDITIONAL 只显示临时特效图标，通用状态须常显
+    flags: { "xjzl-system": { slug: "riding", stackable: false } },
+    system: {
+      changes: [] // 纯标记状态：不改动数值，仅供骑乘类武学/内功脚本判断
+    }
+  },
+  {
     id: "blind",
     name: "XJZL.Status.Blind", // 目盲
     description: "XJZL.Status.BlindDesc",

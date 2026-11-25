@@ -647,7 +647,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>枪扫下盘，对目标造成 0.4 力量点外功伤害，并为其添加“下盘不稳”，持续一回合。</p><p>·若在骑马时施展，改为为其添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "默认施加下盘不稳。骑马改禁足需手动操作。",
+                    "automationNote": "命中自动施加下盘不稳 1 回合；骑乘时改为自动施加禁足 1 回合。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -670,7 +670,7 @@
                             "label": "状态施加",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst eff = game.xjzl.api.effects.getStatus('unstable');\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                            "script": "if (!args.isHit) return;\nconst isMounted = actor.statuses.has(\"riding\");\nconst statusId = isMounted ? 'root' : 'unstable';\nconst eff = game.xjzl.api.effects.getStatus(statusId);\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { value: 1, units: \"rounds\", expiry: \"turnStart\"};\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
                         }
                     ]
                 },
@@ -724,7 +724,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>速势出枪，上下翻飞，对敌人造成 0.5 力量点外功伤害。</p><p>·若在骑马时施展，改为对直线路径上所有敌人造成伤害。</p><p>·你可以移除一层“棍势”，使招式释放距离+3。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "骑马变直线需手动划定范围。消耗棍势加距离需手动确认距离。",
+                    "automationNote": "骑乘时改为直线招式，请自行划定直线范围并多选目标；消耗棍势增加释放距离手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -832,7 +832,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>仰身高举，力劈而下，对目标造成伤害，你每有 100 侠义值招式伤害+5。</p><p>·若在骑马时施展，你的力量每高过对方 30 点，将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "侠义值加伤自动计算。击飞手动。",
+                    "automationNote": "侠义值加伤自动计算。骑乘时命中后按力量差发卡片提示击飞米数，位移请手动移动目标。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -855,6 +855,12 @@
                             "label": "侠义加伤",
                             "trigger": "calc",
                             "script": "const xiayi = actor.system.social?.xiayi || 0;\nconst bonus = Math.floor(xiayi / 100) * 5;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`侠义加伤 +${bonus}`);",
+                            "active": true
+                        },
+                        {
+                            "label": "骑乘击飞提示",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nconst targetLiliang = args.target.system?.stats?.liliang?.total;\nif (typeof targetLiliang !== \"number\") return;\nconst diff = (S.stats.liliang?.total || 0) - targetLiliang;\nconst meters = Math.floor(diff / 30);\nif (meters <= 0) return;\nawait ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><b>骑乘碾压！</b><br>力量高出 ${diff} 点，${args.target.name} 被击飞 ${meters} 米，请手动移动目标。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -914,7 +920,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双锏打开，开启架招。格挡成功后，可立即不消耗动作，对攻击者施展【云起龙骧】。</p><p>·若在骑马时格挡成功，你的力量每高过对方 30 点，此次【云起龙骧】的招式伤害+10。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡后提示反击。",
+                    "automationNote": "格挡成功后发卡片提醒免费反击；骑乘时卡片同时提示此次反击的骑乘加伤数值，加伤请在出招弹窗手动填入。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -930,7 +936,7 @@
                         {
                             "label": "格挡反击提示",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nui.notifications.info(\"狮子张口：格挡成功，可免费施展 [云起龙骧]\");",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nlet bonusLine = \"\";\nconst isMounted = actor.statuses.has(\"riding\");\nconst attackerLiliang = args.attacker?.system?.stats?.liliang?.total;\nif (isMounted && typeof attackerLiliang === \"number\") {\n    const diff = (S.stats.liliang?.total || 0) - attackerLiliang;\n    const bonus = Math.floor(diff / 30) * 10;\n    if (bonus > 0) bonusLine = `<br>骑乘反击：力量高出 ${diff} 点，此次【云起龙骧】伤害 <b>+${bonus}</b>（出招弹窗手动填入）。`;\n}\nawait ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #daa520; background:rgba(218,165,32,0.1); margin-left:2px;\"><b>狮子张口！</b><br>格挡成功，可免费对攻击者施展【云起龙骧】。${bonusLine}</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -947,7 +953,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>雨打白沙地，锏打乱劈柴，巨力对目标造成伤害。</p><p>·若在骑马时施展，你的力量每高过对方 30 点，招式伤害+10，且暴击骰-1。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "条件加成需手动。",
+                    "automationNote": "骑乘时自动按力量差每 30 点伤害+10、暴击骰-1；目标缺少力量数据时不自动结算，请手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -969,7 +975,21 @@
                             6,
                             5
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "骑乘暴击修正",
+                            "trigger": "check",
+                            "script": "const isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nconst targetLiliang = args.target?.system?.stats?.liliang?.total;\nif (typeof targetLiliang !== \"number\") return;\nconst diff = (S.stats.liliang?.total || 0) - targetLiliang;\nconst layers = Math.floor(diff / 30);\nif (layers > 0) args.flags.critThresholdMod += layers;",
+                            "active": true
+                        },
+                        {
+                            "label": "骑乘巨力加伤",
+                            "trigger": "preDamage",
+                            "script": "const isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nconst targetLiliang = args.target?.system?.stats?.liliang?.total;\nif (typeof targetLiliang !== \"number\") return;\nconst diff = (S.stats.liliang?.total || 0) - targetLiliang;\nconst layers = Math.floor(diff / 30);\nif (layers > 0) {\n    args.config.amount += 10 * layers;\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #daa520; background:rgba(218,165,32,0.1); margin-left:2px;\"><b>骑乘巨力！</b><br>力量高出 ${diff} 点，伤害+${10 * layers}，暴击骰-${layers}。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
                 }
             ]
         }

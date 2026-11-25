@@ -237,9 +237,15 @@
                             "trigger": "preDamage",
                             "script": "const stance = args.target.system.martial || {};\nif (stance.stanceActive && stance.stance && stance.stanceItemId) {\n    const stanceItem = args.target.items.get(stance.stanceItemId);\n    const stanceMove = stanceItem?.system.moves.find(m => m.id === stance.stance);\n    const wt = stanceMove?.weaponType;\n    if (wt === 'sword' || wt === 'staff') {\n        args.config.amount += 10;\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #d35400; background:rgba(211,84,0,0.1); margin-left:2px;\"><b>破锋克制！</b><br>敌方架招以剑棍应对，刀势更胜，伤害 <b>+10</b>。</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
+                        },
+                        {
+                            "label": "骑乘击退提示",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nawait ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #b8860b; background:rgba(184,134,11,0.1); margin-left:2px;\"><b>骑乘冲劈！</b><br>${args.target.name} 被击退 1 米，请手动移动目标。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "active": true
                         }
                     ],
-                    "automationNote": "若目标开启的架招属于剑或棍武学，伤害自动+10并发送卡片提示。骑马击退效果需手动处理。"
+                    "automationNote": "目标架招为剑或棍时伤害自动+10并发卡片提示。骑乘时命中后发卡片提示击退 1 米，位移请手动移动目标。"
                 },
                 {
                     "name": "连环提柳",
@@ -268,7 +274,7 @@
                             }
                         ]
                     },
-                    "automationNote": "全手动。骑马不消耗动作请玩家自行斟酌不记作已消耗反应资源。"
+                    "automationNote": "全手动。骑乘时不消耗动作，请自行决定是否记作已消耗反应动作。"
                 },
                 {
                     "name": "推门看山",
@@ -295,11 +301,11 @@
                         {
                             "label": "格挡获刚劲",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    await game.xjzl.api.effects.addEffect(actor, { id: \"gangjin\", flags: { \"xjzl-system\": { maxStacks: 3 } } });\n}",
+                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    const isMounted = actor.statuses.has(\"riding\");\n    const count = isMounted ? 2 : 1;\n    await game.xjzl.api.effects.addEffect(actor, { id: \"gangjin\", flags: { \"xjzl-system\": { maxStacks: 3 } } }, count);\n}",
                             "active": true
                         }
                     ],
-                    "automationNote": "开启架招后，格挡成功自动获得一层“刚劲”。若骑马格挡成功，请手动额外为己方添加一层刚劲。"
+                    "automationNote": "格挡成功自动获得一层刚劲；骑乘时格挡成功自动获得两层（至多三层）。"
                 },
                 {
                     "name": "镇关守国",
@@ -342,7 +348,7 @@
                             "active": true
                         }
                     ],
-                    "automationNote": "检测到目标装备剑或棍时会自动施加 1 回合缴械状并将发送卡片提示。骑马变AOE需玩家手动选择多个目标。"
+                    "automationNote": "目标装备剑或棍时自动施加 1 回合缴械并发卡片提示。骑乘时变为范围招式，请自行圈选多个目标。"
                 }
             ]
         }
@@ -384,11 +390,11 @@
                         {
                             "label": "格挡获挑灯",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"挑灯\").toObject());\n}",
+                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    const isMounted = actor.statuses.has(\"riding\");\n    const count = isMounted ? 2 : 1;\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"挑灯\").toObject(), count);\n}",
                             "active": true
                         }
                     ],
-                    "automationNote": "开启架招后，格挡成功自动获得一层“挑灯”。若骑马格挡成功，请手动额外添加一层挑灯。"
+                    "automationNote": "格挡成功自动获得一层挑灯；骑乘时格挡成功自动获得两层。"
                 },
                 {
                     "name": "风吹雪打",
@@ -418,7 +424,15 @@
                             }
                         ]
                     },
-                    "automationNote": "骑马击倒效果需手动添加状态 (寻找通用状态: 倒地)。"
+                    "automationNote": "骑乘时命中自动击倒目标；未骑乘仅结算伤害。",
+                    "scripts": [
+                        {
+                            "label": "骑乘击倒",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nawait game.xjzl.api.effects.addEffect(args.target, \"prone\");\nui.notifications.info(`${args.target.name} 被击倒！`);",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "沙场点兵",
@@ -447,11 +461,11 @@
                         {
                             "label": "挑灯检测与结算",
                             "trigger": "hit_once",
-                            "script": "const countStr = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"沙场点兵\" },\n    content: \"<p>范围内有多少个敌人？</p><input type='number' value='1'>\",\n    ok: { callback: (e, b) => b.form.elements[0].value }\n});\nconst count = parseInt(countStr);\nif (count > 0) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const totalStacks = count * lvl;\n    const eff = thisItem.effects.getName(\"挑灯\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff, totalStacks);\n    actor.showFloatyText(`挑灯 +${totalStacks}`, {fill: \"#FFA500\"});\n}",
+                            "script": "const countStr = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"沙场点兵\" },\n    content: \"<p>施展范围 5 米（骑乘时 10 米）。范围内有多少个敌人？</p><input type='number' value='1'>\",\n    ok: { callback: (e, b) => b.form.elements[0].value }\n});\nconst count = parseInt(countStr);\nif (count > 0) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const totalStacks = count * lvl;\n    const eff = thisItem.effects.getName(\"挑灯\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff, totalStacks);\n    actor.showFloatyText(`挑灯 +${totalStacks}`, {fill: \"#FFA500\"});\n}",
                             "active": true
                         }
                     ],
-                    "automationNote": "应用效果时会弹出数量输入框，并根据招式等级与敌人数量的乘积，智能计算应得的挑灯层数并自动叠加。"
+                    "automationNote": "应用效果时询问范围内敌人数并自动叠加挑灯层数；施展范围 5 米，骑乘时 10 米。"
                 },
                 {
                     "name": "霹雳惊雷",
@@ -487,7 +501,15 @@
                             }
                         ]
                     },
-                    "automationNote": "绝招主效果自动。骑马变AOE需手动圈选多个目标并在命中后手动给自身叠加对应数量的挑灯层数。"
+                    "automationNote": "骑乘时变为横扫，请自行圈选多个目标；每命中一个目标自动获得一层挑灯，升级后每个敌人额外+1 层。",
+                    "scripts": [
+                        {
+                            "label": "骑乘横扫挑灯",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst eff = thisItem.effects.getName(\"挑灯\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff, lvl);\nui.notifications.info(`骑乘横扫命中，获得 ${lvl} 层 [挑灯]。`);",
+                            "active": true
+                        }
+                    ]
                 }
             ]
         },
@@ -539,7 +561,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>握弓勾弦，开启架招，同时进入“游击”状态，持续到战斗脱离或被击破架招。</p><p><strong>游击：</strong>你的移动速度+1；若在本场战斗中你未曾对一个目标造成过伤害，且该目标也未曾攻击过你，你对其攻击时伤害+10。</p><p>·若在骑马时，你的骑乘马匹也被添加“游击”。</p><p><strong>升级：</strong>格挡值+5，游击提供的速度+1，消耗+1。</p>",
-                    "automationNote": "开启游击自动赋予动态速度。对未交互目标的伤害加成 (+10) 需玩家手动判断并添加修正。马匹Buff需手动添加。",
+                    "automationNote": "开启架招并自动进入游击（速度随等级）。骑乘时马匹也获得游击，请手动为马匹添加；对未交战目标的+10 伤害加成手动判断。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -571,7 +593,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>策风搭箭，对目标造成 0.4 力量点外功伤害后获得一层“乘风”，至多三层持续到脱战。</p><p><strong>乘风：</strong>每层使你速度+1。</p><p>·若在骑马时施展，招式提升马匹速度的伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "命中获乘风自动。骑马速度加伤需手动在弹窗中添加数值修正。",
+                    "automationNote": "命中自动获得乘风。骑乘时招式伤害提升马匹速度值，请在出招弹窗手动填入修正。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -648,7 +670,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>大喊风！风！风！射出爆鸣，对目标造成 0.6 力量点外功伤害，同时将其击倒。</p><p>·若在骑马时施展，且你处于“游击”状态，你可以移除游击，不消耗动作施展一次【风劲弓鸣】。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "命中击倒自动。触发骑马连招时，请手动移除游击状态并施展【风劲弓鸣】（勾选免费施展）。",
+                    "automationNote": "命中自动击倒。骑乘且处于游击时施展后发卡片提醒连招；移除游击与不消耗动作施展【风劲弓鸣】均手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -676,6 +698,12 @@
                             "label": "击倒目标",
                             "trigger": "hit",
                             "script": "if (args.isHit) {\n    const prone = game.xjzl.api.effects.getStatus('prone');\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "骑乘连招提醒",
+                            "trigger": "hit_once",
+                            "script": "const isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nconst youji = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"youji\");\nif (!youji) return;\nawait ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #228b22; background:rgba(34,139,34,0.1); margin-left:2px;\"><b>风！风！风！</b><br>骑乘且处于 [游击]：可手动移除 [游击]，不消耗动作施展一次【风劲弓鸣】。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -747,7 +775,7 @@
                             "active": true
                         }
                     ],
-                    "automationNote": "威风效果中的骑马额外加成需手动处理。"
+                    "automationNote": "命中自动进入威风；威风造成伤害时自动增减士气（自身+5/敌方-5），骑乘时增减量变为 10；伤害延后结算时不触发。"
                 },
                 {
                     "name": "长驱直入",
@@ -783,9 +811,15 @@
                             "trigger": "hit",
                             "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"pojia\", duration: { value: 3, units: \"rounds\", expiry: \"turnStart\"} });\n}",
                             "active": true
+                        },
+                        {
+                            "label": "骑乘突进虚招",
+                            "trigger": "attack",
+                            "script": "const isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nconst answer = await ask({\n    title: \"长驱直入 - 骑乘突进\",\n    content: \"<p>施展前移动了多少米？每移动 5 米虚招值+1（至多+3）。</p>\",\n    buttons: [{ action: \"confirm\", label: \"确认\", default: true }],\n    fields: [{ name: \"meters\", label: \"移动米数\", type: \"integer\", value: 0, min: 0, max: 99 }]\n});\nif (answer.status !== \"answered\") return;\nconst meters = answer.values.meters || 0;\nconst bonus = Math.min(3, Math.floor(meters / 5));\nif (bonus > 0) {\n    args.flags.bonusFeint += bonus;\n    ui.notifications.info(`骑乘突进：虚招值+${bonus}。`);\n}",
+                            "active": true
                         }
                     ],
-                    "automationNote": "击破架招自动施加持续三回合的破甲。骑马移动带来的虚招加值需手动在弹窗中调整。"
+                    "automationNote": "击破架招自动施加持续三回合的破甲。骑乘施展时弹窗询问移动距离，每 5 米自动+1 虚招值（至多+3）。"
                 },
                 {
                     "name": "横江飞渡",
@@ -812,9 +846,15 @@
                             "trigger": "attack",
                             "script": "const eff = thisItem.effects.getName(\"骠骑\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"骠骑状态已应用，下一次攻击伤害提升。\");",
                             "active": true
+                        },
+                        {
+                            "label": "骑乘施展前提",
+                            "trigger": "preAttack",
+                            "script": "const isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) {\n    args.abort = true;\n    args.abortReason = \"横江飞渡仅可在骑乘时施展！\";\n}",
+                            "active": true
                         }
                     ],
-                    "automationNote": "需手动确认是否骑马并手动调整马匹速度。下一次攻击的马匹速度伤害加成（系数随本招等级成长）无法自动判定马匹数据，请手动结算，用后手动移除[骠骑]。"
+                    "automationNote": "未骑乘时自动阻止施展。骠骑状态自动施加；马匹速度+5 与下次攻击的马匹速度伤害加成需手动结算，用后手动移除[骠骑]。"
                 },
                 {
                     "name": "回马枪",
@@ -853,11 +893,17 @@
                         {
                             "label": "破甲致死检定",
                             "trigger": "hit",
-                            "script": "if (args.target.effects.some(e => e.name === \"破甲\" || e.flags[\"xjzl-system\"]?.slug === \"pojia\")) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 15,\n        label: \"回马枪·韧性检定\",\n        failureText: `<span style='color:red;font-weight:bold'>检定失败！</span> ${args.target.name} 需立即进行 <b>死亡检定</b>。`\n    });\n}",
+                            "script": "if (!args.isHit) return;\nif (args.target.effects.some(e => e.name === \"破甲\" || e.flags[\"xjzl-system\"]?.slug === \"pojia\")) {\n    const meters = args.scriptFlags?.huimaMeters || 0;\n    const dc = 15 + Math.floor(meters / 5);\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: dc,\n        label: \"回马枪·韧性检定\",\n        failureText: `<span style='color:red;font-weight:bold'>检定失败！</span> ${args.target.name} 需立即进行 <b>死亡检定</b>。`\n    });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "骑乘蓄势询问",
+                            "trigger": "attack",
+                            "script": "const isMounted = actor.statuses.has(\"riding\");\nif (!isMounted) return;\nconst answer = await ask({\n    title: \"回马枪 - 骑乘蓄势\",\n    content: \"<p>施展前移动了多少米？目标处于破甲时，韧性检定难度每 5 米+1。</p>\",\n    buttons: [{ action: \"confirm\", label: \"确认\", default: true }],\n    fields: [{ name: \"meters\", label: \"移动米数\", type: \"integer\", value: 0, min: 0, max: 99 }]\n});\nif (answer.status !== \"answered\") return;\nargs.flags.huimaMeters = answer.values.meters || 0;",
                             "active": true
                         }
                     ],
-                    "automationNote": "骑马移动增加检定难度需手动告知目标。"
+                    "automationNote": "目标处于破甲时自动发起韧性检定；骑乘施展时弹窗询问移动距离，每 5 米检定难度+1。"
                 }
             ]
         },
@@ -877,7 +923,7 @@
                             {
                                 "trigger": "hit",
                                 "label": "威风士气变动",
-                                "script": "if (args.isHit && args.actionType === 'attack') { await actor.changeResources({ 'system.resources.morale.value': { delta: 5 } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); if (args.target.system?.resources?.morale) await args.target.changeResources({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - 5)}, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); }"
+                                "script": "if (args.isHit && args.actionType === 'attack') {\n    const dealt = (args.hpLost ?? 0) + (args.hutiLost ?? 0) + (args.mpLost ?? 0) + (args.damageResult?.tiliLost ?? 0);\n    if (dealt <= 0) return;\n    const isMounted = actor.statuses.has(\"riding\");\n    const delta = isMounted ? 10 : 5;\n    await actor.changeResources({ 'system.resources.morale.value': { delta: delta } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    if (args.target.system?.resources?.morale) await args.target.changeResources({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - delta)}, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}"
                             }
                         ]
                     }
@@ -1997,12 +2043,12 @@
                     "damageType": "none",
                     "weaponType": "none",
                     "description": "<p><strong>风驰电掣</strong><br>骑术不凡，飒沓流星。<br>你的[马术]等级+2。<br>你骑马攻击敌人时，暴击骰-1。<br><br><strong>披甲重铠</strong><br>铁骑冲锋，无坚不摧。<br>你骑乘穿具马铠的马匹时，马匹的防护额外+5，且马匹不会减少速度。<br><strong>升级：</strong>马术等级+1，暴击骰再-1；马匹防护再+5。</p>",
-                    "automationNote": "自动增加马术等级。骑马判定及马匹防护需手动。",
+                    "automationNote": "自动增加马术等级；骑乘时攻击暴击骰自动-1（随招式等级增加）。披甲重铠的马匹防护与不减速度需手动处理。",
                     "scripts": [
                         {
                             "label": "风驰电掣",
                             "trigger": "passive",
-                            "script": "const lvl = Math.max(1, args.move?.computedLevel || 1);\nS.skills.mashu.mod += (2 + (lvl - 1));"
+                            "script": "const lvl = Math.max(1, args.move?.computedLevel || 1);\nS.skills.mashu.mod += (2 + (lvl - 1));\nconst isMounted = actor.statuses.has(\"riding\");\nif (isMounted) {\n    const critDown = 1 + (lvl - 1);\n    S.combat.crit_waigong -= critDown;\n    S.combat.crit_neigong -= critDown;\n}"
                         }
                     ],
                     "actionCost": "无"
