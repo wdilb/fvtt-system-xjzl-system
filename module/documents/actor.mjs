@@ -68,6 +68,16 @@ const STANCE_BACKGROUND_TRIGGERS = Object.freeze([
   SCRIPT_TRIGGERS.RESOURCE_CHANGED
 ]);
 
+// 架招在本次受击中被击破后，仍允许随 brokenStance 快照补收的防御侧触发器。
+// stopStance() 已在减伤前清空 martial 状态；补收只覆盖本次命中受击链，不包含 passive/avoided/resourceChanged。
+const STANCE_BROKEN_TRIGGERS = Object.freeze([
+  SCRIPT_TRIGGERS.PRE_DEFENSE,
+  SCRIPT_TRIGGERS.PRE_TAKE,
+  SCRIPT_TRIGGERS.DYING,
+  SCRIPT_TRIGGERS.DEATH,
+  SCRIPT_TRIGGERS.DAMAGED
+]);
+
 // 战斗开始、回合开始、回合结束：全部武学招式都可以触发的时机。
 const GLOBAL_WUXUE_TRIGGERS = Object.freeze([
   SCRIPT_TRIGGERS.COMBAT_START,
@@ -1278,9 +1288,11 @@ export class XJZLActor extends Actor {
    * [核心] 收集当前 Actor 身上所有符合触发条件的脚本
    * @param {String} trigger - 触发时机 (来自 SCRIPT_TRIGGERS, 如 'attack')
    * @param {Object|Item} [contextItem] - (可选) 当前正在交互的具体对象 (如招式数据 move，或物品 item)
+   * @param {Object} [options] - 附加收集选项
+   * @param {Object|null} [options.brokenStance] - 本次受击刚被击破的原架招快照 { itemId, moveId }
    * @returns {Array} 脚本对象数组 [{ script, label, source }]
    */
-  collectScripts(trigger, contextItem = null) {
+  collectScripts(trigger, contextItem = null, options = {}) {
     // --- 容器没有脚本逻辑 ---
     if (this.type === "container") return [];
     const scripts = [];
@@ -1358,34 +1370,42 @@ export class XJZLActor extends Actor {
     }
 
     // =====================================================
-    // 3. 当前激活的架招 (Active Stance)
+    // 3. 当前激活的架招 (Active Stance) 或本次破架原架招快照
     // =====================================================
     // 架招开启后，应当视为常驻被动效果，直到关闭
     const martial = this.system.martial;
     // 架招背景触发器白名单见模块作用域的 STANCE_BACKGROUND_TRIGGERS
     // 检查：架招激活 + 有记录的 Move ID + 有记录的 Item ID
-    if (martial?.stanceActive && martial?.stance && martial?.stanceItemId) {
-      // 如果当前触发器不在白名单内，直接跳过架招脚本收集
-      // 解决了“开启架招后，普攻也会触发架招attack脚本”的问题
-      if (STANCE_BACKGROUND_TRIGGERS.includes(trigger)) {
-        const wuxueItem = this.items.get(martial.stanceItemId);
-        if (wuxueItem) {
-          // 在该武学中找到对应的招式
-          const stanceMove = wuxueItem.system.moves.find(m => m.id === martial.stance);
-          // 新增校验：只有当招式等级 > 0 时才收集脚本，免得一些被动在没有领悟的情况下就生效
-          if (stanceMove && stanceMove.scripts && (stanceMove.computedLevel || 0) > 0) {
-            stanceMove.scripts.forEach(s => {
-              // 同样检查触发器和开关
-              if (s.trigger === trigger && s.active) {
-                scripts.push({
-                  script: s.script,
-                  label: s.label || stanceMove.name,
-                  source: wuxueItem, // 源头依然归属于该武学物品
-                  contextData: stanceMove
-                });
-              }
-            });
-          }
+    const activeStanceRef = (martial?.stanceActive && martial?.stance && martial?.stanceItemId && STANCE_BACKGROUND_TRIGGERS.includes(trigger))
+      ? { itemId: martial.stanceItemId, moveId: martial.stance }
+      : null;
+    // 破架补收：stopStance() 已在减伤前清空 martial 状态；
+    // 仅对本次命中受击链显式传入的原架招快照按 STANCE_BROKEN_TRIGGERS 补收脚本，
+    // 让监听 args.isBroken 的被破脚本仍能触发，且不恢复格挡或误触 checkStance()。
+    const brokenStance = options?.brokenStance;
+    const brokenStanceRef = (!activeStanceRef && brokenStance?.itemId && brokenStance?.moveId && STANCE_BROKEN_TRIGGERS.includes(trigger))
+      ? brokenStance
+      : null;
+    const stanceRef = activeStanceRef || brokenStanceRef;
+
+    if (stanceRef) {
+      const wuxueItem = this.items.get(stanceRef.itemId);
+      if (wuxueItem) {
+        // 在该武学中找到对应的招式
+        const stanceMove = wuxueItem.system.moves.find(m => m.id === stanceRef.moveId);
+        // 新增校验：只有当招式等级 > 0 时才收集脚本，免得一些被动在没有领悟的情况下就生效
+        if (stanceMove && stanceMove.scripts && (stanceMove.computedLevel || 0) > 0) {
+          stanceMove.scripts.forEach(s => {
+            // 同样检查触发器和开关
+            if (s.trigger === trigger && s.active) {
+              scripts.push({
+                script: s.script,
+                label: s.label || stanceMove.name,
+                source: wuxueItem, // 源头依然归属于该武学物品
+                contextData: stanceMove
+              });
+            }
+          });
         }
       }
     }
@@ -1501,8 +1521,9 @@ export class XJZLActor extends Actor {
    * @param {String} trigger - 触发时机
    * @param {Object} context - 传递给脚本的上下文变量 (如 { actor, target, flags ... })
    * @param {Object|Item} [contextItem] - 用于 collectScripts 的上下文对象
+   * @param {Object} [options] - 传递给 collectScripts 的附加收集选项
    */
-  async runScripts(trigger, context = {}, contextItem = null) {
+  async runScripts(trigger, context = {}, contextItem = null, options = {}) {
     if (this.type === "container") return; //容器没有脚本
     // preAttack 是声明点：契约默认布尔 true。旧入口直接调用本方法时也在此提供真实默认值，
     // 调用方与后续脚本读取到的是布尔值而非 undefined。
@@ -1510,7 +1531,7 @@ export class XJZLActor extends Actor {
       context.allowDamageModifiers = true;
     }
     // 1. 收集脚本
-    const scriptsToRun = this.collectScripts(trigger, contextItem);
+    const scriptsToRun = this.collectScripts(trigger, contextItem, options);
     if (!scriptsToRun.length) return;
 
     // 固定本次运行的动作上下文，避免后续为被动脚本注入的 contextData 被误判为正在出招。
@@ -2255,10 +2276,11 @@ export class XJZLActor extends Actor {
    * @param {Object} [options]
    * @param {boolean} options.committed - 主资源更新是否已提交
    * @param {Array} [options.resourceChanges] - 已提交时的实际资源变化
+   * @param {Object|null} [options.brokenStance] - 本次破架刚解除的原架招快照 { itemId, moveId }
    */
-  async _runDamageScripts(trigger, context, { committed, resourceChanges = null } = {}) {
+  async _runDamageScripts(trigger, context, { committed, resourceChanges = null, brokenStance = null } = {}) {
     try {
-      await this.runScripts(trigger, context);
+      await this.runScripts(trigger, context, null, brokenStance ? { brokenStance } : undefined);
     } catch (err) {
       // 嵌套伤害传来的中止可能已带包装：识别 scriptAbort 身份并保留原始中止，
       // 使同一宿主的中止继续穿过外层调用（外层运行器同样按该身份识别）。
@@ -2458,12 +2480,19 @@ export class XJZLActor extends Actor {
       attacker = null,    // 攻击者 Actor
       isHit = true,       // 是否命中
       isBroken = false,   // 是否被破防 (状态，不可逆)
+      brokenStance = null,// 本次受击刚被击破的原架招快照 { itemId, moveId }
       targetKanpo = 0,    // 接收敌方看破值，用于战斗统计功能
       isSkill = true,     // false表示普通攻击
       move = null,
       item = null,
       source = "extra"    // 伤害来源标识 (move, basic, both, dot, extra)，默认是extra也就是额外伤害，用来处理哪些伤害应该触发濒死、易伤等问题
     } = data;
+
+    // 仅当本次确实破架且传入了有效架招快照时补收原架招受击脚本；
+    // 不挂 Actor 状态，确保多段后续跳与嵌套反伤不会重复触发。
+    const effectiveBrokenStance = (isBroken && brokenStance?.itemId && brokenStance?.moveId)
+      ? { itemId: String(brokenStance.itemId), moveId: String(brokenStance.moveId) }
+      : null;
 
     // 魍魉心诀类能力：攻击者携带 dyingTargetMpAbsorbOneToOne 标记（由内功 passive 声明，随派生数据每轮重建），
     // 且目标在本笔结算开始前已处于濒死时，第一轮常规伤害的内力抵伤比例按 1:1。
@@ -2523,6 +2552,7 @@ export class XJZLActor extends Actor {
       damageType: type, // 与 type 完全等价，确保脚本无论用 args.type 还是 args.damageType 都能取到
       baseDamage: amount, // 原始面板伤害
       element: config.element,
+      isBroken: isBroken, // 本次是否破架（供 preDefense 阶段的被破架招脚本判断）
       move: move,
       item: item,
       // 可写容器：脚本改写 output.damage 后，暴击倍率与防御/格挡/抗性均按新值结算
@@ -2531,7 +2561,7 @@ export class XJZLActor extends Actor {
       config: config
     };
 
-    await this._runDamageScripts(SCRIPT_TRIGGERS.PRE_DEFENSE, preDefContext, { committed: false });
+    await this._runDamageScripts(SCRIPT_TRIGGERS.PRE_DEFENSE, preDefContext, { committed: false, brokenStance: effectiveBrokenStance });
 
     // PRE_DEFENSE 允许脚本修改效果和战斗属性；此处重新读取，避免后续减伤沿用旧快照。
     const combat = this.system.combat;
@@ -2636,7 +2666,7 @@ export class XJZLActor extends Actor {
       }
     };
 
-    await this._runDamageScripts(SCRIPT_TRIGGERS.PRE_TAKE, takeContext, { committed: false });
+    await this._runDamageScripts(SCRIPT_TRIGGERS.PRE_TAKE, takeContext, { committed: false, brokenStance: effectiveBrokenStance });
 
     // 脚本可能强行中止 (如无敌)
     if (takeContext.output.abort) {
@@ -2776,6 +2806,7 @@ export class XJZLActor extends Actor {
       attacker: attacker,
       target: this,
       damage: finalDamage,
+      isBroken: isBroken, // 供 dying / death 阶段的被破架招及常规防御脚本读取破架状态
       preventDying: false,
       preventDeath: false
     };
@@ -2790,7 +2821,7 @@ export class XJZLActor extends Actor {
       // 如果是“刚被打入濒死(isDying)” 必定触发
       // 如果是“躺着被鞭尸(isHitWhileDying)”，则必须来源有效才触发
       if (isDying || (isHitWhileDying && validWhipCorpse)) {
-        await this._runDamageScripts(SCRIPT_TRIGGERS.DYING, statusCtx, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes });
+        await this._runDamageScripts(SCRIPT_TRIGGERS.DYING, statusCtx, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes, brokenStance: effectiveBrokenStance });
         if (statusCtx.preventDying) {
           isDying = false;
         } else {
@@ -2818,7 +2849,7 @@ export class XJZLActor extends Actor {
 
       // B. 死亡判定
       if (isDead) {
-        await this._runDamageScripts(SCRIPT_TRIGGERS.DEATH, statusCtx, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes });
+        await this._runDamageScripts(SCRIPT_TRIGGERS.DEATH, statusCtx, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes, brokenStance: effectiveBrokenStance });
 
         if (statusCtx.preventDeath) {
           isDead = false;
@@ -2864,7 +2895,7 @@ export class XJZLActor extends Actor {
       item: item
     };
 
-    await this._runDamageScripts(SCRIPT_TRIGGERS.DAMAGED, damagedContext, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes });
+    await this._runDamageScripts(SCRIPT_TRIGGERS.DAMAGED, damagedContext, { committed: mainResourceCommitted, resourceChanges: resourceTransaction.changes, brokenStance: effectiveBrokenStance });
 
     await this._dispatchResourceChanges(resourceTransaction.changes, {
       cause: "damage",

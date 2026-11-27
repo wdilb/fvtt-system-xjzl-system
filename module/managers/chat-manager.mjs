@@ -1383,6 +1383,47 @@ export class ChatCardManager {
         });
     }
 
+    /**
+     * 在击破架招时先快照看破值与原架招引用，再依次解除架招、施加破防状态并飘字。
+     * stopStance() 会立即清空 system.martial；把快照传给本次 applyDamage() 可让受击链路
+     * 补收原架招的被破脚本，同时不影响格挡归零与绑定特效清理时机。
+     * @param {Actor} targetActor 受击目标
+     * @param {Actor|null} attacker 攻击者
+     * @param {ChatMessage|null} message 原攻击消息（origin 兜底）
+     * @returns {Promise<{ targetKanpo: number, brokenStance: { itemId: string, moveId: string }|null }>}
+     */
+    static async _applyStanceBreak(targetActor, attacker, message) {
+        const martial = targetActor?.system?.martial;
+        if (!martial?.stanceActive) {
+            return { targetKanpo: 0, brokenStance: null };
+        }
+
+        const targetKanpo = targetActor.system.combat?.kanpoTotal || 0;
+        const brokenStance = (martial.stanceItemId && martial.stance)
+            ? { itemId: martial.stanceItemId, moveId: martial.stance }
+            : null;
+
+        // 改为调用 stopStance，可以自动化处理持续到架招结束的 AE 与光环
+        if (typeof targetActor.stopStance === "function") {
+            await targetActor.stopStance();
+        }
+
+        // 应用 "破防" 状态
+        const statusConfig = CONFIG.statusEffects.pofang;
+        if (statusConfig) {
+            const breakEffectData = {
+                ...statusConfig,
+                name: game.i18n.localize(statusConfig.name),
+                description: game.i18n.localize(statusConfig.description),
+                origin: attacker ? attacker.uuid : message?.uuid
+            };
+            await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [breakEffectData]);
+        }
+
+        targetActor.showFloatyText?.("被击破架招！", { fill: "#ff0000" });
+        return { targetKanpo, brokenStance };
+    }
+
     /** 应用聊天攻击卡伤害；野兽标记跳过人物攻击脚本并处理特性后效。 */
     static async _applyDamage(attacker, item, flags, targets, message) {
         const isCreatureAttack = flags.isCreatureAttack === true;
@@ -1530,40 +1571,14 @@ export class ChatCardManager {
                     validRageHits++;
                 }
             }
-            // 提前声明用于统计的破架相关数据
+            // 提前声明用于统计与补收脚本的破架相关数据
             let targetKanpo = 0;
+            let brokenStance = null;
             // =====================================================
             // 把击破架招移动到这里来处理
             // =====================================================
             if (isHit && isBroken && targetActor.system.martial.stanceActive) {
-
-                // 记录敌方看破值
-                targetKanpo = targetActor.system.combat?.kanpoTotal || 0;
-
-                // A. 判定失败：移除架招状态
-                // 改为调用stopStance，可以自动化处理持续到架招结束的ae
-                await targetActor.stopStance();
-                // B. 应用 "破防" 状态
-                // 从配置中获取标准数据
-                const statusConfig = CONFIG.statusEffects.pofang;
-
-
-                if (statusConfig) {
-                    // [Optimized] 直接展开配置对象
-                    // 这样 name, img, changes, duration, statuses 全部自动继承
-                    const breakEffectData = {
-                        ...statusConfig,
-                        name: game.i18n.localize(statusConfig.name), // 确保本地化
-                        description: game.i18n.localize(statusConfig.description),
-                        origin: attacker ? attacker.uuid : message.uuid  // 只有来源是动态的
-                    };
-                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [breakEffectData]);
-                }
-
-                // C. 视觉反馈 (飘字: 红色)
-                if (targetActor.showFloatyText) {
-                    targetActor.showFloatyText("被击破架招！", { fill: "#ff0000" });
-                }
+                ({ targetKanpo, brokenStance } = await ChatCardManager._applyStanceBreak(targetActor, attacker, message));
             }
             // =====================================================
             // 执行 PRE_DAMAGE 脚本 (Pre-Application Hook)
@@ -1674,6 +1689,7 @@ export class ChatCardManager {
                 isCrit: isCrit,            // 暴击状态 (用于触发特效)
                 applyCritDamage: damageConfig.applyCritDamage, // 配置: 是否应用暴击伤害倍率 (用于计算数值)
                 isBroken: isBroken,        // 破防状态
+                ...(brokenStance ? { brokenStance } : {}),
                 targetKanpo: targetKanpo,               // 传入敌方看破值，用于数据统计功能
                 ignoreBlock: damageConfig.ignoreBlock,    //无视格挡
                 ignoreDefense: damageConfig.ignoreDefense, //无视内外功防御
@@ -2140,19 +2156,9 @@ export class ChatCardManager {
             const isHit = config.forceHit === true;
             const amount = hasDamage ? Math.max(0, baseDamage + (Number(config.damageMod) || 0)) : 0;
             let targetKanpo = 0;
+            let brokenStance = null;
             if (isHit && config.isBroken && targetActor.system?.martial?.stanceActive) {
-                targetKanpo = targetActor.system.combat?.kanpoTotal || 0;
-                if (typeof targetActor.stopStance === "function") await targetActor.stopStance();
-                const statusConfig = CONFIG.statusEffects.pofang;
-                if (statusConfig) {
-                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [{
-                        ...statusConfig,
-                        name: game.i18n.localize(statusConfig.name),
-                        description: game.i18n.localize(statusConfig.description),
-                        origin: attacker?.uuid || message.uuid
-                    }]);
-                }
-                targetActor.showFloatyText?.("被击破架招！", { fill: "#ff0000" });
+                ({ targetKanpo, brokenStance } = await ChatCardManager._applyStanceBreak(targetActor, attacker, message));
             }
             const damageResult = hasDamage
                 ? await targetActor.applyDamage({
@@ -2164,6 +2170,7 @@ export class ChatCardManager {
                     isCrit: false,
                     applyCritDamage: false,
                     isBroken: config.isBroken,
+                    ...(brokenStance ? { brokenStance } : {}),
                     targetKanpo,
                     ignoreBlock: config.ignoreBlock,
                     ignoreDefense: config.ignoreDefense,
@@ -2301,31 +2308,11 @@ export class ChatCardManager {
             // =====================================================
             // 处理手动应用伤害时击破架招效果
             // =====================================================
-            // 声明用于统计破架的变量
+            // 声明用于统计与补收脚本的破架相关变量
             let targetKanpo = 0;
+            let brokenStance = null;
             if (isHit && config.isBroken && targetActor.system.martial?.stanceActive) {
-                // 记录真实破架
-                targetKanpo = targetActor.system.combat?.kanpoTotal || 0;
-                // A. 移除架招状态
-                // 改为调用stopStance，可以自动化处理持续到架招结束的ae
-                await targetActor.stopStance();
-
-                // B. 应用 "破防" 状态
-                const statusConfig = CONFIG.statusEffects.pofang;
-                if (statusConfig) {
-                    const breakEffectData = {
-                        ...statusConfig,
-                        name: game.i18n.localize(statusConfig.name),
-                        description: game.i18n.localize(statusConfig.description),
-                        origin: attacker ? attacker.uuid : message.uuid
-                    };
-                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [breakEffectData]);
-                }
-
-                // C. 视觉反馈
-                if (targetActor.showFloatyText) {
-                    targetActor.showFloatyText("被击破架招！", { fill: "#ff0000" });
-                }
+                ({ targetKanpo, brokenStance } = await ChatCardManager._applyStanceBreak(targetActor, attacker, message));
             }
             // =====================================================
 
@@ -2409,6 +2396,7 @@ export class ChatCardManager {
                 isCrit: config.isCrit,     // 强制暴击状态
                 applyCritDamage: damageConfig.applyCritDamage, // 是否计算双倍
                 isBroken: config.isBroken, // 强制破防
+                ...(brokenStance ? { brokenStance } : {}),
                 targetKanpo: targetKanpo,               // 用于战斗统计功能
                 ignoreBlock: damageConfig.ignoreBlock,
                 ignoreDefense: damageConfig.ignoreDefense,

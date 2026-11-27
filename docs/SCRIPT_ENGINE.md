@@ -114,7 +114,7 @@
 1. 当前激活内功的当前阶段脚本。
 2. 已装备的武器、防具和奇珍脚本；`ignoreArmorEffects` 会屏蔽头、衣、裤、鞋部位的防具脚本。
 3. Actor 拥有的全部特性脚本。
-4. 当前已开启架招的后台脚本，但仅响应架招白名单。
+4. 架招后台脚本，按下文的触发条件收集。
 5. `passive` 时，已领悟轻功、散手和阵法招式的被动脚本。
 6. 当前上下文招式的脚本。
 7. 当前生效 AE 的脚本。
@@ -131,6 +131,10 @@
 `passive`、`avoided`、`preDefense`、`preTake`、`damaged`、`dying`、`death`、`resourceChanged`。
 
 因此，“开启架招后持续增强角色或后续攻击”不能只写在架招的 `attack` 脚本中；应使用 `passive` 提供持续生效的加成，或在开启时添加 `tiedToStance` AE。
+
+攻击卡结算命中伤害并击破架招时，系统先解除架招，移除架招提供的格挡和 `tiedToStance` 效果。原架招仍可在本笔伤害进入的 `preDefense`、`preTake`、`dying`、`death` 和 `damaged` 阶段运行脚本。
+
+破架脚本用 `args.isBroken` 判断破架，用 `move.computedLevel` 读取原架招等级，用 `thisItem` 访问原架招所属武学。常规格挡效果用 `Macros.checkStance(actor, args)` 判断，架招解除后该方法返回 `false`。
 
 ## 触发流程与选择速查
 
@@ -375,6 +379,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `type` / `damageType` | `string` | 只读 | 当前伤害类型；两者同义。 |
 | `element` | `string` | 只读 | 当前伤害属性。 |
 | `baseDamage` | `number` | 只读 | 原始面板伤害。 |
+| `isBroken` | `boolean` | 只读 | 本次伤害携带的破架标记。 |
 | `move` / `item` | `Object` / `Item` / `null` | 只读 | 招式和物品来源。 |
 | `output.damage` | `number` | **可写** | 暴击与防御/格挡/抗性结算前的伤害基准值，初始等于 `baseDamage`；改写后暴击倍率按新值计算。适用于"受到X类型伤害时+Y"类附加效果。 |
 | `config.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 穿透配置。 |
@@ -407,6 +412,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
 | `damage` | `number` | 只读 | 本次进入资源分配的最终伤害。 |
+| `isBroken` | `boolean` | 只读 | 本次伤害携带的破架标记。 |
 | `preventDying` | `boolean` | **可写** | 设为 `true` 阻止本次添加濒死状态。 |
 | `preventDeath` | `boolean` | 只读 | 与 `death` 共享的初始标记；在本阶段修改不代替 `death` 阶段的判定。 |
 
@@ -418,6 +424,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
 | `damage` | `number` | 只读 | 本次进入资源分配的最终伤害。 |
+| `isBroken` | `boolean` | 只读 | 本次伤害携带的破架标记。 |
 | `preventDying` | `boolean` | 只读 | 前序 `dying` 阶段留下的标记。 |
 | `preventDeath` | `boolean` | **可写** | 设为 `true` 阻止本次添加死亡状态。 |
 
