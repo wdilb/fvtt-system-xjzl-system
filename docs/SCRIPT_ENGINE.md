@@ -325,6 +325,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `targetCount` | `number` | 只读 | 本次实际结算的目标数量；仅在真实逐目标结算阶段提供。 |
 | `targets` | `Actor[]` | 只读 | 本次实际结算的全部目标（自动与手动结算均提供）；需要跨目标统计（如按持有某状态的个数增伤）时使用。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际受击 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
 | `weapon` | `Object` / `null` | 只读 | [出招武器快照](#出招武器快照)。 |
 | `scriptFlags` | `Object` | 只读 | `preAttack` 与 `attack` 阶段写入的出招标记快照；每张攻击卡独立。 |
@@ -363,6 +364,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者；环境伤害的 `attacker` 可为 `null`。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际受击 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `type` | `string` | 只读 | 伤害类型。 |
 | `baseDamage` | `number` | 只读 | 原始面板伤害。 |
 | `isCrit` | `boolean` | 只读 | 调用方传入的暴击意图；即使未命中也会保留。 |
@@ -376,6 +378,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际受击 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `type` / `damageType` | `string` | 只读 | 当前伤害类型；两者同义。 |
 | `element` | `string` | 只读 | 当前伤害属性。 |
 | `baseDamage` | `number` | 只读 | 原始面板伤害。 |
@@ -394,6 +397,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际受击 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `type` / `damageType` | `string` | 只读 | 当前伤害类型。 |
 | `element` | `string` | 只读 | `preDefense` 完成后的伤害属性。 |
 | `baseDamage` | `number` | 只读 | 原始面板伤害。 |
@@ -411,6 +415,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际受击 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `damage` | `number` | 只读 | 本次进入资源分配的最终伤害。 |
 | `isBroken` | `boolean` | 只读 | 本次伤害携带的破架标记。 |
 | `preventDying` | `boolean` | **可写** | 设为 `true` 阻止本次添加濒死状态。 |
@@ -423,6 +428,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际受击 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `damage` | `number` | 只读 | 本次进入资源分配的最终伤害。 |
 | `isBroken` | `boolean` | 只读 | 本次伤害携带的破架标记。 |
 | `preventDying` | `boolean` | 只读 | 前序 `dying` 阶段留下的标记。 |
@@ -437,6 +443,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际受击 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `type` / `damageType` | `string` | 只读 | 最终结算使用的伤害类型。 |
 | `element` | `string` | 只读 | 最终结算使用的伤害属性。 |
 | `finalDamage` | `number` | 只读 | 进入资源分配前的最终伤害。 |
@@ -498,6 +505,7 @@ await actor.applyHealing({
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `target` / `attacker` | `Actor` | 只读 | 当前目标和出招者。 |
+| `targetTokenUuid` | `string` / `null` | 条件提供 | 实际目标 Token 的 UUID；无法确定具体 Token 时为 `null`。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
 | `weapon` | `Object` / `null` | 只读 | [出招武器快照](#出招武器快照)。 |
 | `actionType` | `string` | 只读 | `attack`、`heal` 或 `buff`。 |
@@ -1018,7 +1026,8 @@ await Macros.requestSave({
 
 | 参数 | 类型/默认值 | 说明 |
 |---|---|---|
-| `target` | `Actor`，必填 | 接受检定的目标。 |
+| `target` | `Actor` / `Token` / `TokenDocument`，必填 | 接受检定的目标；传 `Token` 或 `TokenDocument` 时同步保留其受击 Token UUID。 |
+| `targetTokenUuid` | `string`，可选 | 目标受击 Token 的 UUID；在 `preDamage`/`hit` 等带 `args.targetTokenUuid` 的脚本中按 `target: args.target` 调用时会自动继承，用于多 Token 链接角色结算时定位具体受击 Token。 |
 | `type` | `string`，必填 | 属性、技能、技艺或武器类型键。 |
 | `dc` | `number`，必填 | 难度；调用方应传入有效数值。 |
 | `attacker` / `label` | `Actor` / `string`，可选 | 来源 Actor 和卡片标题。 |
@@ -1051,10 +1060,11 @@ await Macros.requestContest({
 });
 ```
 
-`requestContest(options)` 中 `attacker`、`defender`、`type` 必填；`defType` 默认等于 `type`，`attBonus`/`defBonus` 默认 `0`。`outcome.win/lose` 从发起者视角定义，单独传入的 `winText`/`loseText` 会覆盖对应 `outcome` 文本。
+`requestContest(options)` 中 `attacker`、`defender`、`type` 必填；`defType` 默认等于 `type`，`attBonus`/`defBonus` 默认 `0`。`defender` 支持传入 `Actor`、`Token` 或 `TokenDocument`。`outcome.win/lose` 从发起者视角定义，单独传入的 `winText`/`loseText` 会覆盖对应 `outcome` 文本。
 
 | 参数 | 类型/默认值 | 说明 |
 |---|---|---|
+| `targetTokenUuid` | `string`，可选 | 对抗者受击 Token 的 UUID；在 `preDamage`/`hit` 等带 `args.targetTokenUuid` 的脚本中按 `defender: args.target` 调用时会自动继承。 |
 | `item` / `move` | `Item`/UUID / `Object`，可选 | 延期原攻击的来源恢复，随卡保存方式与 `requestSave` 相同。 |
 | `source` / `isBroken` / `isSkill` / `targetKanpo` | `string` / `boolean` / `number`，可选 | 原攻击来源、破架/技能抗性标记与看破值；默认值同 `requestSave`。 |
 

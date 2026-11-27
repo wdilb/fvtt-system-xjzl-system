@@ -43,6 +43,52 @@ function buildSourceFlags({ item, move, source, isBroken, isSkill, targetKanpo }
     return flags;
 }
 
+/** 统一从 Actor / Token / TokenDocument 提取参与方信息，兼容卡片展示与 UUID 保存。 */
+function resolveActorParticipant(docOrToken) {
+    if (!docOrToken) return { actor: null, uuid: null, name: "", img: "" };
+    const actor = docOrToken.actor || docOrToken;
+    return {
+        actor,
+        uuid: actor?.uuid ?? docOrToken.uuid ?? null,
+        name: actor?.name || docOrToken.name || "",
+        img: actor?.img || docOrToken.texture?.src || docOrToken.document?.texture?.src || ""
+    };
+}
+
+/**
+ * 解析目标侧实际受击的 TokenDocument UUID：
+ * 优先采用显式传入值；其次从 Token / TokenDocument / 非链接合成 Actor 提取；
+ * 最后在仍缺失时，若正在脚本执行栈内且请求目标匹配当前脚本目标，从栈帧继承 targetTokenUuid。
+ */
+function resolveTargetTokenUuid(docOrToken, explicitTokenUuid, stackOwners = []) {
+    if (explicitTokenUuid !== undefined) {
+        return typeof explicitTokenUuid === "string" && explicitTokenUuid ? explicitTokenUuid : null;
+    }
+    const directTokenUuid = docOrToken?.document?.uuid
+        || (docOrToken?.documentName === "Token" ? docOrToken.uuid : null)
+        || docOrToken?.token?.uuid
+        || null;
+    if (directTokenUuid) return directTokenUuid;
+
+    const targetActorUuid = (docOrToken?.actor || docOrToken)?.uuid ?? null;
+    if (!targetActorUuid) return null;
+
+    for (const owner of stackOwners) {
+        const stack = owner?._scriptContextStack;
+        if (!Array.isArray(stack) || stack.length === 0) continue;
+        for (let i = stack.length - 1; i >= 0; i--) {
+            const frame = stack[i];
+            if (!frame?.targetTokenUuid) continue;
+            // 仅在请求目标确为当前脚本所结算的目标/受击宿主时继承，避免错挂到其他角色或自检定上
+            const matches = frame.targetUuid
+                ? frame.targetUuid === targetActorUuid
+                : (frame.isDefenderTrigger && frame.hostActorUuid === targetActorUuid);
+            if (matches) return frame.targetTokenUuid;
+        }
+    }
+    return null;
+}
+
 /**
  * 将后果配置中的一笔伤害转为请求卡伤害参数。
  * value 非有限正数（含 0/缺失）视为未配置该笔后果，返回 null；
@@ -171,7 +217,8 @@ export class XJZLMacros {
     /**
      * 发起属性判定请求 (Request Saving Throw)
      * @param {Object} options 配置对象
-     * @param {Actor} options.target     目标 Actor (必须)
+     * @param {Actor|Token|TokenDocument} options.target 目标 Actor 或受击 Token (必须)
+     * @param {String} [options.targetTokenUuid] 目标受击 Token 的 UUID；在脚本上下文中针对当前目标调用时自动继承
      * @param {String} options.type      属性 Key (如 "liliang", "neixi", "wuxing")
      * @param {Number} options.dc        难度等级
      * @param {String} [options.label]   自定义标题 (可选)
@@ -204,9 +251,17 @@ export class XJZLMacros {
      * value 为非负有限数值（number 类型，含合法零输入），伤害类型走标准 applyDamage，资源类型走负数 applyHealing 直接流失；
      * 缺失、非 number 类型或负数视为录入错误，拒绝本笔结算并报告（不做字符串、布尔等值的数值折算）。
      */
-    static async requestSave({ target, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText, removeStanceOnSuccess = false, removeStanceOnFail = false, item, move, source, isBroken, isSkill, targetKanpo }) {
+    static async requestSave({ target, targetTokenUuid, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText, removeStanceOnSuccess = false, removeStanceOnFail = false, item, move, source, isBroken, isSkill, targetKanpo }) {
         if (!target) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestSaveNoTarget"));
         if (!type) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestSaveNoType"));
+
+        const targetInfo = resolveActorParticipant(target);
+        const attackerInfo = resolveActorParticipant(attacker);
+        const resolvedTargetTokenUuid = resolveTargetTokenUuid(
+            target,
+            targetTokenUuid,
+            [attackerInfo.actor, targetInfo.actor]
+        );
 
         // 1. 准备显示数据
         // 兼容 stats 和 skills 的 Label 查找
@@ -217,8 +272,8 @@ export class XJZLMacros {
             type;
         const attrLabel = game.i18n.localize(labelKey);
 
-        const attackerName = attacker ? attacker.name : "未知来源";
-        const targetName = target.name;
+        const attackerName = attackerInfo.name || "未知来源";
+        const targetName = targetInfo.name;
 
         // 数据清洗与防错
         let safeOnFail = onFail;
@@ -238,7 +293,7 @@ export class XJZLMacros {
         const content = await renderTemplate("systems/xjzl-system/templates/chat/request-save.hbs", {
             attackerName,
             targetName,
-            targetImg: target.img,
+            targetImg: targetInfo.img,
             attrLabel,
             dc,
             label
@@ -248,8 +303,9 @@ export class XJZLMacros {
         // 这些数据将在 ChatManager._rollSave 中被读取
         const flags = {
             type: "save-request", // 标记类型
-            targetUuid: target.uuid,
-            attackerUuid: attacker?.uuid, //备用
+            targetUuid: targetInfo.uuid,
+            ...(resolvedTargetTokenUuid ? { targetTokenUuid: resolvedTargetTokenUuid } : {}),
+            attackerUuid: attackerInfo.uuid ?? undefined, //备用
             attribute: type,
             dc: dc,
             onFail: safeOnFail, // 直接存入 Effect 数据对象
@@ -269,7 +325,7 @@ export class XJZLMacros {
         // 4. 发送消息
         return ChatMessage.create({
             author: game.user.id,
-            speaker: ChatMessage.getSpeaker({ actor: target }), // 建议 Speaker 是目标，方便玩家自己看
+            speaker: ChatMessage.getSpeaker({ actor: targetInfo.actor || target }), // 建议 Speaker 是目标，方便玩家自己看
             content: content,
             flags: { "xjzl-system": flags }
         });
@@ -280,8 +336,9 @@ export class XJZLMacros {
       * 这是一个异步的“记分牌”系统，支持并发防冲突与自动化结算。
       * 
       * @param {Object} options 配置对象
-      * @param {Actor} options.attacker   发起者 Actor (通常是 current actor，必须)
-      * @param {Actor} options.defender   对抗者 Actor (目标，必须)
+      * @param {Actor|Token|TokenDocument} options.attacker   发起者 Actor 或 Token (通常是 current actor，必须)
+      * @param {Actor|Token|TokenDocument} options.defender   对抗者 Actor 或受击 Token (目标，必须)
+      * @param {String} [options.targetTokenUuid] 对抗者受击 Token 的 UUID；在脚本上下文中针对当前目标调用时自动继承
       * @param {String} options.type      发起者的属性/技能/技艺 Key (如 "neili", "liliang")
       * @param {String} [options.defType] 对抗者的属性 Key (如果不填，默认和发起者一致)
       * @param {String} [options.label]   对抗标题 (如 "内力比拼", "吸星大法")
@@ -314,9 +371,17 @@ export class XJZLMacros {
      * source/isBroken/isSkill 与 targetKanpo；反噬 (selfDamage) 不继承这些来源，按 applyDamage/
      * applyHealing 缺省行为结算，也没有单笔来源覆盖参数。
      */
-    static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome, attBonus = 0, defBonus = 0, item, move, source, isBroken, isSkill, targetKanpo }) {
+    static async requestContest({ attacker, defender, targetTokenUuid, type, defType, label, winText, loseText, outcome, attBonus = 0, defBonus = 0, item, move, source, isBroken, isSkill, targetKanpo }) {
         if (!attacker || !defender) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestContestNoActors"));
         if (!type) return ui.notifications.error(game.i18n.localize("XJZL.Script.Notifications.RequestContestNoType"));
+
+        const attackerInfo = resolveActorParticipant(attacker);
+        const defenderInfo = resolveActorParticipant(defender);
+        const resolvedTargetTokenUuid = resolveTargetTokenUuid(
+            defender,
+            targetTokenUuid,
+            [attackerInfo.actor, defenderInfo.actor]
+        );
 
         const defenderType = defType || type; // 默认同属性对抗
 
@@ -353,8 +418,9 @@ export class XJZLMacros {
         // 我们只存 ID 和 配置，不存 roll 对象(因为还没投)
         const flags = {
             type: "contest-request",
-            attackerUuid: attacker.uuid,
-            defenderUuid: defender.uuid,
+            attackerUuid: attackerInfo.uuid,
+            defenderUuid: defenderInfo.uuid,
+            ...(resolvedTargetTokenUuid ? { targetTokenUuid: resolvedTargetTokenUuid } : {}),
             // 延期原攻击的来源恢复；无来源请求不写入这些键，保持缺省行为
             ...buildSourceFlags({ item, move, source, isBroken, isSkill, targetKanpo }),
             config: {
@@ -380,17 +446,17 @@ export class XJZLMacros {
         // 3. 渲染初始模板
         const content = await renderTemplate("systems/xjzl-system/templates/chat/request-contest.hbs", {
             ...flags.config,
-            attackerName: attacker.name,
-            defenderName: defender.name,
-            attackerImg: attacker.img,
-            defenderImg: defender.img,
+            attackerName: attackerInfo.name,
+            defenderName: defenderInfo.name,
+            attackerImg: attackerInfo.img,
+            defenderImg: defenderInfo.img,
             flags: flags // 传入 flags 方便模板判断初始状态
         });
 
         // 4. 发送消息
         return ChatMessage.create({
             author: game.user.id,
-            speaker: ChatMessage.getSpeaker({ actor: attacker }), // 默认显示发起者
+            speaker: ChatMessage.getSpeaker({ actor: attackerInfo.actor || attacker }), // 默认显示发起者
             content: content,
             flags: { "xjzl-system": flags }
         });

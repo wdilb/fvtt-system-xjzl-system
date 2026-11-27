@@ -1015,7 +1015,8 @@ pass("雷电真龙：来源按账本 sourceTokenUuid + 来源物品精确定位�
   const ljRegion = { tokens: [memberIn("六甲友"), enemyIn("六甲敌")], getFlag: () => null };
   const lqRegion = {
     tokens: [memberIn("风木友"), enemyIn("风木敌")],
-    getFlag: (scope, key) => (key === "aura" ? { params: { payloadEffectName: "厥阴风木" } } : null)
+    // 与连山六气掌·画碧染绿当前契约一致：按 displayName（"六气·厥阴风木"）识别
+    getFlag: (scope, key) => (key === "aura" ? { params: { displayName: "六气·厥阴风木" } } : null)
   };
   auraQueries.push([ljRegion], [lqRegion]);
   const selfToken = { name: "六气Token", actor, disposition: 1 };

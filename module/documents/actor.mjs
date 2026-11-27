@@ -78,6 +78,17 @@ const STANCE_BROKEN_TRIGGERS = Object.freeze([
   SCRIPT_TRIGGERS.DAMAGED
 ]);
 
+// 宿主本身作为受击目标的防御侧触发器：仅在这些阶段中未显式传目标时，
+// 可将当前受击 Token 关联到宿主自身的请求卡。
+const DEFENSIVE_TARGET_TOKEN_TRIGGERS = new Set([
+  SCRIPT_TRIGGERS.AVOIDED,
+  SCRIPT_TRIGGERS.PRE_DEFENSE,
+  SCRIPT_TRIGGERS.PRE_TAKE,
+  SCRIPT_TRIGGERS.DYING,
+  SCRIPT_TRIGGERS.DEATH,
+  SCRIPT_TRIGGERS.DAMAGED
+]);
+
 // 战斗开始、回合开始、回合结束：全部武学招式都可以触发的时机。
 const GLOBAL_WUXUE_TRIGGERS = Object.freeze([
   SCRIPT_TRIGGERS.COMBAT_START,
@@ -1582,8 +1593,73 @@ export class XJZLActor extends Actor {
       game: game,           // 允许访问 game
       ui: ui,               // 允许访问 ui
       trigger: trigger,      // 告诉脚本当前是什么时机
-      // 注入宏工具
-      Macros: XJZLMacros  // 脚本里可以用 Macros.requestSave(...)
+      // 注入宏工具（按本次沙盒绑定当前目标 Token UUID，避免异步并发与多 Token 混淆）
+      Macros: this._createScriptMacros(trigger, context)
+    };
+  }
+
+  /**
+   * 为脚本沙盒构造上下文隔离的 Macros 代理：
+   * 在 preDamage / hit / 受击等持有 targetTokenUuid 的脚本里，
+   * 当脚本按常规只传入 target: args.target 或 defender: args.target 时自动补全 targetTokenUuid。
+   * @param {String} trigger - 当前触发器
+   * @param {Object} context - 脚本上下文对象
+   * @returns {typeof XJZLMacros} 脚本内使用的 Macros 引用
+   */
+  _createScriptMacros(trigger, context) {
+    if (typeof context?.targetTokenUuid !== "string" || !context.targetTokenUuid) return XJZLMacros;
+
+    const isDefenderTrigger = DEFENSIVE_TARGET_TOKEN_TRIGGERS.has(trigger);
+    const injectTargetTokenUuid = (options, docKey) => {
+      const tokenUuid = typeof context?.targetTokenUuid === "string" && context.targetTokenUuid
+        ? context.targetTokenUuid
+        : null;
+      if (!tokenUuid || !options || typeof options !== "object" || options.targetTokenUuid !== undefined) {
+        return options;
+      }
+      const doc = options[docKey];
+      // 已直接传入 Token / TokenDocument 时交由 macros 自身提取 Token UUID
+      if (!doc || doc.document || doc.documentName === "Token") return options;
+      const docActorUuid = doc.actor?.uuid ?? doc.uuid ?? null;
+      if (!docActorUuid) return options;
+      const contextTargetUuid = context?.target?.uuid || null;
+      // 攻击阶段按 target 匹配当前目标；防御受击阶段无 target 时仅匹配受击宿主自身
+      const matchesTarget = contextTargetUuid
+        ? docActorUuid === contextTargetUuid
+        : (isDefenderTrigger && docActorUuid === this.uuid);
+      if (!matchesTarget) return options;
+      return { ...options, targetTokenUuid: tokenUuid };
+    };
+
+    return new Proxy(XJZLMacros, {
+      get: (target, prop, receiver) => {
+        if (prop === "requestSave") {
+          return (options, ...rest) => XJZLMacros.requestSave(injectTargetTokenUuid(options, "target"), ...rest);
+        }
+        if (prop === "requestContest") {
+          return (options, ...rest) => XJZLMacros.requestContest(injectTargetTokenUuid(options, "defender"), ...rest);
+        }
+        return Reflect.get(target, prop, receiver);
+      }
+    });
+  }
+
+  /**
+   * 构造脚本执行栈帧，集中记录来源物品、主动招式及当前目标 Token 关联。
+   */
+  _buildScriptStackFrame(trigger, sandbox, entry, thisItem, thisEffect, actionContext) {
+    return {
+      item: thisItem,
+      effect: thisEffect,
+      label: entry.label,
+      contextData: entry.contextData || null,
+      actionItem: actionContext?.item || null,
+      actionMove: actionContext?.move || null,
+      actionSource: actionContext?.source || null,
+      targetUuid: sandbox.args?.target?.uuid || null,
+      targetTokenUuid: sandbox.args?.targetTokenUuid || null,
+      hostActorUuid: this.uuid || null,
+      isDefenderTrigger: DEFENSIVE_TARGET_TOKEN_TRIGGERS.has(trigger)
     };
   }
 
@@ -1706,15 +1782,9 @@ export class XJZLActor extends Actor {
         sandbox.system = this.system;
         sandbox.S = this.system;
         // 入栈：记录当前正在执行的脚本来源
-        this._scriptContextStack.push({
-          item: thisItem,
-          effect: thisEffect,
-          label: entry.label,
-          contextData: entry.contextData || null,
-          actionItem: actionContext?.item || null,
-          actionMove: actionContext?.move || null,
-          actionSource: actionContext?.source || null
-        });
+        this._scriptContextStack.push(
+          this._buildScriptStackFrame(sandbox.trigger, sandbox, entry, thisItem, thisEffect, actionContext)
+        );
         // 记录同步执行来源：本段脚本内的文档写入/资源消耗/GM 委托会被同步阻断
         exitSyncGuard = enterSyncScriptContext({
           actorName: this.name,
@@ -1799,15 +1869,9 @@ export class XJZLActor extends Actor {
         sandbox.system = this.system;
         sandbox.S = this.system;
         // 入栈：记录当前正在执行的脚本来源
-        this._scriptContextStack.push({
-          item: thisItem,
-          effect: thisEffect,
-          label: entry.label,
-          contextData: entry.contextData || null,
-          actionItem: actionContext?.item || null,
-          actionMove: actionContext?.move || null,
-          actionSource: actionContext?.source || null
-        });
+        this._scriptContextStack.push(
+          this._buildScriptStackFrame(sandbox.trigger, sandbox, entry, thisItem, thisEffect, actionContext)
+        );
         if (externalDamageInputLocked) externalDamageInput = captureExternalDamageInput(sandbox, actionMove, entry);
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -2481,12 +2545,15 @@ export class XJZLActor extends Actor {
       isHit = true,       // 是否命中
       isBroken = false,   // 是否被破防 (状态，不可逆)
       brokenStance = null,// 本次受击刚被击破的原架招快照 { itemId, moveId }
+      targetTokenUuid = null, // 实际受击 Token UUID（同一 Actor 多 Token 时用于空间效果精确定位）
       targetKanpo = 0,    // 接收敌方看破值，用于战斗统计功能
       isSkill = true,     // false表示普通攻击
       move = null,
       item = null,
       source = "extra"    // 伤害来源标识 (move, basic, both, dot, extra)，默认是extra也就是额外伤害，用来处理哪些伤害应该触发濒死、易伤等问题
     } = data;
+
+    const resolvedTargetTokenUuid = targetTokenUuid || this.token?.uuid || null;
 
     // 仅当本次确实破架且传入了有效架招快照时补收原架招受击脚本；
     // 不挂 Actor 状态，确保多段后续跳与嵌套反伤不会重复触发。
@@ -2523,6 +2590,7 @@ export class XJZLActor extends Actor {
       const avoidContext = {
         attacker: attacker,
         target: this,
+        targetTokenUuid: resolvedTargetTokenUuid,
         type: type,
         baseDamage: amount,
         isCrit: config.isCrit, // 虽然未命中，但把暴击意图传过去也无妨
@@ -2548,6 +2616,7 @@ export class XJZLActor extends Actor {
     const preDefContext = {
       attacker: attacker,
       target: this,
+      targetTokenUuid: resolvedTargetTokenUuid,
       type: type,
       damageType: type, // 与 type 完全等价，确保脚本无论用 args.type 还是 args.damageType 都能取到
       baseDamage: amount, // 原始面板伤害
@@ -2647,6 +2716,7 @@ export class XJZLActor extends Actor {
     const takeContext = {
       attacker: attacker,
       target: this,
+      targetTokenUuid: resolvedTargetTokenUuid,
       type: type,
       damageType: type, // 与 type 完全等价，确保脚本无论用 args.type 还是 args.damageType 都能取到
       element: config.element,
@@ -2805,6 +2875,7 @@ export class XJZLActor extends Actor {
     const statusCtx = {
       attacker: attacker,
       target: this,
+      targetTokenUuid: resolvedTargetTokenUuid,
       damage: finalDamage,
       isBroken: isBroken, // 供 dying / death 阶段的被破架招及常规防御脚本读取破架状态
       preventDying: false,
@@ -2873,6 +2944,7 @@ export class XJZLActor extends Actor {
     const damagedContext = {
       attacker: attacker,
       target: this,
+      targetTokenUuid: resolvedTargetTokenUuid,
       type: type,
       damageType: type, // 与 type 完全等价，确保脚本无论用 args.type 还是 args.damageType 都能取到
       element: config.element,
@@ -4439,11 +4511,13 @@ export class XJZLActor extends Actor {
     for (const token of recipients) {
       const targetActor = token.actor;
       if (!targetActor) continue;
+      const targetTokenUuid = token.document?.uuid || token.uuid || null;
 
       if (check.mode === "contest") {
         await XJZLMacros.requestContest({
           attacker: this,
           defender: targetActor,
+          ...(targetTokenUuid ? { targetTokenUuid } : {}),
           type: check.contest.attAttr,
           defType: panel.check.defAttr,
           attBonus: panel.check.attBonus,
@@ -4459,6 +4533,7 @@ export class XJZLActor extends Actor {
         const fail = buildCreatureSaveOutcome(check.save.fail);
         await XJZLMacros.requestSave({
           target: targetActor,
+          ...(targetTokenUuid ? { targetTokenUuid } : {}),
           attacker: this,
           type: check.save.attr,
           dc: panel.check.dc,

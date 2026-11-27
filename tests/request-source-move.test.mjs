@@ -145,4 +145,38 @@ await XJZLMacros.requestContest({
 }
 pass("requestContest：非空子类型与显式空串随卡保留");
 
+// 4. Token / TokenDocument 与显式 targetTokenUuid 持久化保留
+const tokDefender = {
+  id: "tok-d2",
+  uuid: "Scene.s1.Token.tok-d2",
+  documentName: "Token",
+  name: "目标Token2",
+  texture: { src: "icons/tok.png" },
+  actor: makeActor("defender-tok")
+};
+await XJZLMacros.requestSave({
+  target: tokDefender,
+  type: "liliang",
+  dc: 14,
+  attacker: makeActor("attacker-e")
+});
+{
+  const { flags, persisted } = readLastFlags();
+  assert.equal(persisted.targetUuid, "Actor.defender-tok", "targetUuid 保持 Actor UUID");
+  assert.equal(flags.targetTokenUuid, tokDefender.uuid, "传入 TokenDocument 时同步保留 targetTokenUuid");
+  assert.equal(persisted.targetTokenUuid, tokDefender.uuid, "持久化往返后 targetTokenUuid 仍在");
+}
+await XJZLMacros.requestContest({
+  attacker: makeActor("attacker-e"),
+  defender: makeActor("defender-e"),
+  targetTokenUuid: "Scene.s1.Token.explicit-2",
+  type: "neixi"
+});
+{
+  const { persisted } = readLastFlags();
+  assert.equal(persisted.defenderUuid, "Actor.defender-e");
+  assert.equal(persisted.targetTokenUuid, "Scene.s1.Token.explicit-2", "显式传入 targetTokenUuid 应随对抗卡持久化");
+}
+pass("requestSave / requestContest：TokenDocument 与显式 targetTokenUuid 随卡保留");
+
 console.log(`\n共 ${passed} 组断言通过。`);

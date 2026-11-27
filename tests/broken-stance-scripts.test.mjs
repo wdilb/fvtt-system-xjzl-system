@@ -57,7 +57,13 @@ globalThis.foundry = {
 };
 
 globalThis.renderTemplate = async () => "<div>mock-card</div>";
-globalThis.document = { getElementById: () => null };
+globalThis.document = {
+  getElementById: () => null,
+  createElement: () => ({
+    innerHTML: "",
+    querySelector: () => ({ outerHTML: "" })
+  })
+};
 globalThis.Roll = class MockRoll {
   static fromData(data) { return data; }
 };
@@ -67,10 +73,25 @@ const chatMessages = [];
 const notices = [];
 const socketCalls = [];
 const auraDismissCalls = [];
+const auraCreates = [];
+const addedEffects = [];
 const statusCalls = [];
+const registry = new Map();
+
+const statusTemplates = {
+  chengfeng: {
+    name: "乘风",
+    img: "icons/chengfeng.png",
+    flags: { "xjzl-system": { slug: "chengfeng", stackable: true } }
+  }
+};
 
 globalThis.CONFIG = {
   XJZL: {
+    attributes: { dingli: "XJZL.Attributes.Dingli", liliang: "XJZL.Attributes.Liliang" },
+    skills: { wuxue: "XJZL.Skills.Wuxue" },
+    arts: {},
+    weaponTypes: {},
     damageTypes: {
       waigong: "XJZL.Combat.DamageType.Waigong",
       neigong: "XJZL.Combat.DamageType.Neigong"
@@ -99,7 +120,27 @@ globalThis.game = {
     format: (key, values = {}) => (getProperty(translations, key) ?? key)
       .replace(/\{([^}]+)\}/g, (_, k) => values[k] ?? "")
   },
-  xjzl: { api: { effects: {} } }
+  xjzl: {
+    api: {
+      effects: {
+        getStatus: slug => statusTemplates[slug] ? structuredClone(statusTemplates[slug]) : null,
+        addEffect: async (targetActor, effData) => {
+          const cloned = structuredClone(effData);
+          const created = makeEffectDoc(cloned, `eff-${++sequence}`);
+          targetActor.effects.push(created);
+          targetActor._recomputeDerived?.();
+          addedEffects.push({ actor: targetActor, effData: cloned, created });
+          return created;
+        }
+      }
+    },
+    aura: {
+      create: async (sourceActor, params) => {
+        auraCreates.push({ sourceActor, params });
+        return { id: `region-${auraCreates.length}` };
+      }
+    }
+  }
 };
 
 globalThis.ui = {
@@ -112,10 +153,23 @@ globalThis.ui = {
 
 globalThis.ChatMessage = {
   getSpeaker: ({ actor }) => ({ actor: actor?.id ?? null }),
-  create: async data => { chatMessages.push(data); return data; }
+  create: async data => {
+    const msg = {
+      id: `chat-${chatMessages.length + 1}`,
+      uuid: `ChatMessage.chat-${chatMessages.length + 1}`,
+      ...data,
+      content: data.content ?? '<div class="card-buttons"></div>',
+      async update(updates) {
+        for (const [k, v] of Object.entries(updates)) setProperty(this, k, v);
+        return this;
+      }
+    };
+    chatMessages.push(msg);
+    return msg;
+  }
 };
 
-globalThis.fromUuid = async () => null;
+globalThis.fromUuid = async uuid => registry.get(uuid) ?? null;
 globalThis.Hooks = { on() {}, callAll() {}, call: () => true };
 
 globalThis.Actor = class MockActorRoot {
@@ -197,30 +251,49 @@ globalThis.Macros = XJZLMacros;
 function makeEffectDoc(data, id) {
   const statuses = new Set(data.statuses ?? []);
   const flags = structuredClone(data.flags ?? {});
+  const system = structuredClone(data.system ?? { changes: [] });
+  const duration = structuredClone(data.duration ?? {});
   const scripts = structuredClone(flags["xjzl-system"]?.scripts ?? []);
-  return {
+  return Object.assign(new globalThis.ActiveEffect(), {
     id,
     name: data.name ?? id,
     origin: data.origin ?? null,
     statuses,
     flags,
+    system,
+    duration,
     disabled: false,
     isSuppressed: false,
     hasScript: trigger => scripts.some(s => s.trigger === trigger && s.active !== false),
     scripts,
     getFlag(scope, key) {
       return getProperty(this.flags?.[scope], key);
+    },
+    toObject() {
+      return structuredClone({
+        name: this.name,
+        description: data.description ?? "",
+        img: data.img ?? "",
+        origin: this.origin,
+        flags: this.flags,
+        system: this.system,
+        duration: this.duration,
+        statuses: [...this.statuses]
+      });
     }
-  };
+  });
 }
 
-function makeWuxueItem({ id, name, moves }) {
+function makeWuxueItem({ id, name, moves, effects = [] }) {
+  const effectDocs = effects.map((ef, idx) => makeEffectDoc(ef, `${id}-ef-${idx}`));
+  effectDocs.getName = targetName => effectDocs.find(e => e.name === targetName) ?? null;
   return Object.assign(new globalThis.Item(), {
     id,
     uuid: `Item.${id}`,
     name,
     type: "wuxue",
-    system: { category: "wuxue", moves }
+    system: { category: "wuxue", moves },
+    effects: effectDocs
   });
 }
 
@@ -308,6 +381,17 @@ function makeActor({
       const active = this.system.martial?.stanceActive === true;
       this.system.combat.stanceBlockValue = active ? stanceBlock : 0;
       this.system.combat.blockTotal = active ? stanceBlock : 0;
+      const aeDefWaigong = this.effects.reduce((sum, ef) => {
+        if (ef.disabled || ef.isSuppressed) return sum;
+        const changes = ef.system?.changes ?? [];
+        for (const c of changes) {
+          if (c.key === "system.combat.def_waigong" && c.type === "add") {
+            sum += Number(c.value) || 0;
+          }
+        }
+        return sum;
+      }, 0);
+      this.system.combat.defWaigongTotal = baseDefWaigong + aeDefWaigong;
     },
     getFlag(scope, key) {
       return getProperty(this.flags?.[scope], key);
@@ -333,9 +417,30 @@ function makeActor({
       if (active) {
         this.effects.push(makeEffectDoc({ name: statusId, statuses: [statusId] }, `status-${++sequence}`));
       }
+    },
+    async rollAttributeTest(attr, { bonus = 0 } = {}) {
+      const base = this._nextRollTotal ?? 10;
+      const val = base + bonus;
+      return { total: val, data: { val: 0 }, terms: [{ total: val }], formula: "1d20" };
     }
   });
   return actor;
+}
+
+function loadWuxue(relPath, wuxueName) {
+  const raw = JSON.parse(readFileSync(resolve(root, "data/wuxue", relPath), "utf8"));
+  const itemData = (Array.isArray(raw) ? raw : [raw]).find(i => i.name === wuxueName);
+  assert.ok(itemData, `${relPath} 应存在《${wuxueName}》`);
+  const moves = (itemData.system?.moves ?? []).map((m, idx) => ({
+    ...structuredClone(m),
+    id: m.id || `move-${wuxueName}-${idx}`
+  }));
+  return makeWuxueItem({
+    id: `item-${wuxueName}`,
+    name: itemData.name,
+    moves,
+    effects: itemData.effects ?? []
+  });
 }
 
 function makeAttackItem(move) {
@@ -346,11 +451,16 @@ function makeAttackItem(move) {
   });
 }
 
-function makeChatMessage({ id = "msg-1", flags = {}, hitResults = [] } = {}) {
+function makeChatMessage({ id = "msg-1", flags = {}, hitResults = [], content = '<div class="card-buttons"></div>' } = {}) {
   return {
     id,
     uuid: `ChatMessage.${id}`,
+    content,
     flags: { "xjzl-system": flags },
+    async update(updates) {
+      for (const [k, v] of Object.entries(updates)) setProperty(this, k, v);
+      return this;
+    },
     getFlag(scope, key) {
       if (scope === "xjzl-system" && key === "finalResolvedHit") return hitResults;
       return getProperty(this.flags?.[scope], key);
@@ -363,7 +473,10 @@ function resetMocks() {
   notices.length = 0;
   socketCalls.length = 0;
   auraDismissCalls.length = 0;
+  auraCreates.length = 0;
+  addedEffects.length = 0;
   statusCalls.length = 0;
+  registry.clear();
   game.user.targets = new Set();
   delete game.testLog;
 }
@@ -857,4 +970,401 @@ test("跨客户端 GM 委托：非 owner 目标 applyDamage 通过 serializeReso
   assert.equal(payload.targetKanpo, 18);
   assert.equal(payload.attackerUuid, attacker.uuid);
   assert.deepEqual(payload.brokenStance, brokenStance);
+});
+
+test("阶段二官方武学源数据：5 个二次失效架招在破架流程中均可正确触发", async () => {
+
+  // 1. 易水诀 - 取图奉之：破架后不再受 Macros.checkStance 拦截，成功获得“易水寒”
+  {
+    resetMocks();
+    const yishuiItem = loadWuxue("shenfengbang.json", "易水诀");
+    const stanceMove = yishuiItem.system.moves.find(m => m.name === "取图奉之");
+    stanceMove.computedLevel = 1;
+    const defender = makeActor({
+      id: "def-yishui", name: "易水侠", hp: 100,
+      stanceItem: yishuiItem, stanceMoveId: stanceMove.id, stanceActive: true
+    });
+    const attacker = makeActor({ id: "atk-1", name: "攻者" });
+    const { brokenStance } = await ChatCardManager._applyStanceBreak(defender, attacker, makeChatMessage());
+    await defender.applyDamage({ amount: 20, type: "waigong", attacker, isHit: true, isBroken: true, brokenStance });
+    assert.ok(defender.effects.some(e => e.getFlag("xjzl-system", "slug") === "yishui_han"), "破架应获得易水寒");
+  }
+
+  // 2. 风云扇 - 舞风翩跹：破架清空 martial.stance 后仍正确添加 2 层乘风
+  {
+    resetMocks();
+    const fengyunItem = loadWuxue("qimen.json", "风云扇");
+    const stanceMove = fengyunItem.system.moves.find(m => m.name === "舞风翩跹");
+    stanceMove.computedLevel = 1;
+    const defender = makeActor({
+      id: "def-fengyun", name: "风云侠", hp: 100,
+      stanceItem: fengyunItem, stanceMoveId: stanceMove.id, stanceActive: true
+    });
+    const attacker = makeActor({ id: "atk-2", name: "攻者" });
+    const { brokenStance } = await ChatCardManager._applyStanceBreak(defender, attacker, makeChatMessage());
+    await defender.applyDamage({ amount: 20, type: "waigong", attacker, isHit: true, isBroken: true, brokenStance });
+    const chengfengAdded = addedEffects.filter(x => x.actor === defender && x.effData.flags?.["xjzl-system"]?.slug === "chengfeng");
+    assert.equal(chengfengAdded.length, 2, "舞风翩跹破架应叠加 2 次乘风");
+  }
+
+  // 3. 灵蛇毒棍 - 毒蛇入穴：从注入 move.computedLevel 读取等级，3 级破架给已有灵蛇毒的攻击者施加 5 回合奇蛇毒
+  {
+    resetMocks();
+    const lingsheItem = loadWuxue("gunfa.json", "灵蛇毒棍");
+    const stanceMove = lingsheItem.system.moves.find(m => m.name === "毒蛇入穴");
+    stanceMove.computedLevel = 3;
+    const defender = makeActor({
+      id: "def-lingshe", name: "灵蛇侠", hp: 100,
+      stanceItem: lingsheItem, stanceMoveId: stanceMove.id, stanceActive: true
+    });
+    const attacker = makeActor({ id: "atk-3", name: "毒中者" });
+    // 无毒时先施加 1 回合灵蛇毒
+    const b1 = (await ChatCardManager._applyStanceBreak(defender, attacker, makeChatMessage())).brokenStance;
+    await defender.applyDamage({ amount: 10, type: "waigong", attacker, isHit: true, isBroken: true, brokenStance: b1 });
+    const firstPoison = attacker.effects.find(e => e.getFlag("xjzl-system", "slug") === "lingshedu");
+    assert.ok(firstPoison, "攻击者无灵蛇毒时应先挂上灵蛇毒");
+    assert.equal(firstPoison.duration.value, 1);
+
+    // 重新开启架招并再被已有灵蛇毒的攻击者破架：3 级应挂 3 + (3 - 1) = 5 回合奇蛇毒
+    await defender.update({
+      "system.martial.stanceActive": true,
+      "system.martial.stanceItemId": lingsheItem.id,
+      "system.martial.stance": stanceMove.id
+    });
+    const b2 = (await ChatCardManager._applyStanceBreak(defender, attacker, makeChatMessage())).brokenStance;
+    await defender.applyDamage({ amount: 10, type: "waigong", attacker, isHit: true, isBroken: true, brokenStance: b2 });
+    const qishedu = attacker.effects.find(e => e.getFlag("xjzl-system", "slug") === "qishedu");
+    assert.ok(qishedu, "攻击者已有灵蛇毒时应追加奇蛇毒");
+    assert.equal(qishedu.duration.value, 5, "奇蛇毒回合数应按 3 级毒蛇入穴算为 5 回合");
+  }
+
+  // 4. 光影刺 - 光影荏苒 & 蕴影：同一 Actor 关联两枚 Token，击破/格挡第 2 枚 Token 时遁光必须锚定第 2 枚 Token 且 payloadItemUuid 指向自身《光影刺》
+  {
+    resetMocks();
+    const guangyingItem = loadWuxue("mingjiao.json", "光影刺");
+    const stanceMove = guangyingItem.system.moves.find(m => m.name === "光影荏苒");
+    stanceMove.computedLevel = 2;
+    const defender = makeActor({
+      id: "def-guangying", name: "光影侠", hp: 100,
+      stanceItem: guangyingItem, stanceMoveId: stanceMove.id, stanceActive: true
+    });
+    guangyingItem.parent = defender;
+    const tok1Doc = { id: "tok1", uuid: "Scene.s1.Token.tok1", documentName: "Token", actor: defender, parent: { id: "s1" } };
+    const tok2Doc = { id: "tok2", uuid: "Scene.s1.Token.tok2", documentName: "Token", actor: defender, parent: { id: "s1" } };
+    registry.set(tok1Doc.uuid, tok1Doc);
+    registry.set(tok2Doc.uuid, tok2Doc);
+    registry.set(guangyingItem.uuid, guangyingItem);
+    defender.getActiveTokens = () => [{ document: tok1Doc }, { document: tok2Doc }];
+
+    const attacker = makeActor({ id: "atk-4", name: "攻者" });
+    const atkMove = { id: "atk-move", name: "敌人虚招", type: "feint" };
+    const atkItem = makeAttackItem(atkMove);
+    const targetToken2 = {
+      id: "tok2", uuid: tok2Doc.uuid, name: "光影侠分身2",
+      actor: defender, document: tok2Doc, texture: { src: "icons/token.png" }
+    };
+    const safeKey2 = tok2Doc.uuid.replaceAll(".", "_");
+    const msg = makeChatMessage({
+      id: "msg-gy-2",
+      flags: { moveId: atkMove.id, damage: 15, damageType: "waigong", canCrit: false, feintResults: { [safeKey2]: "broken" } },
+      hitResults: [{ uuid: tok2Doc.uuid, isHit: true, dieUsed: 10 }]
+    });
+
+    await ChatCardManager._applyDamage(attacker, atkItem, msg.flags["xjzl-system"], [targetToken2], msg);
+    assert.equal(auraCreates.length, 1, "光影荏苒破架应创建 1 道遁光");
+    assert.equal(auraCreates[0].sourceActor, tok2Doc, "同一 Actor 多 Token 下必须定位到实际受击的第 2 枚 Token");
+    assert.equal(auraCreates[0].params.payloadItemUuid, guangyingItem.uuid, "payloadItemUuid 必须指向防御者自身的《光影刺》");
+    assert.notEqual(auraCreates[0].params.payloadItemUuid, atkItem.uuid);
+
+    // 4b. 蕴影 AE 格挡第 2 枚 Token：同样锚定 tok2Doc
+    auraCreates.length = 0;
+    await defender.update({
+      "system.martial.stanceActive": true,
+      "system.martial.stanceItemId": guangyingItem.id,
+      "system.martial.stance": stanceMove.id
+    });
+    const yunyingTpl = guangyingItem.effects.getName("蕴影");
+    yunyingTpl.uuid = `${guangyingItem.uuid}.ActiveEffect.yy`;
+    yunyingTpl.parent = guangyingItem;
+    registry.set(yunyingTpl.uuid, yunyingTpl);
+    const yunyingData = yunyingTpl.toObject();
+    yunyingData.origin = yunyingTpl.uuid;
+    await game.xjzl.api.effects.addEffect(defender, yunyingData);
+    await defender.applyDamage({
+      amount: 10, type: "waigong", attacker, targetTokenUuid: tok2Doc.uuid,
+      isHit: true, isBroken: false
+    });
+    assert.equal(auraCreates.length, 1, "蕴影格挡成功应创建 1 道遁光");
+    assert.equal(auraCreates[0].sourceActor, tok2Doc, "蕴影也应定位到实际受击的第 2 枚 Token");
+
+    // 4c. 显式传了 targetTokenUuid 但目标 Token 已不存在时安全跳过，不回退到第 1 枚 Token
+    auraCreates.length = 0;
+    await defender.applyDamage({
+      amount: 10, type: "waigong", attacker, targetTokenUuid: "Scene.s1.Token.deleted",
+      isHit: true, isBroken: false
+    });
+    assert.equal(auraCreates.length, 0, "已删除 Token 不应错误退回到首枚活动 Token");
+  }
+
+  // 5. 刺客列传 - 以衣代首：置于 preDefense 时机，破架瞬间先获得鱼肠防御加成并立即降低本次伤害
+  {
+    resetMocks();
+    const cikeItem = loadWuxue("bishou.json", "刺客列传");
+    const stanceMove = cikeItem.system.moves.find(m => m.name === "以衣代首");
+    const qiMove = cikeItem.system.moves.find(m => m.name === "鱼肠藏剑");
+    stanceMove.computedLevel = 1;
+    qiMove.computedLevel = 3; // bonus = 5 + (3 - 1) * 5 = 15
+    assert.equal(stanceMove.scripts[0].trigger, "preDefense");
+    const defender = makeActor({
+      id: "def-cike", name: "刺客侠", hp: 100, baseDefWaigong: 5, stanceBlock: 20,
+      stanceItem: cikeItem, stanceMoveId: stanceMove.id, stanceActive: true
+    });
+    const attacker = makeActor({ id: "atk-5", name: "攻者" });
+    const { brokenStance } = await ChatCardManager._applyStanceBreak(defender, attacker, makeChatMessage());
+    const dmgRes = await defender.applyDamage({
+      amount: 40, type: "waigong", attacker, isHit: true, isBroken: true, brokenStance
+    });
+    const yuchang = defender.effects.find(e => e.getFlag("xjzl-system", "slug") === "yuchang_buff");
+    assert.ok(yuchang, "以衣代首破架应立即获得鱼肠");
+    assert.equal(yuchang.getFlag("xjzl-system", "cikeBonus"), 15);
+    // 破架后原有架招格挡 20 失效，但 preDefense 获得的鱼肠(防御+15)与基础防御 5 合计 20 立即生效：40 - 20 = 20
+    assert.equal(dmgRes.finalDamage, 20, "鱼肠防御加成应在本次受击中即时生效");
+  }
+});
+
+test("防御侧全受击阶段与延期对抗结算均保留精确的 targetTokenUuid", async () => {
+  resetMocks();
+  const seen = [];
+  game.testLog = seen;
+
+  const probeTrait = Object.assign(new globalThis.Item(), {
+    id: "trait-tok-probe",
+    uuid: "Item.trait-tok-probe",
+    name: "Token探针",
+    type: "trait",
+    system: {
+      scripts: [
+        "avoided", "preDefense", "preTake", "dying", "death", "damaged"
+      ].map(trig => ({
+        label: `probe-${trig}`,
+        trigger: trig,
+        active: true,
+        script: `game.testLog.push({ stage: "${trig}", targetTokenUuid: args.targetTokenUuid });`
+      }))
+    }
+  });
+
+  const defender = makeActor({
+    id: "def-tok-probe", name: "探针侠", hp: 10, mp: 1, items: [probeTrait]
+  });
+  const attacker = makeActor({ id: "atk-tok-probe", name: "攻探针" });
+  const tokUuid = "Scene.s1.Token.probe-2";
+  const tokDoc = { id: "probe-2", uuid: tokUuid, documentName: "Token", actor: defender };
+  registry.set(tokUuid, tokDoc);
+  registry.set(attacker.uuid, attacker);
+
+  // 未命中 -> avoided
+  await defender.applyDamage({ amount: 20, type: "waigong", attacker, targetTokenUuid: tokUuid, isHit: false });
+  // 命中致死 -> preDefense / preTake / dying / death / damaged
+  await defender.applyDamage({ amount: 50, type: "waigong", attacker, targetTokenUuid: tokUuid, isHit: true });
+
+  assert.deepEqual(seen, [
+    { stage: "avoided", targetTokenUuid: tokUuid },
+    { stage: "preDefense", targetTokenUuid: tokUuid },
+    { stage: "preTake", targetTokenUuid: tokUuid },
+    { stage: "dying", targetTokenUuid: tokUuid },
+    { stage: "death", targetTokenUuid: tokUuid },
+    { stage: "damaged", targetTokenUuid: tokUuid }
+  ]);
+
+  // 延期对抗结算（_executeContestAutomation）向后兼容旧卡：defenderUuid 直接为 Token UUID 时仍有效
+  seen.length = 0;
+  const defender2 = makeActor({ id: "def-tok-probe-2", name: "对抗目标", hp: 50, items: [probeTrait] });
+  const tok2Uuid = "Scene.s1.Token.contest-2";
+  const tok2Doc = { id: "contest-2", uuid: tok2Uuid, documentName: "Token", actor: defender2 };
+  registry.set(tok2Uuid, tok2Doc);
+  await ChatCardManager._executeContestAutomation("attacker", {
+    attackerUuid: attacker.uuid,
+    defenderUuid: tok2Uuid,
+    config: {
+      outcome: {
+        win: {
+          targetDamage: { value: 10, type: "waigong" }
+        }
+      }
+    }
+  }, makeChatMessage({ id: "msg-contest" }));
+  assert.ok(seen.every(x => x.targetTokenUuid === tok2Uuid) && seen.length > 0, "延期对抗伤害也应保留 targetTokenUuid");
+});
+
+test("多 Token 链接角色真实发卡到结算全链路：「司空见惯」对抗卡与豁免卡均保留第 2 枚受击 Token", async () => {
+  resetMocks();
+  const seen = [];
+  game.testLog = seen;
+
+  const probeTrait = Object.assign(new globalThis.Item(), {
+    id: "trait-deferred-probe",
+    uuid: "Item.trait-deferred-probe",
+    name: "延期受击探针",
+    type: "trait",
+    system: {
+      scripts: ["preDefense", "preTake", "damaged"].map(trig => ({
+        label: `deferred-${trig}`,
+        trigger: trig,
+        active: true,
+        script: `game.testLog.push({ stage: "${trig}", targetTokenUuid: args.targetTokenUuid, moveName: args.move?.name ?? null });`
+      }))
+    }
+  });
+
+  // 1. 攻击者使用官方《空明掌法 - 司空见惯》（hit 调用 Macros.requestContest({ attacker: actor, defender: args.target, ... })）
+  //    对同一链接角色的第 2 枚 Token 发起攻击，经历真实发卡 -> 持久化 -> 对抗结算
+  const tushouItem = loadWuxue("tushou.json", "空明掌法");
+  const skjgMove = tushouItem.system.moves.find(m => m.name === "司空见惯");
+  assert.ok(skjgMove, "tushou.json 应存在「司空见惯」");
+  skjgMove.computedLevel = 2;
+
+  const guangyingItem = loadWuxue("mingjiao.json", "光影刺");
+  const gyStance = guangyingItem.system.moves.find(m => m.name === "光影荏苒");
+  gyStance.computedLevel = 1;
+
+  const attacker = makeActor({ id: "atk-skjg", name: "太极攻者", items: [tushouItem] });
+  const defender = makeActor({
+    id: "def-skjg",
+    name: "多Token受击者",
+    hp: 100,
+    stanceBlock: 30,
+    stanceItem: guangyingItem,
+    stanceMoveId: gyStance.id,
+    stanceActive: true,
+    items: [probeTrait]
+  });
+  guangyingItem.parent = defender;
+  registry.set(guangyingItem.uuid, guangyingItem);
+  const yunyingTpl = guangyingItem.effects.getName("蕴影");
+  yunyingTpl.uuid = `${guangyingItem.uuid}.ActiveEffect.yy-skjg`;
+  yunyingTpl.parent = guangyingItem;
+  registry.set(yunyingTpl.uuid, yunyingTpl);
+  const yunyingData = yunyingTpl.toObject();
+  yunyingData.origin = yunyingTpl.uuid;
+  await game.xjzl.api.effects.addEffect(defender, yunyingData);
+
+  const tok1Doc = { id: "tok-1", uuid: "Scene.s1.Token.tok-1", documentName: "Token", name: "分身1", actor: defender };
+  const tok2Doc = { id: "tok-2", uuid: "Scene.s1.Token.tok-2", documentName: "Token", name: "分身2", actor: defender };
+  defender.getActiveTokens = () => [tok1Doc, tok2Doc];
+  registry.set(attacker.uuid, attacker);
+  registry.set(defender.uuid, defender);
+  registry.set(tushouItem.uuid, tushouItem);
+  registry.set(tok1Doc.uuid, tok1Doc);
+  registry.set(tok2Doc.uuid, tok2Doc);
+
+  const atkMsg = makeChatMessage({
+    id: "msg-skjg-atk",
+    flags: {
+      moveId: skjgMove.id,
+      damage: 25,
+      damageType: "neigong",
+      canCrit: false
+    },
+    hitResults: [{ uuid: tok2Doc.uuid, isHit: true, dieUsed: 12 }]
+  });
+
+  await ChatCardManager._applyDamage(attacker, tushouItem, atkMsg.flags["xjzl-system"], [tok2Doc], atkMsg);
+
+  // 司空见惯 preDamage 取消默认伤害，hit 发出 1 张 contest-request 卡
+  assert.equal(seen.length, 0, "司空见惯延期前不应直接触发受击脚本");
+  const contestCard = chatMessages.find(m => m.flags?.["xjzl-system"]?.type === "contest-request");
+  assert.ok(contestCard, "司空见惯应在 hit 阶段发出真实对抗请求卡");
+  const persistedContestFlags = JSON.parse(JSON.stringify(contestCard.flags["xjzl-system"]));
+  assert.equal(persistedContestFlags.defenderUuid, defender.uuid, "对抗卡仍保存 defender Actor UUID");
+  assert.equal(persistedContestFlags.targetTokenUuid, tok2Doc.uuid, "对抗卡应同时保存实际受击的第 2 枚 Token UUID");
+
+  // 结算对抗：对抗伤害应准确落到第 2 枚 Token，而非 null 或第 1 枚 Token
+  await ChatCardManager._executeContestAutomation("attacker", persistedContestFlags, contestCard);
+  assert.deepEqual(seen, [
+    { stage: "preDefense", targetTokenUuid: tok2Doc.uuid, moveName: "司空见惯" },
+    { stage: "preTake", targetTokenUuid: tok2Doc.uuid, moveName: "司空见惯" },
+    { stage: "damaged", targetTokenUuid: tok2Doc.uuid, moveName: "司空见惯" }
+  ]);
+  // 光影刺 蕴影 格挡成功在第 2 枚 Token 周围生成遁光，而非第 1 枚
+  assert.equal(auraCreates.length, 1, "对抗真实结算触发架招蕴影应创建 1 道遁光");
+  assert.equal(auraCreates[0].sourceActor, tok2Doc, "蕴影应定位到实际受击的第 2 枚 Token");
+
+  // 2. 豁免请求卡（即使脚本省略 attacker 且未显式传 targetTokenUuid，或目标为非 owner 代理）：
+  //    真实 _applyDamage -> hit Macros.requestSave({ target: args.target, ... }) -> _rollSave 结算
+  chatMessages.length = 0;
+  seen.length = 0;
+  auraCreates.length = 0;
+
+  const saveDeferredMove = {
+    id: "move-save-deferred",
+    name: "测试延期豁免",
+    type: "real",
+    element: "none",
+    damageType: "waigong",
+    scripts: [
+      {
+        label: "拦截默认伤害",
+        trigger: "preDamage",
+        active: true,
+        script: "args.config.skipDamage = true;"
+      },
+      {
+        label: "发起不带attacker的豁免卡与自检定防泄漏验证",
+        trigger: "hit",
+        active: true,
+        script: `
+          await Macros.requestSave({
+            target: args.target,
+            type: "dingli",
+            dc: 20,
+            label: "延期定力豁免",
+            damageOnFail: { value: 15, type: "waigong" }
+          });
+          // 对攻击者自身发起的检定，绝不能误挂受击目标的 tok2Uuid
+          await Macros.requestSave({
+            target: actor,
+            type: "dingli",
+            dc: 12,
+            label: "出招者自检定"
+          });
+        `
+      }
+    ]
+  };
+  const saveAtkItem = makeAttackItem(saveDeferredMove);
+  const attacker2 = makeActor({ id: "atk-save-2", name: "豁免攻者", items: [saveAtkItem] });
+  const remoteDefender = makeActor({ id: "def-save-2", name: "非owner多Token目标", hp: 100, isOwner: false, items: [probeTrait] });
+  remoteDefender._nextRollTotal = 5;
+  const rTok1 = { id: "rtok-1", uuid: "Scene.s1.Token.rtok-1", documentName: "Token", name: "分身A", actor: remoteDefender };
+  const rTok2 = { id: "rtok-2", uuid: "Scene.s1.Token.rtok-2", documentName: "Token", name: "分身B", actor: remoteDefender };
+  registry.set(attacker2.uuid, attacker2);
+  registry.set(remoteDefender.uuid, remoteDefender);
+  registry.set(rTok1.uuid, rTok1);
+  registry.set(rTok2.uuid, rTok2);
+
+  const saveAtkMsg = makeChatMessage({
+    id: "msg-save-atk",
+    flags: { moveId: saveDeferredMove.id, damage: 15, damageType: "waigong", canCrit: false },
+    hitResults: [{ uuid: rTok2.uuid, isHit: true, dieUsed: 10 }]
+  });
+  await ChatCardManager._applyDamage(attacker2, saveAtkItem, saveAtkMsg.flags["xjzl-system"], [rTok2], saveAtkMsg);
+
+  const saveCards = chatMessages.filter(m => m.flags?.["xjzl-system"]?.type === "save-request");
+  assert.equal(saveCards.length, 2);
+  const targetSaveCard = saveCards[0];
+  const selfSaveCard = saveCards[1];
+  const persistedSaveFlags = JSON.parse(JSON.stringify(targetSaveCard.flags["xjzl-system"]));
+  assert.equal(persistedSaveFlags.targetUuid, remoteDefender.uuid);
+  assert.equal(persistedSaveFlags.targetTokenUuid, rTok2.uuid, "即使省略 attacker 且目标是 Proxy，豁免卡仍应保留第 2 枚受击 Token");
+  assert.equal(selfSaveCard.flags["xjzl-system"].targetTokenUuid, undefined, "对攻击者自身发起的豁免不应误挂敌方受击 Token");
+
+  // _rollSave 结算时校验 isOwner；切回 owner 模拟拥有者/GM 结算失败豁免伤害
+  remoteDefender.isOwner = true;
+  await ChatCardManager._rollSave(persistedSaveFlags, targetSaveCard);
+  assert.deepEqual(seen, [
+    { stage: "preDefense", targetTokenUuid: rTok2.uuid, moveName: null },
+    { stage: "preTake", targetTokenUuid: rTok2.uuid, moveName: null },
+    { stage: "damaged", targetTokenUuid: rTok2.uuid, moveName: null }
+  ]);
 });

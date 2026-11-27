@@ -1298,6 +1298,19 @@ export class ChatCardManager {
     }
 
     /**
+     * 从 Token / TokenDocument / 非链接合成 Actor 中解析具体的受击 Token UUID。
+     * 链接 Actor 本体无法区分场景中多枚同名 Token，返回 null。
+     * @param {Token|TokenDocument|Actor|null} target 目标对象
+     * @returns {string|null} TokenDocument UUID 或 null
+     */
+    static _resolveTargetTokenUuid(target) {
+        return target?.document?.uuid
+            || (target?.documentName === "Token" ? target.uuid : null)
+            || target?.token?.uuid
+            || null;
+    }
+
+    /**
      * 野兽攻击最终结算后的轻量后效：直接状态和需要最终命中的检定都在这里处理。
      * @param {Actor} attacker 发起攻击的野兽
      * @param {Actor} targetActor 最终结算目标
@@ -1305,8 +1318,9 @@ export class ChatCardManager {
      * @param {Object} damageResult applyDamage 返回的最终结果
      * @param {ChatMessage} message 原攻击卡
      * @param {boolean} isHit 最终命中结果
+     * @param {string|null} [targetTokenUuid] 目标受击 Token UUID
      */
-    static async _applyCreaturePostDamage(attacker, targetActor, ability, damageResult, message, isHit) {
+    static async _applyCreaturePostDamage(attacker, targetActor, ability, damageResult, message, isHit, targetTokenUuid = null) {
         if (!ability || !targetActor || !isHit) return;
 
         const directEffects = buildCreatureEffectConfigs(ability.directEffects, {
@@ -1348,6 +1362,7 @@ export class ChatCardManager {
             await XJZLMacros.requestContest({
                 attacker,
                 defender: targetActor,
+                ...(targetTokenUuid ? { targetTokenUuid } : {}),
                 type: panel.attAttr,
                 defType: panel.defAttr,
                 attBonus: panel.attBonus,
@@ -1366,6 +1381,7 @@ export class ChatCardManager {
         const fail = buildCreatureSaveOutcome(panel.fail);
         await XJZLMacros.requestSave({
             target: targetActor,
+            ...(targetTokenUuid ? { targetTokenUuid } : {}),
             attacker,
             type: panel.attr,
             dc: panel.dc,
@@ -1485,6 +1501,7 @@ export class ChatCardManager {
         // 4. 遍历目标
         for (const target of targets) {
             const uuid = target.uuid;
+            const targetTokenUuid = ChatCardManager._resolveTargetTokenUuid(target);
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
@@ -1606,6 +1623,7 @@ export class ChatCardManager {
                 const preDamageContext = {
                     attacker: attacker,
                     target: targetActor,
+                    targetTokenUuid: targetTokenUuid,
                     item: item,
                     move: move,
                     element: moveElement,
@@ -1683,7 +1701,7 @@ export class ChatCardManager {
             } : await targetActor.applyDamage({
                 amount: damageConfig.amount,     // 面板伤害
                 type: damageConfig.type,    // 伤害类型
-                targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
+                targetTokenUuid: targetTokenUuid,
                 attacker: attacker,        // 攻击者
                 isHit: isHit,              // 命中状态
                 isCrit: isCrit,            // 暴击状态 (用于触发特效)
@@ -1709,7 +1727,8 @@ export class ChatCardManager {
                     flags.creatureAbility,
                     damageResult,
                     message,
-                    isHit
+                    isHit,
+                    targetTokenUuid
                 );
             }
 
@@ -1799,6 +1818,7 @@ export class ChatCardManager {
             const hitContext = {
                 ...resultEntry, // 展开上面的结果
                 attacker: attacker,
+                targetTokenUuid: targetTokenUuid,
                 item: item,
                 move: move,
                 actionType: "attack",         //  动作类型，不再使用type，容易和其他的脚本阶段的type混淆
@@ -2150,6 +2170,7 @@ export class ChatCardManager {
         const damageSource = flags.moveId === "opportunity-attack" ? "both" : "basic";
 
         for (const target of targets) {
+            const targetTokenUuid = ChatCardManager._resolveTargetTokenUuid(target);
             const targetActor = target?.actor || target;
             if (!targetActor) continue;
 
@@ -2164,7 +2185,7 @@ export class ChatCardManager {
                 ? await targetActor.applyDamage({
                     amount,
                     type: flags.damageType,
-                    targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
+                    targetTokenUuid,
                     attacker,
                     isHit,
                     isCrit: false,
@@ -2201,7 +2222,8 @@ export class ChatCardManager {
                     ability,
                     damageResult,
                     message,
-                    isHit
+                    isHit,
+                    targetTokenUuid
                 );
             }
 
@@ -2286,6 +2308,7 @@ export class ChatCardManager {
         const moveElement = move ? (move.element || "none") : "none";
 
         for (const target of targets) {
+            const targetTokenUuid = ChatCardManager._resolveTargetTokenUuid(target);
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
@@ -2323,6 +2346,7 @@ export class ChatCardManager {
                 const preDamageContext = {
                     attacker: attacker,
                     target: targetActor,
+                    targetTokenUuid: targetTokenUuid,
                     item: item,
                     move: move,
                     element: moveElement,
@@ -2390,7 +2414,7 @@ export class ChatCardManager {
             } : await targetActor.applyDamage({
                 amount: damageConfig.amount,
                 type: damageConfig.type,    // 沿用招式类型
-                targetTokenUuid: target.document?.uuid || (target.documentName === "Token" ? target.uuid : null),
+                targetTokenUuid: targetTokenUuid,
                 attacker: attacker,
                 isHit: isHit,
                 isCrit: config.isCrit,     // 强制暴击状态
@@ -2477,6 +2501,7 @@ export class ChatCardManager {
             const hitContext = {
                 ...resultEntry,
                 attacker: attacker,
+                targetTokenUuid: targetTokenUuid,
                 item: item,
                 move: move,
                 actionType: "attack", //  动作类型，不再使用type，容易和其他的脚本阶段的type混淆
@@ -2793,7 +2818,7 @@ export class ChatCardManager {
                             const damageResult = await actor.applyDamage({
                                 amount: amount,
                                 type: typeKey,
-                                targetTokenUuid: doc?.documentName === "Token" ? doc.uuid : null,
+                                targetTokenUuid: flags.targetTokenUuid || ChatCardManager._resolveTargetTokenUuid(doc),
                                 attacker: attacker,
                                 isHit: true,
                                 isCrit: damageConfig.isCrit === true,
@@ -3131,9 +3156,11 @@ export class ChatCardManager {
         const config = (winner === "attacker") ? outcomeConfig.win : outcomeConfig.lose;
         if (!config) return logs; // 没有配置
 
-        // 2. 获取 Actor 实例
-        const attacker = (await fromUuid(flags.attackerUuid))?.actor || await fromUuid(flags.attackerUuid);
-        const defender = (await fromUuid(flags.defenderUuid))?.actor || await fromUuid(flags.defenderUuid);
+        // 2. 获取 Actor 实例（保留 Token 文档引用，以便延期对抗伤害定位精确受击 Token）
+        const attackerDoc = await fromUuid(flags.attackerUuid);
+        const defenderDoc = await fromUuid(flags.defenderUuid);
+        const attacker = attackerDoc?.actor || attackerDoc;
+        const defender = defenderDoc?.actor || defenderDoc;
 
         if (!attacker || !defender) return ["错误：无法找到参与者，自动化中止。"];
 
@@ -3151,6 +3178,7 @@ export class ChatCardManager {
             source: flags.source,
             isBroken: flags.isBroken,
             isSkill: flags.isSkill,
+            targetTokenUuid: flags.targetTokenUuid || ChatCardManager._resolveTargetTokenUuid(defenderDoc),
             // 破架统计所需的看破值：随延期请求卡保存，真实后果按原值计入统计
             targetKanpo: flags.targetKanpo
         };
@@ -3293,6 +3321,7 @@ export class ChatCardManager {
             ...(context.source ? { source: context.source } : {}),
             ...(context.isBroken ? { isBroken: true } : {}),
             ...(context.isSkill === false ? { isSkill: false } : {}),
+            ...(context.targetTokenUuid ? { targetTokenUuid: context.targetTokenUuid } : {}),
             ...(Number.isFinite(context.targetKanpo) ? { targetKanpo: context.targetKanpo } : {})
         };
 
@@ -3390,6 +3419,7 @@ export class ChatCardManager {
         const summaryData = [];
 
         for (const target of targets) {
+            const targetTokenUuid = ChatCardManager._resolveTargetTokenUuid(target);
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
@@ -3435,6 +3465,7 @@ export class ChatCardManager {
             const hitContext = {
                 // 1. 核心身份
                 target: targetActor,
+                targetTokenUuid: targetTokenUuid,
                 attacker: attacker,
                 item: item,
                 move: move,
