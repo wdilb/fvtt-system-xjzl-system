@@ -13,6 +13,9 @@ function toPlainMoveSnapshot(move) {
         element: move.element ?? "none",
         damageType: move.damageType ?? null,
         weaponType: move.weaponType ?? null,
+        // 与普通出招的 args.move 对齐：子类型为规则书中文名，空串表示无子类型；
+        // 旧卡/缺字段归一为空串，结算端脚本按空串沿用无子类型行为
+        weaponSubtype: move.weaponSubtype ?? "",
         currentCost: move.currentCost
             ? { mp: move.currentCost.mp || 0, rage: move.currentCost.rage || 0, hp: move.currentCost.hp || 0 }
             : null
@@ -190,7 +193,7 @@ export class XJZLMacros {
      *
      * 延期原攻击的来源恢复 (可选；通用无来源请求不传，保持缺省行为)：
      * @param {Item|String} [options.item] 原攻击来源 Item 文档或 UUID；随卡保存 UUID，结算时还原
-     * @param {Object} [options.move] 原攻击招式；只随卡保存 id/name/type/element/damageType/weaponType/currentCost 普通字段
+     * @param {Object} [options.move] 原攻击招式；只随卡保存 id/name/type/element/damageType/weaponType/weaponSubtype/currentCost 普通字段
      * @param {String} [options.source] 真实伤害后果的 applyDamage source (如 "move"/"basic"/"both")；默认 "extra"
      * @param {Boolean} [options.isBroken] 真实伤害后果保留的破架状态；默认 false
      * @param {Boolean} [options.isSkill] 真实伤害后果是否按招式伤害计入技能抗性；默认 true

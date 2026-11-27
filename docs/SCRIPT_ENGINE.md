@@ -1019,7 +1019,7 @@ await Macros.requestSave({
 | `onSuccess` / `onFail` | 状态 ID、AE 数据或数组，可选 | 结果状态；AE 对象可带一次施加层数 `count`，见[请求状态后果](#请求状态后果)。不能传函数，函数会被忽略并警告。 |
 | `damageOnSuccess` / `damageOnFail` | `{ value, type, ... }`，可选 | 对应结果的伤害或资源流失；字段与默认值见[请求后果](#请求后果)。 |
 | `item` | `Item` 或 UUID 字符串，可选 | 延期原攻击的来源 Item；卡片只保存 UUID，本地或 GM 结算时还原，使[空]、北冥护体等受击脚本读到正确来源。 |
-| `move` | `Object`，可选 | 延期原攻击的招式；卡片只保存 `id`/`name`/`type`/`element`/`damageType`/`weaponType`/`currentCost` 普通字段，不保存描述或脚本数组。 |
+| `move` | `Object`，可选 | 延期原攻击的招式；卡片只保存 `id`/`name`/`type`/`element`/`damageType`/`weaponType`/`weaponSubtype`/`currentCost` 普通字段，不保存描述或脚本数组。 |
 | `source` | `string`，可选 | 真实伤害后果的 `applyDamage` 来源（如 `move`/`basic`/`both`）；不传保持缺省 `extra`。 |
 | `isBroken` / `isSkill` | `boolean`，可选 | 真实伤害后果保留的破架状态（默认 `false`）与是否按招式伤害计入技能抗性（默认 `true`）。 |
 | `targetKanpo` | `number`，默认 `0` | 从 `hit`/`preDamage` 的 `args.targetKanpo` 读取，随延期原攻击传递，用于破架统计。 |
