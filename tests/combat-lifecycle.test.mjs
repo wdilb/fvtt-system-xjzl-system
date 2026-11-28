@@ -267,6 +267,7 @@ function makeLifecycleActor(uuid, name, { ownership = null, hp = 50, mp = 10 } =
     items: { get: () => null, find: () => null, some: () => false, filter: () => [] },
     healCalls: [],
     regenCalls: [],
+    regenTargetTokenUuids: [],
     collectedByTrigger: new Map(),
     testUserPermission(user, permission) {
       // 与核心口径一致的简化判定：GM 恒为 OWNER，其余按 ownership 表；权限串转数值。
@@ -280,7 +281,10 @@ function makeLifecycleActor(uuid, name, { ownership = null, hp = 50, mp = 10 } =
   };
   actor.damageCalls = [];
   actor.applyDamage = async data => { actor.damageCalls.push(data); return { finalDamage: data.amount ?? 0, hpLost: data.amount ?? 0 }; };
-  actor.processRegen = async timing => { actor.regenCalls.push(timing); };
+  actor.processRegen = async (timing, targetTokenUuid) => {
+    actor.regenCalls.push(timing);
+    actor.regenTargetTokenUuids.push(targetTokenUuid ?? null);
+  };
   actor.showFloatyText = async () => {};
   return actor;
 }
@@ -339,10 +343,11 @@ console.log("A. 活动 GM 本地执行契约");
   stubCollectScripts(actor, {
     turnStart: [{ script: "game.__log.push({round, turn, combatId: combat.id, argsRound: args.round, argsTurn: args.turn, selfCombatant: combatant.actor === actor});", label: "s", source: null }]
   });
-  const combatant = { id: "c1", actor, token: { name: "甲Token" } };
+  const combatant = { id: "c1", actor, token: { name: "甲Token", uuid: "Scene.s1.Token.a2" } };
   combat.combatants.push(combatant);
   await runCombatLifecycleScripts({ combat, combatants: combatant, trigger: "turnStart", round: 3, turn: 2 });
   assert.deepEqual(actor.regenCalls, ["TurnStart"], "turnStart 先执行 processRegen(TurnStart)");
+  assert.deepEqual(actor.regenTargetTokenUuids, ["Scene.s1.Token.a2"], "自动回复与流血伤害继承事件 Token");
   assert.deepEqual(gameMock.__log, [{ round: 3, turn: 2, combatId: combat.id, argsRound: 3, argsTurn: 2, selfCombatant: true }],
     "脚本读取事件 round/turn 快照与 args.combat/combatant");
 }

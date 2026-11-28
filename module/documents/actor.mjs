@@ -2374,7 +2374,7 @@ export class XJZLActor extends Actor {
     return this._applyDamage(data);
   }
 
-  /** applyDamage 的异步实现体；除同步防护入口外与原行为一致。 */
+  /** 结算实际伤害，并按本次受击 Token 定位视觉反馈。 */
   async _applyDamage(data) {
     // [权限拦截]
     if (!this.isOwner) {
@@ -2383,9 +2383,13 @@ export class XJZLActor extends Actor {
       return unwrapResourceSocketResult(await xjzlSocket.executeAsGM("applyDamage", this.uuid, socketData));
     }
 
+    const resolvedTargetTokenUuid = data?.targetTokenUuid || this.token?.uuid || null;
+    const showDamageFloaty = (content, style) =>
+      this.showFloatyText(content, style, resolvedTargetTokenUuid, true);
+
     // --- 容器受到攻击不处理，或者返回0伤害 ---
     if (this.type === "container") {
-      this.showFloatyText("无效", { fill: "#cccccc" });
+      showDamageFloaty("无效", { fill: "#cccccc" });
       return { finalDamage: 0 };
     }
 
@@ -2397,7 +2401,7 @@ export class XJZLActor extends Actor {
 
       // 1. 未命中直接返回
       if (!isHit) {
-        this.showFloatyText("闪避", { fontSize: 32, fill: "#ffffff" });
+        showDamageFloaty("闪避", { fontSize: 32, fill: "#ffffff" });
         return { finalDamage: 0, isDead: false };
       }
 
@@ -2447,21 +2451,23 @@ export class XJZLActor extends Actor {
             { "system.resources.tili.value": newVal },
             creatureResourceContext
           );
-          actualTiliLost = actualLost;
+          actualTiliLost = Math.min(actualLost, Math.max(0, current - this.system.resources.tili.value));
 
-          // 飘字
-          let flavor = `-${actualLost} 体力`;
-          let color = "#ff0000";
-          let size = 32;
+          // 视觉反馈按更新后实际体力差值生成，避免取消或裁剪更新仍显示预估损失。
+          if (actualTiliLost > 0) {
+            let flavor = `-${actualTiliLost} 体力`;
+            let color = "#ff0000";
+            let size = 32;
 
-          // 暴击时的视觉反馈
-          if (isCrit) {
-            flavor = `暴击! ${flavor}`;
-            size = 48;
-            color = "#ff4500";
+            // 暴击时的视觉反馈
+            if (isCrit) {
+              flavor = `暴击! ${flavor}`;
+              size = 48;
+              color = "#ff4500";
+            }
+
+            showDamageFloaty(flavor, { fill: color, fontSize: size });
           }
-
-          this.showFloatyText(flavor, { fill: color, fontSize: size });
 
           // 死亡检查
           if (newVal <= 0) {
@@ -2476,7 +2482,7 @@ export class XJZLActor extends Actor {
         }
       } else {
         // 未破防
-        this.showFloatyText("未破防", { fill: "#cccccc" });
+        showDamageFloaty("未破防", { fill: "#cccccc" });
       }
 
       const finalDamageResult = {
@@ -2545,15 +2551,12 @@ export class XJZLActor extends Actor {
       isHit = true,       // 是否命中
       isBroken = false,   // 是否被破防 (状态，不可逆)
       brokenStance = null,// 本次受击刚被击破的原架招快照 { itemId, moveId }
-      targetTokenUuid = null, // 实际受击 Token UUID（同一 Actor 多 Token 时用于空间效果精确定位）
       targetKanpo = 0,    // 接收敌方看破值，用于战斗统计功能
       isSkill = true,     // false表示普通攻击
       move = null,
       item = null,
       source = "extra"    // 伤害来源标识 (move, basic, both, dot, extra)，默认是extra也就是额外伤害，用来处理哪些伤害应该触发濒死、易伤等问题
     } = data;
-
-    const resolvedTargetTokenUuid = targetTokenUuid || this.token?.uuid || null;
 
     // 仅当本次确实破架且传入了有效架招快照时补收原架招受击脚本；
     // 不挂 Actor 状态，确保多段后续跳与嵌套反伤不会重复触发。
@@ -2602,7 +2605,7 @@ export class XJZLActor extends Actor {
       await this._runDamageScripts(SCRIPT_TRIGGERS.AVOIDED, avoidContext, { committed: false });
 
       // 飘字：闪避
-      this.showFloatyText("闪避", { fontSize: 32, fill: "#ffffff" });
+      showDamageFloaty("闪避", { fontSize: 32, fill: "#ffffff" });
 
       return { finalDamage: 0, hpLost: 0, isDead: false };
     }
@@ -2740,7 +2743,7 @@ export class XJZLActor extends Actor {
 
     // 脚本可能强行中止 (如无敌)
     if (takeContext.output.abort) {
-      this.showFloatyText("免疫", { fill: "#ffff00" });
+      showDamageFloaty("免疫", { fill: "#ffff00" });
       return { finalDamage: 0, hpLost: 0, isDead: false };
     }
 
@@ -2843,6 +2846,7 @@ export class XJZLActor extends Actor {
     if (totalMpLost > 0) updates["system.resources.mp.value"] = currentMP;
 
     let resourceTransaction = { result: null, changes: [] };
+    let actualDamageChanges = [];
     // committed 必须反映真实提交结果：更新被 preUpdate 取消或无实际差值时按未提交处理，
     // 不能因进入濒死/死亡/受击后效阶段就假定主资源已提交。
     let mainResourceCommitted = false;
@@ -2865,7 +2869,8 @@ export class XJZLActor extends Actor {
           item,
           source
         }, {}, { lockHeld: true });
-        mainResourceCommitted = this._computeResourceChanges(applicableFields, beforeDamage).length > 0;
+        actualDamageChanges = this._computeResourceChanges(applicableFields, beforeDamage);
+        mainResourceCommitted = actualDamageChanges.length > 0;
       });
     }
 
@@ -2985,59 +2990,76 @@ export class XJZLActor extends Actor {
     // 10. 视觉与回怒 (Visuals & Rage)
     // =====================================================
 
-    // A. 飘字
-    if (this.token?.object) {
-      const stdTotal = stdHutiLost + stdHpLost;
-      if (stdTotal > 0) {
-        let flavor = `-${stdTotal}`;
-        let color = "#ff0000";
-        let size = 32;
+    // A. 飘字由接收端在各自的场景中定位，结算端无需绘制目标 Token。
+    // 同一资源可能先承受常规伤害再承受流失，按结算顺序将已提交损失归入两类飘字。
+    const actualResourceLosses = new Map(actualDamageChanges.map(change => [
+      change.resource,
+      Math.max(0, -change.delta)
+    ]));
+    const actualHutiLost = Math.min(totalHutiLost, actualResourceLosses.get("huti") || 0);
+    const actualHpLost = Math.min(totalHpLost, actualResourceLosses.get("hp") || 0);
+    const actualMpLost = Math.min(totalMpLost, actualResourceLosses.get("mp") || 0);
+    const actualStdHutiLost = Math.min(stdHutiLost, actualHutiLost);
+    const actualStdHpLost = Math.min(stdHpLost, actualHpLost);
+    const actualStdMpLost = Math.min(stdMpLost, actualMpLost);
+    const actualLiuHutiLost = actualHutiLost - actualStdHutiLost;
+    const actualLiuHpLost = actualHpLost - actualStdHpLost;
+    const actualLiuMpLost = actualMpLost - actualStdMpLost;
+    const actualStdTotal = actualStdHutiLost + actualStdHpLost;
+    if (actualStdTotal > 0) {
+      let flavor = `-${actualStdTotal}`;
+      let color = "#ff0000";
+      let size = 32;
 
-        if (config.isCrit) { // 使用最终暴击状态判断颜色
-          flavor = `暴击! ${flavor}`;
-          size = 48;
-          color = "#ff4500";
-        }
-        if (stdHutiLost > 0 && stdHpLost === 0) {
-          color = "#00ffff";
-          flavor = `护体 -${stdHutiLost}`;
-        }
-
-        this.showFloatyText(flavor, { fontSize: size, fill: color, anchor: 0 });
+      if (config.isCrit) { // 使用最终暴击状态判断颜色
+        flavor = `暴击! ${flavor}`;
+        size = 48;
+        color = "#ff4500";
+      }
+      if (actualStdHutiLost > 0 && actualStdHpLost === 0) {
+        color = "#00ffff";
+        flavor = `护体 -${actualStdHutiLost}`;
       }
 
-      // --- 内力扣除  ---
-      // 濒死抵扣或以蓝代血时触发
-      if (stdMpLost > 0) {
-        // 蓝色字体表示内力损耗
-        let mpFlavor = `内力 -${stdMpLost}`;
-        if (config.isCrit && stdTotal === 0) { // 如果全是暴击造成的内力伤，也可以加暴击前缀
-          mpFlavor = `暴击! ${mpFlavor}`;
-        }
-        this.showFloatyText(mpFlavor, {
-          fontSize: 32,
-          fill: "#4444ff",
-          anchor: CONST.TEXT_ANCHOR_POINTS.CENTER,
-          jitter: 0.35 // 稍微增加抖动以错开位置
-        });
+      showDamageFloaty(flavor, { fontSize: size, fill: color, anchor: 0 });
+    }
+
+    // --- 内力扣除  ---
+    // 濒死抵扣或以蓝代血时触发
+    if (actualStdMpLost > 0) {
+      // 蓝色字体表示内力损耗
+      let mpFlavor = `内力 -${actualStdMpLost}`;
+      if (config.isCrit && actualStdTotal === 0) { // 如果全是暴击造成的内力伤，也可以加暴击前缀
+        mpFlavor = `暴击! ${mpFlavor}`;
       }
+      showDamageFloaty(mpFlavor, {
+        fontSize: 32,
+        fill: "#4444ff",
+        anchor: CONST.TEXT_ANCHOR_POINTS.CENTER,
+        jitter: 0.35 // 稍微增加抖动以错开位置
+      });
+    }
 
-      // --- 流失伤害 (易伤/撕裂/中毒) 处理 ---
-      // 包含内力流失检查，防止仅流失内力时不提示
-      const liuTotal = liuHutiLost + liuHpLost + liuMpLost;
+    // --- 流失伤害 (易伤/撕裂/中毒) 处理 ---
+    // 包含内力流失检查，防止仅流失内力时不提示
+    const liuTotal = liuHutiLost + liuHpLost + liuMpLost;
+    const actualLiuTotal = actualLiuHutiLost + actualLiuHpLost + actualLiuMpLost;
+    if (actualLiuTotal > 0) {
+      const hpAndHutiLoss = actualLiuHutiLost + actualLiuHpLost;
+      const flavor = hpAndHutiLoss > 0
+        ? `流失 -${hpAndHutiLoss}${actualLiuMpLost > 0 ? `，内力 -${actualLiuMpLost}` : ""}`
+        : `流失 内力 -${actualLiuMpLost}`;
+      showDamageFloaty(flavor, { fontSize: 28, fill: "#8b0000", anchor: 1 });
+    }
 
-      if (liuTotal > 0) {
-        // 1. 保持原有的飘字
-        this.showFloatyText(`流失 -${liuHutiLost + liuHpLost}`, { fontSize: 28, fill: "#8b0000", anchor: 1 });
+    // 仅对结算端画布上的合成 Token 发送流失聊天卡。
+    if (actualLiuTotal > 0 && this.token?.object) {
+      const parts = [];
+      if (actualLiuHutiLost > 0) parts.push(`护体 <span style="font-weight:bold;">-${actualLiuHutiLost}</span>`);
+      if (actualLiuHpLost > 0) parts.push(`气血 <span style="font-weight:bold;">-${actualLiuHpLost}</span>`);
+      if (actualLiuMpLost > 0) parts.push(`内力 <span style="font-weight:bold;">-${actualLiuMpLost}</span>`);
 
-        // 2. 发送流失结算卡片
-        // 只有当有实际数值损失时才生成文本
-        let parts = [];
-        if (liuHutiLost > 0) parts.push(`护体 <span style="font-weight:bold;">-${liuHutiLost}</span>`);
-        if (liuHpLost > 0) parts.push(`气血 <span style="font-weight:bold;">-${liuHpLost}</span>`);
-        if (liuMpLost > 0) parts.push(`内力 <span style="font-weight:bold;">-${liuMpLost}</span>`);
-
-        const cardContent = `
+      const cardContent = `
           <div class="xjzl-chat-card" style="padding: 4px 8px; border-left: 3px solid #8b0000; background: rgba(139, 0, 0, 0.05); font-size: 0.9em; color: #666;">
               <div style="font-weight: bold; color: #8b0000; margin-bottom: 2px;">
                   <i class="fas fa-tint"></i> 触发气血流失
@@ -3046,26 +3068,22 @@ export class XJZLActor extends Actor {
                   ${parts.join('<span style="color:#ccc;">|</span>')}
               </div>
           </div>
-        `;
+      `;
 
-        // 发送给所有玩家看 (type: OTHER)
-        ChatMessage.create({
-          author: game.user.id,
-          speaker: ChatMessage.getSpeaker({ actor: this }),
-          content: cardContent,
-          style: CONST.CHAT_MESSAGE_STYLES.OTHER
-        });
-      }
-
-      // 必须所有类型的损失都为0才算无伤
-      const totalLoss = stdTotal + stdMpLost + liuTotal;
-
-      if (totalLoss === 0 && isHit) {
-        this.showFloatyText("无伤", { fill: "#cccccc" });
-      }
-
+      // 发送给所有玩家看 (type: OTHER)
+      ChatMessage.create({
+        author: game.user.id,
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: cardContent,
+        style: CONST.CHAT_MESSAGE_STYLES.OTHER
+      });
     }
 
+    // 必须所有类型的损失都为0才算无伤
+    const totalLoss = actualStdTotal + actualStdMpLost + actualLiuTotal;
+    if (totalLoss === 0 && isHit && stdHutiLost + stdHpLost + stdMpLost + liuTotal === 0) {
+      showDamageFloaty("无伤", { fill: "#cccccc" });
+    }
 
     // B. 被击回怒
     let rageGained = false;
@@ -3152,9 +3170,9 @@ export class XJZLActor extends Actor {
     // 附带流失也可能穿透护体；只给视觉合并损失，不改变脚本和返回值中的常规伤害契约。
     queueHitEffect(this, data, {
       finalDamage,
-      hpLost: totalHpLost,
-      hutiLost: totalHutiLost,
-      mpLost: totalMpLost
+      hpLost: actualHpLost,
+      hutiLost: actualHutiLost,
+      mpLost: actualMpLost
     }, xjzlSocket, config);
 
     return finalDamageResult;
@@ -3480,8 +3498,9 @@ export class XJZLActor extends Actor {
   /**
    * 处理自动化回复/消耗
    * @param {String} timing 时机标识: "TurnStart", "TurnEnd", "Attack"
+   * @param {string|null} targetTokenUuid - 回合时传入参战 Token，用于精确定位回合流血飘字
    */
-  async processRegen(timing) {
+  async processRegen(timing, targetTokenUuid = null) {
     // --- 容器没有自动回复 ---
     if (this.type === "container") return;
 
@@ -3622,7 +3641,8 @@ export class XJZLActor extends Actor {
           ignoreBlock: true,  // 无法被格挡
           ignoreStance: true, // 无视架招反击
           ignoreDefense: true, // 无视常规内外功护甲，仅拼抗性
-          source: "dot" //这是一种dot伤害
+          source: "dot", // 这是一种dot伤害
+          targetTokenUuid
         });
 
         // 构造专属的流血战报发送给聊天栏
@@ -5601,8 +5621,10 @@ export class XJZLActor extends Actor {
    * @param {number} [style.jitter=0.25] - 抖动幅度
    * @param {number} [style.anchor] - 锚点
    * @param {number} [style.direction] - 飘动方向
+   * @param {string|null} [targetTokenUuid] - 指定的 TokenDocument UUID；缺省时由接收端通过 Actor 定位
+   * @param {boolean} [linkedOnly=false] - Actor 回退定位时仅从关联 Token 中选择
    */
-  async showFloatyText(content, style = {}) {
+  async showFloatyText(content, style = {}, targetTokenUuid = null, linkedOnly = false) {
     // 1. 定义系统默认样式
     const defaults = {
       anchor: CONST.TEXT_ANCHOR_POINTS.CENTER,
@@ -5618,9 +5640,8 @@ export class XJZLActor extends Actor {
     const finalStyle = { ...defaults, ...style };
 
     // 3. 调用 Socket 广播
-    // 传入 this.uuid，Socket端会自动解析
     if (xjzlSocket) {
-      await xjzlSocket.executeForEveryone("showScrollingText", this.uuid, content, finalStyle);
+      await xjzlSocket.executeForEveryone("showScrollingText", targetTokenUuid || this.uuid, content, finalStyle, linkedOnly);
     } else {
       console.warn("XJZL | Socket 未初始化，无法飘字");
     }

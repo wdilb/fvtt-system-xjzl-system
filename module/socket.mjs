@@ -366,7 +366,7 @@ async function _socketAuraDismiss(sceneUuid, labelOrRegionId, sourceTokenUuid = 
  * @param {string} text - 显示文本
  * @param {Object} settings - 样式配置 (fill, stroke, jitter 等)
  */
-async function _socketShowScrollingText(tokenUuid, text, settings) {
+async function _socketShowScrollingText(tokenUuid, text, settings, linkedOnly = false) {
     // 1. 解析目标
     // 尝试直接获取 Token，如果传入的是 Actor UUID，尝试获取其在当前场景的 Token
     const doc = await fromUuid(tokenUuid);
@@ -375,10 +375,12 @@ async function _socketShowScrollingText(tokenUuid, text, settings) {
     if (doc instanceof TokenDocument) {
         tokenObject = doc.object;
     } else if (doc instanceof Actor) {
-        // 如果是 Actor，找当前画布上的 Token
-        // getActiveTokens(false) 返回的是 PlaceableObject (即 token.object)
-        const tokens = doc.getActiveTokens(false);
-        if (tokens.length > 0) tokenObject = tokens[0];
+        // 伤害飘字限制为关联 Token；其他 Actor 飘字保留原有的活动 Token 回退。
+        // 合成 Actor 即使要求仅关联 Token，也会返回其所属的唯一 Token。
+        const activeTokens = doc.getActiveTokens(linkedOnly);
+        tokenObject = linkedOnly
+            ? activeTokens.find(token => token?.renderable && (token.visible || game.user.isGM)) || null
+            : activeTokens[0] || null;
     }
 
     // 2. 存在性检查

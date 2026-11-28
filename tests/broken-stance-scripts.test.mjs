@@ -37,7 +37,8 @@ const setProperty = (object, path, value) => {
 
 globalThis.CONST = {
   DOCUMENT_OWNERSHIP_LEVELS: { NONE: 0, LIMITED: 1, OBSERVER: 2, OWNER: 3 },
-  CHAT_MESSAGE_STYLES: { OTHER: 0 }
+  CHAT_MESSAGE_STYLES: { OTHER: 0 },
+  TEXT_ANCHOR_POINTS: { CENTER: 0, TOP: 2 }
 };
 
 globalThis.foundry = {
@@ -72,6 +73,7 @@ const translations = JSON.parse(readFileSync(resolve(root, "lang/zh-cn.json"), "
 const chatMessages = [];
 const notices = [];
 const socketCalls = [];
+const hitEffectCalls = [];
 const auraDismissCalls = [];
 const auraCreates = [];
 const addedEffects = [];
@@ -193,7 +195,8 @@ const socketStub = {
   executeAsGM: async (...args) => {
     socketCalls.push(args);
     return { ok: true, result: { finalDamage: 0, hpLost: 0, isDead: false } };
-  }
+  },
+  executeForEveryone: async (...args) => { socketCalls.push(args); }
 };
 
 const stubs = new Map([
@@ -206,7 +209,7 @@ const stubs = new Map([
       promptControllerAttributeTestConfig: async () => null
     }
   }],
-  ["module/managers/combat-fx-manager.mjs", { queueHitEffect: () => {} }],
+  ["module/managers/combat-fx-manager.mjs", { queueHitEffect: (...args) => hitEffectCalls.push(args) }],
   ["module/region/xjzl-aura-manager.mjs", { AuraManager: { dismissBySource: async call => auraDismissCalls.push(call) } }],
   ["module/applications/action-tracker.mjs", { ActionTracker: { consumeAction: () => {} } }],
   ["module/managers/target-manager.mjs", { TargetManager: {} }],
@@ -472,6 +475,7 @@ function resetMocks() {
   chatMessages.length = 0;
   notices.length = 0;
   socketCalls.length = 0;
+  hitEffectCalls.length = 0;
   auraDismissCalls.length = 0;
   auraCreates.length = 0;
   addedEffects.length = 0;
@@ -951,6 +955,7 @@ test("跨客户端 GM 委托：非 owner 目标 applyDamage 通过 serializeReso
   });
   const attacker = makeActor({ id: "remote-atk", name: "本地攻击者" });
   const brokenStance = { itemId: "wuxue-1", moveId: "stance-9" };
+  const targetTokenUuid = "Scene.s1.Token.remote-def";
 
   await remoteTarget.applyDamage({
     amount: 20,
@@ -959,6 +964,7 @@ test("跨客户端 GM 委托：非 owner 目标 applyDamage 通过 serializeReso
     isHit: true,
     isBroken: true,
     brokenStance,
+    targetTokenUuid,
     targetKanpo: 18
   });
 
@@ -969,6 +975,7 @@ test("跨客户端 GM 委托：非 owner 目标 applyDamage 通过 serializeReso
   assert.equal(payload.isBroken, true);
   assert.equal(payload.targetKanpo, 18);
   assert.equal(payload.attackerUuid, attacker.uuid);
+  assert.equal(payload.targetTokenUuid, targetTokenUuid);
   assert.deepEqual(payload.brokenStance, brokenStance);
 });
 
@@ -1132,6 +1139,111 @@ test("阶段二官方武学源数据：5 个二次失效架招在破架流程中
   }
 });
 
+test("伤害飘字优先广播受击 Token UUID，缺省时按合成 Token 或 Actor 定位", async () => {
+  resetMocks();
+  const linked = makeActor();
+  delete linked.showFloatyText;
+  const targetTokenUuid = "Scene.s1.Token.linked-2";
+  const hit = await linked.applyDamage({ amount: 20, type: "waigong", targetTokenUuid });
+  assert.equal(hit.hpLost, 20);
+  await linked.applyDamage({ amount: 20, type: "waigong", targetTokenUuid, isHit: false });
+  await linked.applyDamage({ amount: 0, type: "waigong" });
+
+  const unlinked = makeActor();
+  unlinked.token = { uuid: "Scene.s1.Token.unlinked", object: null };
+  unlinked.uuid = `${unlinked.token.uuid}.Actor.${unlinked.id}`;
+  delete unlinked.showFloatyText;
+  await unlinked.applyDamage({ amount: 20, type: "waigong" });
+
+  const bleeding = makeActor();
+  bleeding.xjzlStatuses.takeBleedDamageTurnStart = 5;
+  let bleedDamage;
+  bleeding.applyDamage = async data => {
+    bleedDamage = data;
+    return { finalDamage: 0 };
+  };
+  await bleeding.processRegen("TurnStart", "Scene.s1.Token.bleeding");
+
+  assert.deepEqual(socketCalls.map(call => call.slice(0, 3)), [
+    ["showScrollingText", targetTokenUuid, "-20"],
+    ["showScrollingText", targetTokenUuid, "闪避"],
+    ["showScrollingText", linked.uuid, "无伤"],
+    ["showScrollingText", unlinked.token.uuid, "-20"]
+  ]);
+  assert.deepEqual(socketCalls.map(call => call[4]), [true, true, true, true], "伤害飘字应要求接收端只定位关联 Token");
+  assert.equal(bleedDamage.targetTokenUuid, "Scene.s1.Token.bleeding");
+
+  await linked.showFloatyText("治疗", {});
+  assert.equal(socketCalls.at(-1)[4], false, "非伤害飘字应保留全部活动 Token 的 Actor 回退");
+
+  const regenerating = makeActor({ mp: 10 });
+  delete regenerating.showFloatyText;
+  regenerating.xjzlStatuses.regenMpTurnStart = 1;
+  await regenerating.processRegen("TurnStart", "Scene.s1.Token.regenerating");
+  assert.equal(socketCalls.at(-1)[1], regenerating.uuid, "自动回复飘字应保持原有 Actor 定位");
+  assert.equal(socketCalls.at(-1)[4], false, "自动回复飘字不应启用伤害专用的关联 Token 限制");
+});
+
+test("伤害飘字反映已提交的资源损失，并为纯内力流失显示正确数值", async () => {
+  resetMocks();
+  const cancelled = makeActor();
+  cancelled._commitResourceChanges = async () => ({ result: null, changes: [] });
+  cancelled.token = { uuid: "Scene.s1.Token.cancelled", object: {} };
+  cancelled.xjzlStatuses.bleedOnHit = 5;
+  await cancelled.applyDamage({ amount: 10, type: "waigong", source: "move" });
+  assert.equal(cancelled.system.resources.hp.value, 100);
+  assert.deepEqual(cancelled.floatyTexts, [], "资源更新取消时不应显示预估伤害");
+  assert.equal(chatMessages.some(message => message.content.includes("触发气血流失")), false, "取消的流失不应发聊天卡");
+  assert.deepEqual(hitEffectCalls.at(-1)[2], {
+    finalDamage: 10, hpLost: 0, hutiLost: 0, mpLost: 0
+  }, "取消的资源更新不应播放受击特效");
+
+  const partial = makeActor();
+  partial._commitResourceChanges = async function (updates, context, operation, options) {
+    return XJZLActor.prototype._commitResourceChanges.call(this, {
+      ...updates,
+      "system.resources.hp.value": 95
+    }, context, operation, options);
+  };
+  await partial.applyDamage({ amount: 10, type: "waigong" });
+  assert.equal(partial.system.resources.hp.value, 95);
+  assert.deepEqual(partial.floatyTexts.map(({ text }) => text), ["-5"], "飘字金额应取实际提交差值");
+
+  const mpOnly = makeActor({ hp: 0, mp: 20 });
+  mpOnly.xjzlStatuses.bleedOnHit = 5;
+  await mpOnly.applyDamage({ amount: 5, type: "waigong", source: "dot" });
+  assert.deepEqual(mpOnly.floatyTexts.map(({ text }) => text), ["内力 -1", "流失 内力 -5"]);
+});
+
+test("野兽体力更新取消时不显示预估扣减或受击特效", async () => {
+  resetMocks();
+  const beast = makeActor();
+  beast.type = "creature";
+  beast.system.resources.tili = { value: 10, max: 10 };
+  setProperty(beast._source, "system.resources.tili.value", 10);
+  beast.system.combat.protectionTotal = 5;
+  beast._commitResourceChanges = async () => ({ result: null, changes: [] });
+
+  const result = await beast.applyDamage({ amount: 10, type: "waigong", isHit: true });
+
+  assert.equal(result.tiliLost, 2, "伤害结果仍保留原有的理论体力损失契约");
+  assert.equal(beast.system.resources.tili.value, 10);
+  assert.deepEqual(beast.floatyTexts, [], "取消体力更新时不应显示预估扣减");
+  assert.deepEqual(hitEffectCalls.at(-1)[2], {
+    finalDamage: 2, tiliLost: 0
+  }, "取消体力更新时不应播放受击特效");
+
+  const fatalBeast = makeActor();
+  fatalBeast.type = "creature";
+  fatalBeast.system.resources.tili = { value: 1, max: 10 };
+  setProperty(fatalBeast._source, "system.resources.tili.value", 1);
+  fatalBeast.system.combat.protectionTotal = 5;
+  fatalBeast._commitResourceChanges = async () => ({ result: null, changes: [] });
+  const fatalResult = await fatalBeast.applyDamage({ amount: 10, type: "waigong", isHit: true });
+  assert.equal(fatalResult.isDead, true, "保持既有的致死判定与返回值");
+  assert.ok(statusCalls.some(call => call.actor === fatalBeast.uuid && call.statusId === "dead"), "致死判定仍写入死亡状态");
+});
+
 test("防御侧全受击阶段与延期对抗结算均保留精确的 targetTokenUuid", async () => {
   resetMocks();
   const seen = [];
@@ -1280,6 +1392,7 @@ test("多 Token 链接角色真实发卡到结算全链路：「司空见惯」�
   assert.equal(persistedContestFlags.targetTokenUuid, tok2Doc.uuid, "对抗卡应同时保存实际受击的第 2 枚 Token UUID");
 
   // 结算对抗：对抗伤害应准确落到第 2 枚 Token，而非 null 或第 1 枚 Token
+  delete defender.showFloatyText;
   await ChatCardManager._executeContestAutomation("attacker", persistedContestFlags, contestCard);
   assert.deepEqual(seen, [
     { stage: "preDefense", targetTokenUuid: tok2Doc.uuid, moveName: "司空见惯" },
@@ -1361,10 +1474,14 @@ test("多 Token 链接角色真实发卡到结算全链路：「司空见惯」�
 
   // _rollSave 结算时校验 isOwner；切回 owner 模拟拥有者/GM 结算失败豁免伤害
   remoteDefender.isOwner = true;
+  delete remoteDefender.showFloatyText;
   await ChatCardManager._rollSave(persistedSaveFlags, targetSaveCard);
   assert.deepEqual(seen, [
     { stage: "preDefense", targetTokenUuid: rTok2.uuid, moveName: null },
     { stage: "preTake", targetTokenUuid: rTok2.uuid, moveName: null },
     { stage: "damaged", targetTokenUuid: rTok2.uuid, moveName: null }
+  ]);
+  assert.deepEqual(socketCalls.filter(([event]) => event === "showScrollingText").map(([, uuid]) => uuid), [
+    tok2Doc.uuid, rTok2.uuid
   ]);
 });

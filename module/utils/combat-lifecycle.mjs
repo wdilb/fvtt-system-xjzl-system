@@ -54,7 +54,7 @@ export async function runCombatLifecycleScripts({ combat, combatants, trigger, r
     const context = { combat, combatant, round, turn };
     try {
       if (regenTiming) {
-        await actor.processRegen(regenTiming);
+        await actor.processRegen(regenTiming, combatant.token?.uuid ?? null);
         // 自动回复内部可能等待资源事件中的问询或死亡结算；期间事件作用域
         // 或本次参战者身份可能失效，不得继续扣资源、施加效果或弹窗。
         if (!isCombatEventLive(combat) || combat.combatants.get(combatant.id) !== combatant) return;

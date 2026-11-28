@@ -1238,7 +1238,7 @@ try {
     amount: 5,
     type: "liushi",
     attacker: args.attacker || null,
-    targetTokenUuid: actor.token?.document?.uuid || null,
+    targetTokenUuid: args.targetTokenUuid || actor.token?.document?.uuid || null,
     move: args.move || null,
     item: args.item || null,
     isHit: true
