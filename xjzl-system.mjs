@@ -1165,8 +1165,15 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
       await game.xjzl.api.effects.addEffect(actor, dataToAdd);
     });
 
-    // 绑定右键 (减层/移除)
-    newIcon.addEventListener("contextmenu", async (event) => {
+    // 阻止浏览器在状态图标上打开右键菜单。
+    newIcon.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    // Foundry V14 在 HUD 根节点处理 auxclick，在图标上拦截同一事件以免原生逻辑整条移除。
+    newIcon.addEventListener("auxclick", async (event) => {
+      if (event.button !== 2) return;
       event.preventDefault();
       event.stopPropagation();
       await game.xjzl.api.effects.removeEffect(actor, slug, 1);
