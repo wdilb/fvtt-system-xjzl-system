@@ -98,7 +98,7 @@ function starTexture() {
 }
 
 /** 在 RGB 空间混合颜色；ratio 为 0~1，用于保持自定义光环色相。 */
-function mixColor(from, to, ratio) {
+export function mixColor(from, to, ratio) {
     const mix = shift => Math.round(((from >> shift) & 255) * (1 - ratio) + ((to >> shift) & 255) * ratio);
     return (mix(16) << 16) | (mix(8) << 8) | mix(0);
 }
@@ -108,9 +108,9 @@ function mixColor(from, to, ratio) {
  * 旧数据没有行为实例时才回退到创建时的 flags 快照。
  * 圆仅为视觉指示，不参与格子包含判定。
  */
-function readAuraVisual(object) {
-    const doc = object?.document;
-    const meta = doc?.getFlag("xjzl-system", "aura");
+export function readAuraVisual(object) {
+    const doc = object?.document ?? object;
+    const meta = doc?.getFlag?.("xjzl-system", "aura");
     const size = canvas.dimensions?.size ?? 0;
     if (!meta || !(size > 0)) return null;
     const behavior = doc.behaviors?.find?.(entry => entry.type === "xjzlAura");
@@ -413,4 +413,5 @@ function setAuraParticlesForScene(enabled) {
         }
         syncCoverageHighlight(object, true, enabled);
     }
+    globalThis.Hooks?.callAll?.("xjzl.auraFxSettingChanged", enabled);
 }

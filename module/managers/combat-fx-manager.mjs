@@ -2,9 +2,11 @@
  * 受击视觉管理器：在结算结果已经确定后播放 Token 动作、变色与命中粒子。
  * 特效只改变客户端画布，不参与伤害事务；事件由伤害结算端广播给所有客户端。
  */
+import { isDioramaOpen, playDioramaHitEffect, stopDioramaHitEffects } from "../utils/diorama-compat.mjs";
 
 const TEXTURE_SIZE = 256;
 const MAX_ACTIVE_GENERATORS = 72;
+const surfaceCache = new Map();
 const textureCache = new Map();
 const activeGenerators = new Set();
 const activeReactions = new Map();
@@ -97,6 +99,7 @@ export function registerCombatFxSetting() {
 
 /** 停止本客户端所有受击动作与粒子，并恢复未被核心或其他模块改写的外观。 */
 export function stopAllHitEffects() {
+  stopDioramaHitEffects();
   for (const reaction of activeReactions.values()) stopTokenReaction(reaction);
   for (const generator of activeGenerators) {
     try {
@@ -133,6 +136,37 @@ export async function renderHitEffect(payload = {}) {
   // UUID 解析期间可能切换场景或关闭选项；晚到的事件不能重新启动特效。
   if (!isEnabled() || !globalThis.canvas?.ready || canvas.scene !== scene || !token.renderable || token.destroyed
     || (!token.visible && !globalThis.game?.user?.isGM)) return;
+
+  const style = effectStyle(kind, payload.damageType);
+  const accentColor = style === "slash" ? COLORS.blade : color;
+  const attackAngle = attackerToken && attackerToken !== token
+    ? Math.atan2(token.center.y - attackerToken.center.y, token.center.x - attackerToken.center.x)
+    : -0.18;
+
+  if (isDioramaOpen()) {
+    try {
+      playDioramaHitEffect({
+        token,
+        attackerToken,
+        kind,
+        color,
+        criticalColor,
+        accentColor,
+        scale,
+        critical,
+        damageType: payload.damageType,
+        source: payload.source,
+        style,
+        attackAngle,
+        photosafe: canvas.photosensitiveMode === true,
+        surfaces: getSurfacesFor(kind, payload.damageType, style, critical)
+      });
+    } catch (error) {
+      console.error("XJZL | 2.5D 受击特效播放失败，已跳过视觉反馈。", error);
+    }
+    return;
+  }
+
   try {
     startTokenReaction(token, {kind, color, criticalColor, scale, critical, source: payload.source, attackerToken});
   } catch (error) {
@@ -143,11 +177,6 @@ export async function renderHitEffect(payload = {}) {
   // 光敏模式只保留缓慢、低强度的变色；AOE 上限只抑制粒子，不丢弃 Token 动作。
   if (canvas.photosensitiveMode || activeGenerators.size + (critical ? 3 : 2) > MAX_ACTIVE_GENERATORS) return;
   const particleScale = scale * clamp(Math.max(token.w, token.h) / 100 || 1, 0.5, 4);
-  const style = effectStyle(kind, payload.damageType);
-  const accentColor = style === "slash" ? COLORS.blade : color;
-  const attackAngle = attackerToken && attackerToken !== token
-    ? Math.atan2(token.center.y - attackerToken.center.y, token.center.x - attackerToken.center.x)
-    : -0.18;
   const generators = [];
 
   try {
@@ -460,139 +489,158 @@ function createStarGenerator(token, scale, attackAngle, color) {
 }
 
 /** 将不同伤害画成斩痕、罡气与游丝；笔锋和飞白只在首次生成纹理时绘制。 */
+function paintRingSurface(context, size, style) {
+  const center = size / 2;
+  switch (style) {
+    case "shield":
+      paintBrushArc(context, center, size * 0.36, -Math.PI * 0.2, Math.PI * 1.1, 11);
+      paintBrushArc(context, center, size * 0.36, Math.PI * 0.92, Math.PI * 0.76, 8);
+      paintBrushArc(context, center, size * 0.29, -Math.PI * 0.12, Math.PI * 0.68, 3);
+      break;
+    case "inner":
+      paintBrushArc(context, center, size * 0.34, -Math.PI * 0.8, Math.PI * 1.18, 13);
+      paintBrushArc(context, center, size * 0.24, Math.PI * 0.1, Math.PI * 0.8, 7);
+      paintBrushArc(context, center, size * 0.43, Math.PI * 0.46, Math.PI * 0.5, 3);
+      break;
+    case "flame":
+      paintBrushCut(context, 90, 195, 80, 36, 22, 12);
+      paintBrushCut(context, 127, 196, 159, 32, -38, 18);
+      paintBrushCut(context, 165, 186, 213, 76, -18, 8);
+      break;
+    case "droplet":
+      paintBrushArc(context, center, size * 0.27, Math.PI * 0.75, Math.PI * 1.4, 14);
+      paintBrushArc(context, center, size * 0.36, -Math.PI * 0.35, Math.PI * 0.74, 6);
+      paintBrushCut(context, 109, 169, 146, 65, 24, 4);
+      break;
+    case "mental":
+      paintBrushArc(context, center, size * 0.39, -Math.PI * 0.72, Math.PI * 0.5, 9);
+      paintBrushArc(context, center, size * 0.3, Math.PI * 0.25, Math.PI * 0.65, 8);
+      paintBrushCut(context, 67, 165, 204, 54, -22, 3);
+      break;
+    case "bleed":
+      paintBrushCut(context, 92, 175, 131, 31, 9, 8);
+      paintBrushCut(context, 124, 192, 160, 69, 5, 6);
+      paintBrushCut(context, 61, 179, 96, 95, -3, 4);
+      break;
+    default:
+      paintBrushCut(context, 20, 166, 237, 83, -24, 16);
+      paintBrushCut(context, 48, 192, 219, 110, -17, 6);
+      paintBrushCut(context, 47, 130, 165, 59, -10, 3);
+  }
+}
+
 function ringTexture(style) {
-  return cachedTexture(`ring-${style}`, TEXTURE_SIZE, TEXTURE_SIZE, (context, size) => {
-    const center = size / 2;
-    switch (style) {
-      case "shield":
-        paintBrushArc(context, center, size * 0.36, -Math.PI * 0.2, Math.PI * 1.1, 11);
-        paintBrushArc(context, center, size * 0.36, Math.PI * 0.92, Math.PI * 0.76, 8);
-        paintBrushArc(context, center, size * 0.29, -Math.PI * 0.12, Math.PI * 0.68, 3);
-        break;
-      case "inner":
-        paintBrushArc(context, center, size * 0.34, -Math.PI * 0.8, Math.PI * 1.18, 13);
-        paintBrushArc(context, center, size * 0.24, Math.PI * 0.1, Math.PI * 0.8, 7);
-        paintBrushArc(context, center, size * 0.43, Math.PI * 0.46, Math.PI * 0.5, 3);
-        break;
-      case "flame":
-        paintBrushCut(context, 90, 195, 80, 36, 22, 12);
-        paintBrushCut(context, 127, 196, 159, 32, -38, 18);
-        paintBrushCut(context, 165, 186, 213, 76, -18, 8);
-        break;
-      case "droplet":
-        paintBrushArc(context, center, size * 0.27, Math.PI * 0.75, Math.PI * 1.4, 14);
-        paintBrushArc(context, center, size * 0.36, -Math.PI * 0.35, Math.PI * 0.74, 6);
-        paintBrushCut(context, 109, 169, 146, 65, 24, 4);
-        break;
-      case "mental":
-        paintBrushArc(context, center, size * 0.39, -Math.PI * 0.72, Math.PI * 0.5, 9);
-        paintBrushArc(context, center, size * 0.3, Math.PI * 0.25, Math.PI * 0.65, 8);
-        paintBrushCut(context, 67, 165, 204, 54, -22, 3);
-        break;
-      case "bleed":
-        paintBrushCut(context, 92, 175, 131, 31, 9, 8);
-        paintBrushCut(context, 124, 192, 160, 69, 5, 6);
-        paintBrushCut(context, 61, 179, 96, 95, -3, 4);
-        break;
-      default:
-        paintBrushCut(context, 20, 166, 237, 83, -24, 16);
-        paintBrushCut(context, 48, 192, 219, 110, -17, 6);
-        paintBrushCut(context, 47, 130, 165, 59, -10, 3);
-    }
-  });
+  return cachedTexture(`ring-${style}`, TEXTURE_SIZE, TEXTURE_SIZE, (context, size) => paintRingSurface(context, size, style));
 }
 
 /** 小粒子沿用同一套笔触，颜色交由 tint；不把火毒和气劲画成独立图标。 */
+function paintSparkSurface(context, size, shape) {
+  const center = size / 2;
+  const gradient = context.createRadialGradient(center, center, 0, center, center, center);
+  gradient.addColorStop(0, "rgba(255,255,255,0.14)");
+  gradient.addColorStop(0.4, "rgba(255,255,255,0.05)");
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+  switch (shape) {
+    case "shield":
+      paintBrushArc(context, center, 19, -Math.PI * 0.8, Math.PI * 0.92, 5);
+      paintBrushArc(context, center, 14, Math.PI * 0.2, Math.PI * 0.6, 2);
+      break;
+    case "inner":
+      paintBrushCut(context, 32, 60, 36, 4, 12, 7);
+      paintBrushCut(context, 27, 50, 27, 15, -6, 2);
+      break;
+    case "flame":
+      paintBrushCut(context, 30, 60, 35, 4, -10, 9);
+      paintBrushCut(context, 34, 48, 45, 13, 8, 3);
+      break;
+    case "droplet":
+      paintBrushCut(context, 29, 57, 37, 5, 15, 10);
+      paintBrushCut(context, 24, 48, 29, 20, -7, 3);
+      break;
+    case "mental":
+      paintBrushCut(context, 25, 58, 39, 6, 10, 4);
+      paintBrushCut(context, 45, 54, 22, 14, -9, 2.5);
+      break;
+    case "bleed":
+      paintBrushCut(context, 30, 60, 33, 5, 3, 4);
+      context.fillStyle = "rgba(255,255,255,0.8)";
+      context.beginPath();
+      context.arc(29, 45, 3, 0, Math.PI * 2);
+      context.fill();
+      break;
+    default:
+      paintBrushCut(context, 30, 60, 34, 4, 3, 5.5);
+  }
+}
+
 function sparkTexture(kind, damageType) {
   const shape = effectStyle(kind, damageType);
-  return cachedTexture(`spark-${shape}`, 64, 64, (context, size) => {
-    const center = size / 2;
-    const gradient = context.createRadialGradient(center, center, 0, center, center, center);
-    gradient.addColorStop(0, "rgba(255,255,255,0.14)");
-    gradient.addColorStop(0.4, "rgba(255,255,255,0.05)");
-    gradient.addColorStop(1, "rgba(255,255,255,0)");
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, size, size);
-    switch (shape) {
-      case "shield":
-        paintBrushArc(context, center, 19, -Math.PI * 0.8, Math.PI * 0.92, 5);
-        paintBrushArc(context, center, 14, Math.PI * 0.2, Math.PI * 0.6, 2);
-        break;
-      case "inner":
-        paintBrushCut(context, 32, 60, 36, 4, 12, 7);
-        paintBrushCut(context, 27, 50, 27, 15, -6, 2);
-        break;
-      case "flame":
-        paintBrushCut(context, 30, 60, 35, 4, -10, 9);
-        paintBrushCut(context, 34, 48, 45, 13, 8, 3);
-        break;
-      case "droplet":
-        paintBrushCut(context, 29, 57, 37, 5, 15, 10);
-        paintBrushCut(context, 24, 48, 29, 20, -7, 3);
-        break;
-      case "mental":
-        paintBrushCut(context, 25, 58, 39, 6, 10, 4);
-        paintBrushCut(context, 45, 54, 22, 14, -9, 2.5);
-        break;
-      case "bleed":
-        paintBrushCut(context, 30, 60, 33, 5, 3, 4);
-        context.fillStyle = "rgba(255,255,255,0.8)";
-        context.beginPath();
-        context.arc(29, 45, 3, 0, Math.PI * 2);
-        context.fill();
-        break;
-      default:
-        paintBrushCut(context, 30, 60, 34, 4, 3, 5.5);
-    }
-  });
+  return cachedTexture(`spark-${shape}`, 64, 64, (context, size) => paintSparkSurface(context, size, shape));
 }
 
 /**
  * 墨点与气泡形态的微粒：不抢主笔锋，只在爆发边缘留下几枚轻小余韵。
  * 纹理按样式缓存，颜色仍由粒子 tint 统一控制。
  */
+function paintMoteSurface(context, size, style) {
+  const center = size / 2;
+  const gradient = context.createRadialGradient(center, center, 0, center, center, center);
+  gradient.addColorStop(0, "rgba(255,255,255,0.62)");
+  gradient.addColorStop(0.3, "rgba(255,255,255,0.18)");
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, size, size);
+  switch (style) {
+    case "shield":
+      paintBrushArc(context, center, 13, -Math.PI * 0.8, Math.PI * 1.25, 4);
+      break;
+    case "inner":
+    case "mental":
+      paintBrushArc(context, center, 11, -Math.PI * 0.6, Math.PI * 1.3, 3);
+      break;
+    case "flame":
+      paintBrushCut(context, 23, 43, 26, 7, -4, 5);
+      break;
+    case "droplet":
+      paintBrushCut(context, 21, 43, 27, 7, 4, 5);
+      break;
+    case "bleed":
+      context.fillStyle = "rgba(255,255,255,0.92)";
+      context.beginPath();
+      context.arc(center, center + 2, 5, 0, Math.PI * 2);
+      context.fill();
+      break;
+    default:
+      paintBrushCut(context, 15, 38, 34, 10, 3, 4);
+  }
+}
+
 function moteTexture(style) {
-  return cachedTexture(`mote-${style}`, 48, 48, (context, size) => {
-    const center = size / 2;
-    const gradient = context.createRadialGradient(center, center, 0, center, center, center);
-    gradient.addColorStop(0, "rgba(255,255,255,0.62)");
-    gradient.addColorStop(0.3, "rgba(255,255,255,0.18)");
-    gradient.addColorStop(1, "rgba(255,255,255,0)");
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, size, size);
-    switch (style) {
-      case "shield":
-        paintBrushArc(context, center, 13, -Math.PI * 0.8, Math.PI * 1.25, 4);
-        break;
-      case "inner":
-      case "mental":
-        paintBrushArc(context, center, 11, -Math.PI * 0.6, Math.PI * 1.3, 3);
-        break;
-      case "flame":
-        paintBrushCut(context, 23, 43, 26, 7, -4, 5);
-        break;
-      case "droplet":
-        paintBrushCut(context, 21, 43, 27, 7, 4, 5);
-        break;
-      case "bleed":
-        context.fillStyle = "rgba(255,255,255,0.92)";
-        context.beginPath();
-        context.arc(center, center + 2, 5, 0, Math.PI * 2);
-        context.fill();
-        break;
-      default:
-        paintBrushCut(context, 15, 38, 34, 10, 3, 4);
-    }
-  });
+  return cachedTexture(`mote-${style}`, 48, 48, (context, size) => paintMoteSurface(context, size, style));
 }
 
 /** 古金锋芒用交错的长短笔锋表达穿透感，避免星形徽记遮住受击动作。 */
+function paintStarSurface(context) {
+  paintBrushCut(context, 4, 58, 58, 5, -2, 6);
+  paintBrushCut(context, 9, 15, 51, 48, 2, 3);
+  paintBrushCut(context, 16, 59, 58, 18, -4, 1.5);
+}
+
 function starTexture() {
-  return cachedTexture("critical-blade", 64, 64, context => {
-    paintBrushCut(context, 4, 58, 58, 5, -2, 6);
-    paintBrushCut(context, 9, 15, 51, 48, 2, 3);
-    paintBrushCut(context, 16, 59, 58, 18, -4, 1.5);
-  });
+  return cachedTexture("critical-blade", 64, 64, paintStarSurface);
+}
+
+/** 为 2.5D 叠加层获取已烘焙的离屏画布，共用同一份笔触缓存而不依赖 PIXI。 */
+function getSurfacesFor(kind, damageType, style, critical) {
+  const shape = effectStyle(kind, damageType);
+  return {
+    ring: cachedSurface(`ring-${style}`, TEXTURE_SIZE, TEXTURE_SIZE, (ctx, size) => paintRingSurface(ctx, size, style)),
+    spark: cachedSurface(`spark-${shape}`, 64, 64, (ctx, size) => paintSparkSurface(ctx, size, shape)),
+    mote: cachedSurface(`mote-${style}`, 48, 48, (ctx, size) => paintMoteSurface(ctx, size, style)),
+    star: critical ? cachedSurface("critical-blade", 64, 64, paintStarSurface) : null
+  };
 }
 
 /** 圆弧只作为笔锋的中轴；变宽、收尖和飞白由 paintBrushRibbon 处理。 */
@@ -677,14 +725,21 @@ function paintBrushRibbon(context, points, width) {
   context.restore();
 }
 
-function cachedTexture(key, width, height, paint) {
-  if (textureCache.has(key)) return textureCache.get(key);
+function cachedSurface(key, width, height, paint) {
+  if (surfaceCache.has(key)) return surfaceCache.get(key);
   const surface = document.createElement("canvas");
   surface.width = width;
   surface.height = height;
   const context = surface.getContext("2d");
   if (!context) throw new Error("无法创建受击特效纹理画布。");
   paint(context, width, height);
+  surfaceCache.set(key, surface);
+  return surface;
+}
+
+function cachedTexture(key, width, height, paint) {
+  if (textureCache.has(key)) return textureCache.get(key);
+  const surface = cachedSurface(key, width, height, paint);
   const texture = PIXI.Texture.from(surface);
   textureCache.set(key, texture);
   return texture;

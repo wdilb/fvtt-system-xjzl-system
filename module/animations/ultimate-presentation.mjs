@@ -3,6 +3,7 @@
  * 拥有自己的 Canvas/DOM/RAF 与可取消的屏幕反冲，不修改 Foundry 相机、Token 或业务文档。
  */
 import { getUltimateMaterials } from "./ultimate-materials.mjs";
+import { getDioramaRecoilElement, getDioramaTokenScreenPoint, isDioramaOpen } from "../utils/diorama-compat.mjs";
 
 export const ULTIMATE_PRESETS = Object.freeze([
   Object.freeze({id: "stars", color: "159,194,247", accent: "#e7d5aa", duration: 6800}),
@@ -182,8 +183,15 @@ export class UltimatePresentation {
 
   /** 前段居中展示，收束前移向实时 Token 投影；释放原点不钳制到屏幕内或侧栏边缘。 */
   draw(time) {
-    const point = canvas.stage.worldTransform.apply(this.token.center), screen = canvas.app.renderer.screen;
-    this.targetX = point.x * this.width / screen.width;this.targetY = point.y * this.height / screen.height;
+    const dioramaPoint = isDioramaOpen() ? getDioramaTokenScreenPoint(this.token) : null;
+    if (dioramaPoint) {
+      const rootRect = this.root.getBoundingClientRect();
+      this.targetX = dioramaPoint.x - rootRect.left;
+      this.targetY = dioramaPoint.y - rootRect.top;
+    } else {
+      const point = canvas.stage.worldTransform.apply(this.token.center), screen = canvas.app.renderer.screen;
+      this.targetX = point.x * this.width / screen.width;this.targetY = point.y * this.height / screen.height;
+    }
     const binding = this.reduced ? 0 : smooth(phase(time, 2650, 3900));
     this.cx = mix(this.identityX, this.targetX, binding);this.cy = mix(this.height * .48, this.targetY, binding);
     for (const motion of this.recoil || []) motion.currentTime = time;
@@ -220,8 +228,9 @@ export class UltimatePresentation {
       keyframes.push({offset: time / this.preset.duration, translate: x.toFixed(3) + "px " + y.toFixed(3) + "px"});
     }
     this.recoil = [];
+    const stageElement = (isDioramaOpen() ? getDioramaRecoilElement() : null) ?? this.board;
     // 独立 translate 可与核心定位及其他动画合成；cancel 会自动撤销，不需要回写旧样式。
-    for (const element of [this.board, this.surface]) {
+    for (const element of [stageElement, this.surface]) {
       const motion = element.animate(keyframes, {duration: this.preset.duration, composite: "add", fill: "none", id: "xjzl-ultimate-recoil"});
       this.recoil.push(motion);motion.pause();motion.currentTime = 0;
     }

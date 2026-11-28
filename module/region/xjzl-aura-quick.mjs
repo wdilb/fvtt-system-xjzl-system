@@ -11,6 +11,7 @@
  */
 
 import {drawAuraCircle, isParticlesEnabled, refreshAuraFx, startAuraParticles, stopAuraParticles} from "./xjzl-aura-fx.mjs";
+import {isDioramaOpen, setDioramaPlacementPreview} from "../utils/diorama-compat.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -153,10 +154,14 @@ function beginPlacement(params) {
             preview.lineTo(center.x + 8, center.y);
             preview.moveTo(center.x, center.y - 8);
             preview.lineTo(center.x, center.y + 8);
+            if (isDioramaOpen()) {
+                setDioramaPlacementPreview({x: center.x, y: center.y, radiusPx: r, color: params.color ?? DEFAULT_COLOR});
+            }
             return center;
         };
 
         const cleanup = () => {
+            setDioramaPlacementPreview(null);
             canvas.stage.off("pointermove", onMove);
             canvas.stage.off("pointerdown", onDown);
             canvas.stage.off("pointerdown", onDownCapture);

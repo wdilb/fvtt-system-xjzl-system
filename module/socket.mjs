@@ -7,6 +7,7 @@ import { assertNoSyncScriptWrite } from "./utils/sync-script-guard.mjs";
 import { AuraLedger } from "./region/xjzl-aura-ledger.mjs";
 import { renderHitEffect } from "./managers/combat-fx-manager.mjs";
 import { renderUltimateEffect } from "./managers/ultimate-fx-manager.mjs";
+import { floatDioramaText, isDioramaOpen } from "./utils/diorama-compat.mjs";
 
 export let xjzlSocket;
 
@@ -389,6 +390,8 @@ async function _socketShowScrollingText(tokenUuid, text, settings) {
     if (!tokenObject.visible && !game.user.isGM) return;
 
     // 4. 执行渲染
+    // 2.5D 开启时转发给立牌头顶飘字，跳过被遮挡的 2D 画布绘制
+    if (isDioramaOpen() && floatDioramaText(tokenObject, text, settings)) return;
     // 使用 interface.createScrollingText 确保是 UI 层面的绘制
     canvas.interface.createScrollingText(tokenObject.center, text, settings);
 }

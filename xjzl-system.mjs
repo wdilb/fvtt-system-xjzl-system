@@ -79,6 +79,7 @@ import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs
 import { runResourceSync, isResourceSyncRunning } from "./module/managers/resource-sync-manager.mjs";
 import { XJZLResourceSyncReport } from "./module/applications/resource-sync-report.mjs";
 import { registerAEMigrationSetting, runAEMigrationsIfNeeded } from "./module/migration/ae-migration.mjs";
+import { initDioramaCompat } from "./module/utils/diorama-compat.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -731,6 +732,9 @@ Hooks.once("ready", async function () {
 
   //目标选择管理器，修改为按下ALT后左键点击选择目标
   TargetManager.init();
+
+  // 初始化 2.5D 视图（rutz-diorama）隔离兼容层；未启用该模块时零侵入直接返回
+  initDioramaCompat();
 
   //战斗追踪器先攻拖拽重排：GM 拖拽条目直接调整先攻顺序（整数取值，挤开级联）
   CombatReorderManager.init();

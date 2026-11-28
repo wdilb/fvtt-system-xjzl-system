@@ -2,6 +2,15 @@
  * 目标管理器：维护原生 ALT 瞄准，以及人工出招时的本地目标选择会话。
  * 选择会话只在本地绘制预览；确认后由调用方在进入脚本/扣费前同步原生目标。
  */
+import {
+    cancelDioramaRightClickDrag,
+    getDioramaCanvasRect,
+    getDioramaTokenScreenBounds,
+    isDioramaCanvasTarget,
+    isDioramaOpen,
+    panDioramaBy,
+    pickDioramaToken
+} from "../utils/diorama-compat.mjs";
 
 /**
  * 判断一次调用应走哪种目标来源。`skipTargetSelection` 的源数据值优先；
@@ -339,12 +348,25 @@ export class TargetManager {
     static _onSelectionPointerUp(event) {
         const state = this._activeSelection;
         if (state && !state.settled && event.button === 2 && state.rightPointer) {
-            const moved = state.rightPointer.moved;
+            const onDiorama = isDioramaOpen() && isDioramaCanvasTarget(event.target);
+            const moved = state.rightPointer.moved
+                || (onDiorama && Math.hypot(event.clientX - state.rightPointer.x, event.clientY - state.rightPointer.y) > 5);
             state.rightPointer = null;
             if (moved) {
                 // 右拖已经完成平移；阻止松开后的原生菜单，但不要终结选择会话。
                 state.rightDragMoved = true;
                 this._suppressContextMenuUntil = Date.now() + 250;
+                return;
+            }
+            if (onDiorama) {
+                // 2.5D 视图在 pointerup 即调用 onCellContext（clickMove="right" 时会先触发移动），
+                // 因此仅在 2.5D 棋盘上截断未拖动的右键松开；2D 画布必须放行 pointerup 让鼠标管理器收尾。
+                this._suppressContextMenuUntil = Date.now() + 1000;
+                this._suppressClickUntil = Date.now() + 350;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                cancelDioramaRightClickDrag();
+                void this._finishSelection(state, null);
             }
             return;
         }
@@ -399,8 +421,9 @@ export class TargetManager {
             return;
         }
         state.pointer = { x: event.clientX, y: event.clientY };
-        const view = canvas.app?.view;
-        const rect = view?.getBoundingClientRect?.();
+        const rect = isDioramaOpen()
+            ? getDioramaCanvasRect()
+            : canvas.app?.view?.getBoundingClientRect?.();
         state.edgeScroll = this._getEdgeScrollVector(event.clientX, event.clientY, rect);
     }
 
@@ -429,7 +452,13 @@ export class TargetManager {
      */
     static _panSelectionAtEdge(state, elapsed) {
         const { x, y } = state.edgeScroll ?? {};
-        if ((!x && !y) || !canvas?.stage?.pivot || typeof canvas.pan !== "function") return;
+        if (!x && !y) return;
+        if (isDioramaOpen()) {
+            const stepPx = (elapsed / 16.667) * 14;
+            panDioramaBy(x * stepPx, y * stepPx);
+            return;
+        }
+        if (!canvas?.stage?.pivot || typeof canvas.pan !== "function") return;
         const scale = Math.max(0.1, Number(canvas.stage.scale?.x) || 1);
         const step = (elapsed / 16.667) * 10 / scale;
         canvas.pan({
@@ -439,6 +468,7 @@ export class TargetManager {
     }
 
     static _isCanvasEvent(event) {
+        if (isDioramaOpen()) return isDioramaCanvasTarget(event.target);
         return event.target === canvas.app?.view || event.target?.id === "board";
     }
 
@@ -564,6 +594,7 @@ export class TargetManager {
 
     static _tokenAtPoint(point, candidates) {
         if (!point) return null;
+        if (isDioramaOpen()) return pickDioramaToken(point.x, point.y, candidates);
         for (let i = candidates.length - 1; i >= 0; i--) {
             const token = candidates[i];
             if (!isSelectableTarget(token, canvas.scene)) continue;
@@ -746,6 +777,7 @@ export class TargetManager {
      * 状态图标和姓名，不能用作 Token 的中心、命中框或连线端点。
      */
     static _getScreenBounds(token) {
+        if (isDioramaOpen()) return getDioramaTokenScreenBounds(token);
         const bounds = token?.bounds;
         if (!bounds || !canvas.stage) return null;
         const view = canvas.app?.view;
